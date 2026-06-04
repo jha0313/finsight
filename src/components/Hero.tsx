@@ -50,10 +50,10 @@ export function Hero({
             <span className="nav-link !text-on-dark">{brandName}</span>
           </div>
 
-          <h1 className="font-finsight-display text-[44px] leading-none font-normal tracking-[-0.025em] text-on-dark sm:text-[64px] lg:text-[80px]">
+          <h1 className="font-finsight-display text-[44px] leading-none font-normal tracking-[-0.025em] !text-on-dark sm:text-[64px] lg:text-[80px]">
             {headline}
           </h1>
-          <p className="body-md mt-lg max-w-xl !text-on-dark-soft">
+          <p className="body-md mt-lg max-w-[36rem] !text-on-dark-soft">
             {description}
           </p>
           <div className="mt-xl">
