@@ -7,7 +7,8 @@
       "name": "polar-adapter",
       "status": "completed",
       "started_at": "2026-06-04T13:23:13+0900",
-      "summary": "Added lazy Polar checkout creation, raw-body webhook verification, and subscription upsert normalization."
+      "summary": "Added lazy Polar checkout creation, raw-body webhook verification, and subscription upsert normalization.",
+      "completed_at": "2026-06-04T13:29:39+0900"
     },
     {
       "step": 1,
