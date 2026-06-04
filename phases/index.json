@@ -4,6 +4,10 @@
       "dir": "0-foundation",
       "status": "completed",
       "completed_at": "2026-06-04T11:27:35+0900"
+    },
+    {
+      "dir": "1-core-loop",
+      "status": "pending"
     }
   ]
 }
