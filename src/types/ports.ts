@@ -20,6 +20,11 @@ export interface StatementRepository {
   ): Promise<{ statementId: string }>;
 }
 
+export interface AiUsageGateway {
+  getCachedInsights(userId: string, inputHash: string): Promise<unknown | null>;
+  tryConsumeDailyQuota(userId: string, tier: Tier): Promise<boolean>;
+}
+
 export interface SaveStatementAnalysisInput {
   userId: string;
   statement: {

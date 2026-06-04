@@ -3,6 +3,7 @@ import type { CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type {
+  AiUsageGateway,
   StatementRepository,
   SubscriptionGateway,
 } from "@/types/ports";
@@ -290,10 +291,7 @@ export function createSubscriptionGateway(): SubscriptionGateway {
   };
 }
 
-export function createAiUsage(): {
-  getCachedInsights(userId: string, inputHash: string): Promise<unknown | null>;
-  tryConsumeDailyQuota(userId: string, tier: Tier): Promise<boolean>;
-} {
+export function createAiUsage(): AiUsageGateway {
   return {
     async getCachedInsights(userId, inputHash) {
       const supabase = createServerSupabaseClient();

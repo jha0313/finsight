@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProInsights } from "@/types/analysis";
-import type { InsightProvider } from "@/types/ports";
+import type {
+  AiUsageGateway,
+  InsightProvider,
+  StatementRepository,
+  SubscriptionGateway,
+} from "@/types/ports";
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
 
-import { runAnalysis } from "./index";
+import { runAnalysis, runAnalyzeRequest } from "./index";
 
 const STANDARD_CSV = `date,merchant,amount,currency,account
 2026-06-01,스타벅스,5500,KRW,1234-5678-9012-3456
@@ -29,6 +34,75 @@ class FakeInsightProvider implements InsightProvider {
 
     return this.handler(input);
   }
+}
+
+function createAnalyzeRequestDeps(input: {
+  userId?: string | null;
+  tier?: Tier;
+  quotaOk?: boolean;
+  cachedInsights?: unknown | null;
+  insightProvider?: InsightProvider;
+}) {
+  const statementRepository: StatementRepository & {
+    calls: Parameters<StatementRepository["saveStatementAnalysis"]>[0][];
+  } = {
+    calls: [],
+    async saveStatementAnalysis(saveInput) {
+      this.calls.push(saveInput);
+
+      return { statementId: "statement-1" };
+    },
+  };
+  const subscriptionGateway: SubscriptionGateway & { calls: string[] } = {
+    calls: [],
+    async resolveTier(userId) {
+      this.calls.push(userId);
+
+      return input.tier ?? "free";
+    },
+  };
+  const aiUsage: AiUsageGateway & {
+    cacheCalls: Array<{ userId: string; inputHash: string }>;
+    quotaCalls: Array<{ userId: string; tier: Tier }>;
+  } = {
+    cacheCalls: [],
+    quotaCalls: [],
+    async getCachedInsights(userId, inputHash) {
+      this.cacheCalls.push({ userId, inputHash });
+
+      return input.cachedInsights ?? null;
+    },
+    async tryConsumeDailyQuota(userId, tier) {
+      this.quotaCalls.push({ userId, tier });
+
+      return input.quotaOk ?? true;
+    },
+  };
+  const insightProvider =
+    input.insightProvider ??
+    new FakeInsightProvider(() => ({
+      summary: "AI 요약",
+      insights: ["지출을 점검하세요."],
+    }));
+  const insightProviderFactory = () => insightProvider;
+
+  return {
+    deps: {
+      async getCurrentUser() {
+        return input.userId === null
+          ? null
+          : { id: input.userId ?? "user-1" };
+      },
+      subscriptionGateway,
+      aiUsage,
+      statementRepository,
+      insightProviderFactory,
+    },
+    aiUsage,
+    insightProvider,
+    statementRepository,
+    subscriptionGateway,
+  };
 }
 
 describe("runAnalysis", () => {
@@ -191,5 +265,181 @@ one,two`,
       },
     });
     expect(provider.calls).toHaveLength(1);
+  });
+});
+
+describe("runAnalyzeRequest", () => {
+  it("returns 401 for unauthenticated users before resolving subscription state", async () => {
+    const { deps, statementRepository, subscriptionGateway } =
+      createAnalyzeRequestDeps({
+        userId: null,
+      });
+
+    const result = await runAnalyzeRequest({
+      csv: STANDARD_CSV,
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 401,
+      body: { error: "unauthorized" },
+    });
+    expect(subscriptionGateway.calls).toEqual([]);
+    expect(statementRepository.calls).toEqual([]);
+  });
+
+  it("resolves free tier through the subscription gateway and saves one RPC payload", async () => {
+    const provider = new FakeInsightProvider(({ tier }) => ({
+      summary: `${tier} 요약`,
+      insights: ["무료 분석"],
+    }));
+    const { deps, aiUsage, statementRepository, subscriptionGateway } =
+      createAnalyzeRequestDeps({
+        tier: "free",
+        insightProvider: provider,
+      });
+
+    const result = await runAnalyzeRequest({
+      csv: STANDARD_CSV,
+      deps,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.tier).toBe("free");
+    expect(result.body.pro).toEqual({
+      status: "locked",
+      insights: {
+        summary: "free 요약",
+        insights: ["무료 분석"],
+      },
+    });
+    expect(result.body.free.byCategory).toEqual([
+      { category: "food", total: "5500.00", count: 1 },
+      { category: "transport", total: "1500.00", count: 1 },
+    ]);
+    expect(subscriptionGateway.calls).toEqual(["user-1"]);
+    expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "free" }]);
+    expect(provider.calls).toHaveLength(1);
+    expect(statementRepository.calls).toHaveLength(1);
+    expect(statementRepository.calls[0]).toMatchObject({
+      userId: "user-1",
+      statement: {
+        status: "ready",
+      },
+      analysis: {
+        model: "claude-sonnet-4-6",
+        result: {
+          summary: "free 요약",
+          insights: ["무료 분석"],
+        },
+      },
+    });
+    expect(statementRepository.calls[0].statement.sourceHash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
+    expect(statementRepository.calls[0].analysis?.inputHash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
+  });
+
+  it("returns active pro status for DB-resolved pro users", async () => {
+    const provider = new FakeInsightProvider(({ tier }) => ({
+      summary: `${tier} 심층 분석`,
+      insights: ["고급 절약 인사이트"],
+    }));
+    const { deps, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      insightProvider: provider,
+    });
+
+    const result = await runAnalyzeRequest({
+      csv: STANDARD_CSV,
+      deps,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.tier).toBe("pro");
+    expect(result.body.pro).toEqual({
+      status: "active",
+      insights: {
+        summary: "pro 심층 분석",
+        insights: ["고급 절약 인사이트"],
+      },
+    });
+    expect(statementRepository.calls[0].analysis?.model).toBe(
+      "claude-opus-4-8",
+    );
+  });
+
+  it("skips Claude when daily quota is exhausted while preserving free analysis", async () => {
+    let insightProviderCreated = false;
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      quotaOk: false,
+    });
+    deps.insightProviderFactory = () => {
+      insightProviderCreated = true;
+
+      return new FakeInsightProvider(() => ({
+        summary: "should not run",
+        insights: [],
+      }));
+    };
+
+    const result = await runAnalyzeRequest({
+      csv: STANDARD_CSV,
+      deps,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.pro).toEqual({ status: "unavailable" });
+    expect(result.body.free.trend).toEqual([
+      { period: "2026-06", total: "7000.00" },
+    ]);
+    expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(insightProviderCreated).toBe(false);
+    expect(statementRepository.calls).toHaveLength(1);
+    expect(statementRepository.calls[0].analysis).toBeUndefined();
+  });
+
+  it("uses cached insights without consuming quota or creating a Claude provider", async () => {
+    let insightProviderCreated = false;
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      cachedInsights: {
+        summary: "캐시된 심층 분석",
+        insights: ["이미 계산된 인사이트"],
+      },
+    });
+    deps.insightProviderFactory = () => {
+      insightProviderCreated = true;
+
+      return new FakeInsightProvider(() => ({
+        summary: "should not run",
+        insights: [],
+      }));
+    };
+
+    const result = await runAnalyzeRequest({
+      csv: STANDARD_CSV,
+      deps,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.pro).toEqual({
+      status: "active",
+      insights: {
+        summary: "캐시된 심층 분석",
+        insights: ["이미 계산된 인사이트"],
+      },
+    });
+    expect(aiUsage.cacheCalls[0]).toMatchObject({ userId: "user-1" });
+    expect(aiUsage.cacheCalls[0].inputHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(aiUsage.quotaCalls).toEqual([]);
+    expect(insightProviderCreated).toBe(false);
+    expect(statementRepository.calls[0].analysis?.result).toEqual({
+      summary: "캐시된 심층 분석",
+      insights: ["이미 계산된 인사이트"],
+    });
   });
 });
