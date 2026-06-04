@@ -79,6 +79,13 @@ type RpcTransaction = {
   rowHash: string;
 };
 
+export function isSupabaseConfigured(): boolean {
+  return (
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+    Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+  );
+}
+
 export function createServerSupabaseClient(): SupabaseClient {
   return createSupabaseClientWithCookies({
     getAll: getAllRequestCookies,
@@ -229,6 +236,10 @@ function createSupabaseClientWithCookies(
 }
 
 export async function getCurrentUser(): Promise<{ id: string } | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase.auth.getUser();
 

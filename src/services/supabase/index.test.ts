@@ -11,6 +11,7 @@ import {
   createSubscriptionGateway,
   exchangeAuthCodeForSession,
   getCurrentUser,
+  isSupabaseConfigured,
   resolveAuthCallbackRedirect,
   resolveMiddlewareAuthDecision,
   sanitizeRedirectPath,
@@ -160,6 +161,23 @@ describe("supabase adapter", () => {
     expect(user).toEqual({ id: "user-1" });
     expect(supabaseMocks.authGetUser).toHaveBeenCalledTimes(1);
     expect(supabaseMocks.authGetSession).not.toHaveBeenCalled();
+  });
+
+  it("reports configuration from the publishable env presence", () => {
+    expect(isSupabaseConfigured()).toBe(true);
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    expect(isSupabaseConfigured()).toBe(false);
+  });
+
+  it("returns null user without throwing when Supabase is not configured", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    supabaseMocks.createServerClient.mockClear();
+
+    await expect(getCurrentUser()).resolves.toBeNull();
+    expect(supabaseMocks.createServerClient).not.toHaveBeenCalled();
+    expect(supabaseMocks.authGetUser).not.toHaveBeenCalled();
   });
 
   it("starts Google OAuth through Supabase with the provided callback URL", async () => {

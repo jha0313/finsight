@@ -8,6 +8,7 @@ const authMocks = vi.hoisted(() => {
   const authGetUser = vi.fn();
   const createMiddlewareSupabaseClient = vi.fn();
   const getResponse = vi.fn();
+  const isSupabaseConfigured = vi.fn();
   const resolveMiddlewareAuthDecision = vi.fn();
 
   return {
@@ -15,18 +16,21 @@ const authMocks = vi.hoisted(() => {
     authGetUser,
     createMiddlewareSupabaseClient,
     getResponse,
+    isSupabaseConfigured,
     resolveMiddlewareAuthDecision,
   };
 });
 
 vi.mock("@/services/supabase", () => ({
   createMiddlewareSupabaseClient: authMocks.createMiddlewareSupabaseClient,
+  isSupabaseConfigured: authMocks.isSupabaseConfigured,
   resolveMiddlewareAuthDecision: authMocks.resolveMiddlewareAuthDecision,
 }));
 
 describe("middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authMocks.isSupabaseConfigured.mockReturnValue(true);
     authMocks.createMiddlewareSupabaseClient.mockReturnValue({
       getResponse: authMocks.getResponse,
       supabase: {
@@ -85,5 +89,21 @@ describe("middleware", () => {
       search: "",
     });
     expect(response).toBe(nextResponse);
+  });
+
+  it("treats requests as unauthenticated without a Supabase client when not configured", async () => {
+    authMocks.isSupabaseConfigured.mockReturnValue(false);
+    authMocks.resolveMiddlewareAuthDecision.mockReturnValue({ type: "next" });
+
+    const response = await middleware(new NextRequest("https://finsight.test/"));
+
+    expect(authMocks.createMiddlewareSupabaseClient).not.toHaveBeenCalled();
+    expect(authMocks.authGetUser).not.toHaveBeenCalled();
+    expect(authMocks.resolveMiddlewareAuthDecision).toHaveBeenCalledWith({
+      isAuthenticated: false,
+      pathname: "/",
+      search: "",
+    });
+    expect(response).toBeInstanceOf(NextResponse);
   });
 });
