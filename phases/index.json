@@ -12,7 +12,8 @@
     },
     {
       "dir": "2-api-dashboard",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-06-04T13:16:43+0900"
     }
   ]
 }
