@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-block-dangerous.sh\"",
+            "timeout": 10,
+            "statusMessage": "위험 명령 검사"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-tdd-guard.sh\"",
+            "timeout": 15,
+            "statusMessage": "TDD 가드 검사"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/scripts/hooks/codex-verify-gate.sh\"",
+            "timeout": 600,
+            "statusMessage": "lint·build·test 게이트"
+          }
+        ]
+      }
+    ]
+  }
+}

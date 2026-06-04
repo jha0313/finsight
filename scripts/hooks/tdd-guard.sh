@@ -11,6 +11,15 @@ if [ -z "$FILE_PATH" ]; then
   exit 0
 fi
 
+# 프로젝트가 아직 스캐폴딩되지 않았으면(package.json 없음) TDD 가드를 건너뛴다.
+# 테스트 프레임워크가 깔리기 전(MVP 부트스트랩)에는 강제할 대상이 없기 때문.
+# package.json이 생기면 이후 모든 lib/소스 편집에 TDD가 적용된다.
+# (Claude .claude/settings.json 과 codex .codex/hooks.json 양쪽에서 공유하는 스크립트)
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+if [ ! -f "$ROOT/package.json" ]; then
+  exit 0
+fi
+
 # 테스트 파일 자체를 수정하는 건 허용
 case "$FILE_PATH" in
   *test*|*spec*|*.test.*|*.spec.*|*__tests__*)
