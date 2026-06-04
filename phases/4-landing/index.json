@@ -7,7 +7,8 @@
       "name": "landing-sections",
       "status": "completed",
       "started_at": "2026-06-04T14:01:21+0900",
-      "summary": "Hero, FeatureGrid, SecuritySection, PricingTable 렌더 테스트와 랜딩 조립을 추가하고 FeatureGrid 하단에 step 1 샘플 데모 슬롯을 예약"
+      "summary": "Hero, FeatureGrid, SecuritySection, PricingTable 렌더 테스트와 랜딩 조립을 추가하고 FeatureGrid 하단에 step 1 샘플 데모 슬롯을 예약",
+      "completed_at": "2026-06-04T14:10:58+0900"
     },
     {
       "step": 1,
