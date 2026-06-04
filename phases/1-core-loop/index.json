@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "analysis",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T11:59:18+0900",
+      "summary": "Rule-based Free analysis added with category/trend aggregation plus subscription leak and outlier detection, all covered by TDD.",
+      "completed_at": "2026-06-03T20:03:07-0700"
     },
     {
       "step": 4,
