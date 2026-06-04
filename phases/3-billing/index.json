@@ -1,0 +1,29 @@
+{
+  "project": "finsight",
+  "phase": "3-billing",
+  "steps": [
+    {
+      "step": 0,
+      "name": "polar-adapter",
+      "status": "completed",
+      "started_at": "2026-06-04T13:23:13+0900",
+      "summary": "Added lazy Polar checkout creation, raw-body webhook verification, and subscription upsert normalization."
+    },
+    {
+      "step": 1,
+      "name": "checkout-route",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "webhook-route",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "upgrade-ui",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-06-04T13:23:13+0900"
+}
