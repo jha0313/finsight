@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "dashboard-page",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T13:09:36+0900",
+      "summary": "인증 대시보드 페이지, CSV 업로드 상태 흐름, Free 차트와 Pro 잠금/불가/활성 결과 렌더링을 결선",
+      "completed_at": "2026-06-04T13:15:13+0900"
     }
   ],
   "created_at": "2026-06-04T12:25:04+0900"

@@ -17,7 +17,8 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
         title="Pro 분석 잠금"
       >
         <p className="body-sm">
-          구독 상태가 활성화되면 Opus 심층 분석을 표시합니다.
+          Free 분석 결과를 먼저 표시합니다. Pro 구독이 활성화되면 Opus
+          심층 분석을 이어서 표시합니다.
         </p>
       </InsightShell>
     );
