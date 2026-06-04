@@ -32,7 +32,7 @@
       "status": "completed",
       "started_at": "2026-06-04T12:49:46+0900",
       "summary": "POST /api/analyze를 getUser 인증, DB 티어/캐시/쿼터, Claude 주입, RPC 저장 흐름으로 와이어링",
-      "completed_at": "2026-06-03T20:56:20-0700"
+      "completed_at": "2026-06-04T12:57:31+0900"
     },
     {
       "step": 4,
