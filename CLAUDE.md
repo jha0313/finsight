@@ -7,14 +7,14 @@
 - TypeScript strict mode
 - Tailwind CSS
 - 테스트: Vitest
-- AI(Pro 전용): Anthropic Claude — `@anthropic-ai/sdk` structured outputs(`messages.parse` + `output_config.format` + `zodOutputFormat()` → 검증된 `parsed_output`), 모델 `claude-opus-4-8`
+- AI: Anthropic Claude — `@anthropic-ai/sdk` structured outputs(`messages.parse` + `output_config.format` + `zodOutputFormat()` → 검증된 `parsed_output`). 티어별 모델 라우팅: Free=`claude-sonnet-4-6`, Pro=`claude-opus-4-8`
 - 인증/DB: Supabase (`@supabase/ssr`, Postgres RLS, 구글 OAuth)
 - 결제: Polar.sh (`@polar-sh/nextjs`, Merchant of Record)
-- 배포: Vercel (CLI 자동배포) · UI 언어 영어(1차 타겟: 글로벌 얼리어답터)
+- 배포: Vercel (CLI 자동배포) · UI 언어 한국어 우선(글로벌 확장 지향, i18n 후속)
 
 ## 티어
-- Free: 규칙·통계 분석만(카테고리 분류·기간 추이·이상거래/구독누수 탐지). **LLM 호출 0**.
-- Pro: 위 전부 + Claude(`claude-opus-4-8`) 자연어 요약·절약 인사이트.
+- Free: 규칙·통계 분석(카테고리 분류·기간 추이·이상거래/구독누수 탐지) + Claude **Sonnet**(`claude-sonnet-4-6`) 자연어 요약·인사이트.
+- Pro: 위 전부 + Claude **Opus**(`claude-opus-4-8`) 심층 분석(더 깊은 절약 인사이트·고급 분석).
 
 ## 아키텍처 규칙
 - CRITICAL: 레이어 의존성은 단방향. `lib/`는 `services/`와 외부 SDK(`@anthropic-ai/sdk`·`@supabase/*`·`@polar-sh/*`)를 import하지 마라. 이유: 네트워크 결합이 생기면 mock-first(키 없이 테스트)가 깨진다. lib는 `types/`의 포트 인터페이스에만 의존하고, 실제 어댑터는 route handler(composition root)에서 주입한다. (Zod 등 순수 유틸은 예외)
@@ -24,10 +24,10 @@
 - CRITICAL: 금액은 `numeric`을 쓰고 float을 쓰지 마라. CSV 파싱 시 통화기호·콤마·괄호음수를 정규화하고 부호 규약(지출 양수/환불 음수)을 `direction(debit/credit/refund)`으로 단일화하라. 합계/소계 요약행은 필터링하라. 틀리면 모든 분석이 조용히 반대로 나온다.
 - CRITICAL: CSV 컬럼 매핑은 **표준 파서 우선**, 인식 실패 시에만 **Claude 폴백 매핑** → 사용자 1회 확인/수정 → 이후 결정론적 파싱. 표준 경로는 LLM 0.
 - CRITICAL: 카드·계좌번호 등 직접 식별자는 **적재 시 마스킹**해 전체값을 평문으로 저장하지 마라(전체 PAN 미보관). MVP는 마스킹 + Supabase at-rest + RLS로 보호하고 컬럼 암호화(pgcrypto)는 Post-MVP. dedup용 hash는 정규화된 평문 기준으로 계산해 별도 컬럼에 둔다.
-- CRITICAL: Claude(Pro)에는 **카드·계좌번호를 마스킹한 거래 단위**(가맹점명·금액·날짜·카테고리)만 전달하라. 전체 식별자는 절대 외부로 내보내지 마라. 대용량은 행 상한/요약으로 토큰을 방어한다. 모델 `claude-opus-4-8`은 latency가 크므로 `timeout`(예: 30s)을 두고, 실패·초과 시 Free 결과는 보존하고 `pro.status=unavailable`로 격리하라.
+- CRITICAL: Claude에는 **카드·계좌번호를 마스킹한 거래 단위**(가맹점명·금액·날짜·카테고리)만 전달하라(Free=Sonnet, Pro=Opus). 전체 식별자는 절대 외부로 내보내지 마라. 대용량은 행 상한/요약으로 토큰을 방어한다. opus는 latency가 크므로 `timeout`(예: 30s)을 두고, 실패·초과 시 규칙·통계 결과는 보존하고 AI 인사이트는 `unavailable`로 격리하라.
 - CRITICAL: 체크아웃의 `customerExternalId`는 클라이언트 입력이 아니라 **서버 세션 `getUser().id`로 강제**하라.
 - CRITICAL: 분석은 **동기 처리**. `statements`·`transactions`·`analyses` 저장은 일반 다중 호출이 아니라 **Postgres RPC 단일 트랜잭션**(`save_statement_analysis`)으로 하고, 중간 실패 시 전체 rollback하라. Vercel `maxDuration`을 상향하라.
-- Pro 분석 결과는 `analyses`에 **`unique(user_id, input_hash)`** 로 캐시 — 동일 입력(거래 단위 입력+모델+프롬프트 버전) 재분석 시 opus 재호출을 skip한다. Pro 호출은 `ai_usage_daily` 원자 카운터로 **일일 quota**를 적용한다.
+- AI 분석 결과는 `analyses`에 **`unique(user_id, input_hash)`** 로 캐시 — 동일 입력(거래 단위 입력+모델+프롬프트 버전) 재분석 시 재호출을 skip한다. Claude 호출(Free=Sonnet/Pro=Opus)은 `ai_usage_daily` 원자 카운터로 **tier별 일일 quota**를 적용한다.
 - 웹훅은 **raw body 서명검증** + `processed_webhook_events.event_id` 선삽입으로 멱등 처리한다.
 - 컴포넌트는 props만 받는 dumb으로 만들고, 계산·포맷·파싱·마스킹 로직은 `lib/`로 분리(TDD 대상)한다. 디렉토리: `src/{app,components,lib,services,types}`.
 

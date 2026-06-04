@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 ## 철학
-MVP 속도 최우선. "작동하는 최소"가 미덕 — 운영하다 필요해지는 것은 출시 전에 짓지 않는다. 단, 핀테크라 **보안·금액 정합성·프라이버시 경계는 타협하지 않는다**: "무엇을 저장하고 무엇을 외부로 보내느냐"를 결정의 기준으로 둔다. 1차 타겟은 글로벌(영어권) 얼리어답터.
+MVP 속도 최우선. "작동하는 최소"가 미덕 — 운영하다 필요해지는 것은 출시 전에 짓지 않는다. 단, 핀테크라 **보안·금액 정합성·프라이버시 경계는 타협하지 않는다**: "무엇을 저장하고 무엇을 외부로 보내느냐"를 결정의 기준으로 둔다. 1차 타겟은 한국 사용자, 글로벌 확장 지향.
 
 ---
 
@@ -20,15 +20,15 @@ MVP 속도 최우선. "작동하는 최소"가 미덕 — 운영하다 필요해
 **이유**: Harness 자율실행이 키 없이 build/test green이어야 끊기지 않는다.
 **트레이드오프**: 어댑터 보일러플레이트. 단 포트는 핵심(InsightProvider 등)으로 최소화.
 
-### ADR-004: Claude structured outputs + opus 4.8 + 마스킹된 거래 단위 전달
-**결정**: `messages.parse` + `output_config.format` + `zodOutputFormat()`으로 검증된 `parsed_output` 수신. 모델 `claude-opus-4-8`(Pro 전용). 입력은 카드·계좌번호를 마스킹한 **거래 단위 데이터**(가맹점명·금액·날짜·카테고리). `timeout` 30s, 실패·초과 시 Free 보존 + `pro.status=unavailable` 격리.
-**이유**: 스키마 준수 보장(파싱 재시도 불필요) + 가맹점 수준의 구체 인사이트를 위해 거래 단위를 전달하되, 직접 식별자는 마스킹해 제3자 PII 노출을 차단. Free는 LLM 0이라 opus 비용은 Pro에만 발생.
-**트레이드오프**: 집계만 보내는 대안보다 토큰이 크고 가맹점명이 외부로 나감(구체 인사이트 위해 의도적 허용). 비용은 ① 대용량 행 상한/요약 ② `analyses` 캐시(`unique(user_id,input_hash)`)로 동일 입력 재호출 skip ③ `ai_usage_daily` 일일 quota로 방어. Zod `.min/.max` 미지원 → 범위 검증 후처리.
+### ADR-004: Claude structured outputs + 티어별 모델 라우팅 + 마스킹된 거래 단위 전달
+**결정**: `messages.parse` + `output_config.format` + `zodOutputFormat()`으로 검증된 `parsed_output` 수신. 티어별 모델 라우팅 — Free=`claude-sonnet-4-6`, Pro=`claude-opus-4-8`. 입력은 카드·계좌번호를 마스킹한 **거래 단위 데이터**(가맹점명·금액·날짜·카테고리). `timeout` 30s, 실패·초과 시 규칙·통계 결과 보존 + AI 인사이트 `unavailable` 격리.
+**이유**: 스키마 준수 보장(파싱 재시도 불필요) + 가맹점 수준의 구체 인사이트를 위해 거래 단위를 전달하되, 직접 식별자는 마스킹해 제3자 PII 노출을 차단. Free는 저비용 Sonnet, Pro는 고품질 Opus 심층 분석으로 모델 차이가 곧 티어 가치 차이가 된다.
+**트레이드오프**: Free도 LLM 비용이 발생(Sonnet은 Opus 대비 저렴). 비용은 ① 대용량 행 상한/요약 ② `analyses` 캐시(`unique(user_id,input_hash)`, 모델 포함)로 동일 입력 재호출 skip ③ `ai_usage_daily` tier별 일일 quota로 방어. Zod `.min/.max` 미지원 → 범위 검증 후처리.
 
 ### ADR-005: Polar 웹훅 = 구독 진실원천
 **결정**: 체크아웃 리다이렉트를 신뢰하지 않고 웹훅(raw body 서명검증)으로 `subscriptions` upsert. `processed_webhook_events.event_id` 선삽입으로 재전송 멱등. 게이팅은 DB 상태로만. 체크아웃 `customerExternalId`는 서버 세션 uid로 강제(위조 방지).
 **이유**: 결제 정합성. Polar는 Merchant of Record라 VAT/세금을 대신 처리해 글로벌 판매에 적합.
-**트레이드오프**: 웹훅 누락 시 checkout 후 polling 보조. out-of-order guard는 MVP 범위 밖(event_id 멱등으로 충분, 필요해지면 후속 도입).
+**트레이드오프**: 웹훅 누락 시 checkout 후 polling 보조. out-of-order guard는 MVP 범위 밖(event_id 멱등으로 충분, 필요해지면 후속 도입). 국내 간편결제(토스·카카오페이) 미지원 → 한국 사용자는 해외카드/USD 결제(검증 후 국내 PG 확장).
 
 ### ADR-006: CSV — 표준 파서 우선 + Claude 폴백 매핑, 부호/금액 정규화
 **결정**: 표준 파서로 먼저 컬럼 매핑·파싱을 시도하고 **인식 실패 시에만** Claude로 매핑 추론 → 사용자 1회 확인/수정 → 이후 결정론적 파싱. 금액은 `numeric`, 통화기호·콤마·괄호음수 strip, 출금/입금 2컬럼은 `출금-입금`으로 단일화해 `signed_amount` + `direction(debit/credit/refund)`. 합계/소계 요약행은 휴리스틱 필터.
@@ -51,6 +51,6 @@ MVP 속도 최우선. "작동하는 최소"가 미덕 — 운영하다 필요해
 **트레이드오프**: 더 강한 기밀성(규제 등)이 요구되면 컬럼 암호화를 후속 도입. dedup/집계는 암호화와 무관한 hash·정규화 컬럼으로 처리.
 
 ### ADR-010: 핵심 분석 루프를 가장 먼저 빌드
-**결정**: ①기반(Next.js+Supabase Auth+스키마) → ②핵심 루프(업로드→표준파싱/폴백→마스킹→Free 룰베이스 분석→대시보드) → ③랜딩+샘플 데모 → ④Polar 결제+게이팅+Pro(opus) 인사이트.
-**이유**: 최대 리스크는 "임의 CSV → 신뢰할 만한 분석"이 실제로 작동하느냐. 그게 검증돼야 랜딩·결제가 의미를 가짐. Free 루프(LLM 0)가 먼저 서면 Pro는 그 위에 얹는다.
+**결정**: ①기반(Next.js+Supabase Auth+스키마) → ②핵심 루프(업로드→표준파싱/폴백→마스킹→규칙·통계 분석→Sonnet AI 인사이트→대시보드) → ③랜딩+샘플 데모 → ④Polar 결제+게이팅+Pro Opus 심층 분석.
+**이유**: 최대 리스크는 "임의 CSV → 신뢰할 만한 분석"이 실제로 작동하느냐. 그게 검증돼야 랜딩·결제가 의미를 가짐. 규칙·통계 루프가 먼저 서고, Sonnet(Free)·Opus(Pro)는 그 위에 얹는다.
 **트레이드오프**: 수익화(결제·Pro)가 뒤로 밀림. 대신 작동하지 않는 제품에 결제를 붙이는 위험을 회피.
