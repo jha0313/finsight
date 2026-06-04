@@ -6,7 +6,7 @@ src/
 ├── app/         # 페이지 + API 라우트 (composition root)
 ├── components/  # UI 컴포넌트 (dumb, props만 받음)
 ├── types/       # 도메인 타입 + 포트 인터페이스 (leaf, 값 import 0)
-├── lib/         # 도메인 로직 (csv 파서, 분석, 오케스트레이션, gating)
+├── lib/         # 도메인 로직 (csv 파서/매핑, 마스킹, 분석, 오케스트레이션, gating)
 └── services/    # 외부 API 어댑터 (claude, supabase, polar)
 ```
 
@@ -22,14 +22,17 @@ app → lib → types ← services
 ## 데이터 흐름 (동기 처리)
 ```
 사용자 → 대시보드(Client) → POST /api/analyze
-  → lib/csv 파싱 (인코딩 감지 · 부호/금액 정규화 · 합계행 필터)
-  → lib/analysis Free 분석 (①분류 ②추이 ③이상탐지)
-  → [구독자 & quota OK] services/claude AI 인사이트 (④, 집계만 전달, timeout 30s)
+  → lib/csv 표준 파싱 (인코딩 감지 · 부호/금액 정규화 · 합계행 필터)
+       └ 컬럼 인식 실패 시에만 services/claude 폴백 매핑 → 사용자 1회 확인
+  → lib/mask 직접 식별자(카드·계좌번호) 마스킹
+  → lib/analysis Free 분석 (①분류 ②추이 ③이상탐지 · 룰베이스 · LLM 0)
+  → [구독자 & quota OK] services/claude Pro 인사이트 (④, 마스킹된 거래 단위 전달, timeout 30s)
   → Postgres RPC(save_statement_analysis) 단일 트랜잭션 저장 (RLS)
   → 200 + { free, pro:{status,insights?}, tier, warnings } → 차트·인사이트 렌더
 ```
+- Free 분석은 LLM 호출 0(규칙·통계). Claude는 ① 표준 파싱 폴백 매핑, ② Pro 인사이트(④)에서만 호출.
 - 미구독/쿼터소진/Claude 실패 시에도 **200 + Free 결과**를 주고 `pro.status`로 잠금/불가를 표현(402 아님).
-- opus 4.8은 latency가 크므로 Vercel `maxDuration` 상향 + Claude `timeout` 필수.
+- opus 4.8은 latency가 크므로 Vercel `maxDuration` 상향 + Claude `timeout` 필수. 대용량은 행 상한/요약으로 토큰 방어.
 
 ## 상태 관리
 - 서버 상태: Server Components + Route Handlers
@@ -39,14 +42,20 @@ app → lib → types ← services
 ## mock-first
 - 포트/어댑터 + 의존성 주입. 외부 클라이언트는 **호출 시점 지연 생성**(import 시 env 읽어 throw 금지).
 - 단위 테스트는 테스트 더블(FakeInsightProvider · 목 SupabaseClient · 고정 Polar 페이로드)로 네트워크 0.
-- composition root는 route handler만(≤15줄 와이어링). 분기·에러매핑은 `lib/orchestration`(TDD 강제).
+- composition root는 route handler(얇은 와이어링). 분기·에러매핑은 `lib/orchestration`(TDD 강제).
+
+## 보안 & 프라이버시
+- **저장**: 카드·계좌번호 등 직접 식별자는 적재 시 마스킹해 전체값을 평문 보관하지 않는다(전체 PAN 미보관). 나머지 거래 데이터는 Supabase at-rest + RLS로 보호(컬럼 암호화는 Post-MVP).
+- **전송**: Claude(Pro)에는 마스킹된 거래 단위(가맹점명·금액·날짜·카테고리)만 전송. 전체 식별자 미전송(가맹점명은 구체 인사이트를 위해 의도적 허용).
+- **격리**: 전 테이블 RLS `auth.uid()=user_id`로 "A의 명세서를 B가 못 본다"를 DB 레벨 보장.
+- **삭제**: 전 체인 `on delete cascade`(계정삭제 UI는 Post-MVP, cascade FK는 유지).
 
 ## DB 스키마 (요약)
 - `statements`(명세서 · status[ready/failed] · source_hash, `unique(user_id,source_hash)`)
-- `transactions`(거래 · `signed_amount numeric(14,2)` · `direction` · `category text` · `row_hash`, dedup `unique(statement_id,row_hash)` + on conflict)
+- `transactions`(거래 · `signed_amount numeric(14,2)` · `direction` · `category text` · `row_hash` · 직접 식별자 마스킹 저장, dedup `unique(statement_id,row_hash)` + on conflict)
 - `analyses`(Pro ④ 결과만 jsonb, 캐시 키 `unique(user_id,input_hash)`)
-- `subscriptions`(user PK · 웹훅 upsert · `polar_subscription_id` · `status` · `current_period_end` · `last_event_occurred_at`)
-- `processed_webhook_events`(`event_id` PK · 재전송 멱등 · out-of-order guard)
+- `subscriptions`(user PK · 웹훅 upsert · `polar_subscription_id` · `status` · `current_period_end`)
+- `processed_webhook_events`(`event_id` PK · 재전송 멱등)
 - `ai_usage_daily`(`unique(user_id,usage_date)` · `pro_calls` 원자 증가 → Pro 일일 quota)
 - `profiles`·`categories` 테이블 없음 (user_id는 `auth.users` 직접 FK, category는 코드 상수 union)
 - 전 테이블 RLS `auth.uid()=user_id` + user_id 인덱스, 전 체인 `on delete cascade`
