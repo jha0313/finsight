@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "supabase-adapter",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T12:32:14+0900",
+      "summary": "Supabase SSR lazy client, getUser auth, RPC 저장소, DB 구독 게이트웨이, AI cache/quota 보조 구현",
+      "completed_at": "2026-06-03T20:39:00-0700"
     },
     {
       "step": 2,

@@ -1,0 +1,343 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { SaveStatementAnalysisInput } from "@/types/ports";
+
+import {
+  createAiUsage,
+  createServerSupabaseClient,
+  createStatementRepository,
+  createSubscriptionGateway,
+  getCurrentUser,
+} from "./index";
+
+const supabaseMocks = vi.hoisted(() => {
+  const createServerClient = vi.fn();
+  const authGetSession = vi.fn();
+  const authGetUser = vi.fn();
+  const eq = vi.fn();
+  const gt = vi.fn();
+  const insert = vi.fn();
+  const maybeSingle = vi.fn();
+  const rpc = vi.fn();
+  const select = vi.fn();
+  const single = vi.fn();
+  const update = vi.fn();
+  const upsert = vi.fn();
+  const from = vi.fn();
+
+  const client = {
+    auth: {
+      getSession: authGetSession,
+      getUser: authGetUser,
+    },
+    from,
+    rpc,
+  };
+
+  return {
+    authGetSession,
+    authGetUser,
+    client,
+    createServerClient,
+    eq,
+    gt,
+    insert,
+    maybeSingle,
+    rpc,
+    select,
+    single,
+    update,
+    upsert,
+    from,
+  };
+});
+
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: supabaseMocks.createServerClient,
+}));
+
+function selectChain(finalResult: unknown = { data: null, error: null }) {
+  const chain = {
+    eq: supabaseMocks.eq,
+    gt: supabaseMocks.gt,
+    maybeSingle: supabaseMocks.maybeSingle,
+    single: supabaseMocks.single,
+  };
+
+  supabaseMocks.select.mockReturnValue(chain);
+  supabaseMocks.eq.mockReturnValue(chain);
+  supabaseMocks.gt.mockReturnValue(chain);
+  supabaseMocks.maybeSingle.mockResolvedValue(finalResult);
+  supabaseMocks.single.mockResolvedValue(finalResult);
+
+  return chain;
+}
+
+function table() {
+  return {
+    insert: supabaseMocks.insert,
+    select: supabaseMocks.select,
+    update: supabaseMocks.update,
+    upsert: supabaseMocks.upsert,
+  };
+}
+
+function setSupabaseEnv() {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "publishable-key";
+}
+
+describe("supabase adapter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setSupabaseEnv();
+    supabaseMocks.createServerClient.mockReturnValue(supabaseMocks.client);
+    supabaseMocks.from.mockReturnValue(table());
+    supabaseMocks.rpc.mockResolvedValue({
+      data: [{ statement_id: "statement-1" }],
+      error: null,
+    });
+    supabaseMocks.authGetUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    supabaseMocks.authGetSession.mockResolvedValue({
+      data: { session: { user: { id: "session-user" } } },
+      error: null,
+    });
+  });
+
+  it("does not create a Supabase client at import time", async () => {
+    vi.resetModules();
+    supabaseMocks.createServerClient.mockClear();
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+    await import("./index");
+
+    expect(supabaseMocks.createServerClient).not.toHaveBeenCalled();
+  });
+
+  it("creates the server client lazily with publishable env", () => {
+    const client = createServerSupabaseClient();
+
+    expect(client).toBe(supabaseMocks.client);
+    expect(supabaseMocks.createServerClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "publishable-key",
+      expect.objectContaining({
+        cookies: expect.objectContaining({
+          getAll: expect.any(Function),
+          setAll: expect.any(Function),
+        }),
+      }),
+    );
+  });
+
+  it("verifies auth with getUser instead of trusting getSession", async () => {
+    const user = await getCurrentUser();
+
+    expect(user).toEqual({ id: "user-1" });
+    expect(supabaseMocks.authGetUser).toHaveBeenCalledTimes(1);
+    expect(supabaseMocks.authGetSession).not.toHaveBeenCalled();
+  });
+
+  it("returns null when getUser has no verified user", async () => {
+    supabaseMocks.authGetUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: null,
+    });
+
+    await expect(getCurrentUser()).resolves.toBeNull();
+  });
+
+  it("resolves pro only for active subscriptions with a future period", async () => {
+    selectChain({
+      data: {
+        status: "active",
+        current_period_end: "2999-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const tier = await createSubscriptionGateway().resolveTier("user-1");
+
+    expect(tier).toBe("pro");
+    expect(supabaseMocks.from).toHaveBeenCalledWith("subscriptions");
+    expect(supabaseMocks.select).toHaveBeenCalledWith("status,current_period_end");
+    expect(supabaseMocks.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(supabaseMocks.gt).toHaveBeenCalledWith(
+      "current_period_end",
+      expect.any(String),
+    );
+  });
+
+  it("resolves free for missing, expired, or inactive subscriptions", async () => {
+    const gateway = createSubscriptionGateway();
+
+    selectChain({ data: null, error: null });
+    await expect(gateway.resolveTier("user-1")).resolves.toBe("free");
+
+    selectChain({
+      data: {
+        status: "active",
+        current_period_end: "2020-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+    await expect(gateway.resolveTier("user-1")).resolves.toBe("free");
+
+    selectChain({
+      data: {
+        status: "canceled",
+        current_period_end: "2999-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+    await expect(gateway.resolveTier("user-1")).resolves.toBe("free");
+  });
+
+  it("saves statement analysis through the save_statement_analysis RPC", async () => {
+    const input: SaveStatementAnalysisInput = {
+      userId: "user-1",
+      statement: {
+        sourceHash: "source-hash",
+        status: "ready",
+      },
+      transactions: [
+        {
+          date: "2026-06-01",
+          merchant: "스타벅스 강남점",
+          signedAmount: "5500.00",
+          direction: "debit",
+          category: "food",
+          currency: "KRW",
+          maskedAccount: "**** **** **** 3456",
+          rowHash: "row-hash",
+        },
+      ],
+      analysis: {
+        inputHash: "input-hash",
+        model: "claude-sonnet-4-6",
+        result: {
+          summary: "요약",
+          insights: ["반복 결제를 점검하세요."],
+        },
+      },
+    };
+
+    await expect(
+      createStatementRepository().saveStatementAnalysis(input),
+    ).resolves.toEqual({ statementId: "statement-1" });
+
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("save_statement_analysis", {
+      p_user_id: "user-1",
+      p_statement_source_hash: "source-hash",
+      p_statement_status: "ready",
+      p_transactions: [
+        {
+          date: "2026-06-01",
+          merchant: "스타벅스 강남점",
+          signedAmount: "5500.00",
+          direction: "debit",
+          category: "food",
+          maskedAccount: "**** **** **** 3456",
+          currency: "KRW",
+          rowHash: "row-hash",
+        },
+      ],
+      p_analysis: {
+        inputHash: "input-hash",
+        model: "claude-sonnet-4-6",
+        result: {
+          summary: "요약",
+          insights: ["반복 결제를 점검하세요."],
+        },
+      },
+    });
+    expect(supabaseMocks.from).not.toHaveBeenCalledWith("statements");
+    expect(supabaseMocks.from).not.toHaveBeenCalledWith("transactions");
+    expect(supabaseMocks.from).not.toHaveBeenCalledWith("analyses");
+  });
+
+  it("reads cached insights by unique user and input hash", async () => {
+    selectChain({
+      data: { result: { summary: "cached" } },
+      error: null,
+    });
+
+    const cached = await createAiUsage().getCachedInsights("user-1", "input-1");
+
+    expect(cached).toEqual({ summary: "cached" });
+    expect(supabaseMocks.from).toHaveBeenCalledWith("analyses");
+    expect(supabaseMocks.select).toHaveBeenCalledWith("result");
+    expect(supabaseMocks.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(supabaseMocks.eq).toHaveBeenCalledWith("input_hash", "input-1");
+  });
+
+  it("consumes free daily quota with an atomic compare-and-swap update", async () => {
+    const usageSelectChain = {
+      eq: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { count: 0 },
+        error: null,
+      }),
+    };
+    usageSelectChain.eq.mockReturnValue(usageSelectChain);
+    const updateResultChain = {
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { count: 1 },
+        error: null,
+      }),
+    };
+    const updateChain = {
+      eq: vi.fn(),
+      select: vi.fn().mockReturnValue(updateResultChain),
+    };
+    updateChain.eq.mockReturnValue(updateChain);
+    const usageTable = {
+      insert: supabaseMocks.insert,
+      select: vi.fn().mockReturnValue(usageSelectChain),
+      update: vi.fn().mockReturnValue(updateChain),
+      upsert: supabaseMocks.upsert,
+    };
+    supabaseMocks.from.mockReturnValue(usageTable);
+
+    await expect(
+      createAiUsage().tryConsumeDailyQuota("user-1", "free"),
+    ).resolves.toBe(true);
+
+    expect(supabaseMocks.from).toHaveBeenCalledWith("ai_usage_daily");
+    expect(usageTable.update).toHaveBeenCalledWith({ count: 1 });
+    expect(updateChain.eq).toHaveBeenCalledWith("user_id", "user-1");
+    expect(updateChain.eq).toHaveBeenCalledWith(
+      "usage_date",
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    );
+    expect(updateChain.eq).toHaveBeenCalledWith("count", 0);
+  });
+
+  it("does not consume quota after the tier limit is reached", async () => {
+    const usageSelectChain = {
+      eq: vi.fn(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { count: 3 },
+        error: null,
+      }),
+    };
+    usageSelectChain.eq.mockReturnValue(usageSelectChain);
+    const usageTable = {
+      insert: supabaseMocks.insert,
+      select: vi.fn().mockReturnValue(usageSelectChain),
+      update: vi.fn(),
+      upsert: supabaseMocks.upsert,
+    };
+    supabaseMocks.from.mockReturnValue(usageTable);
+
+    await expect(
+      createAiUsage().tryConsumeDailyQuota("user-1", "free"),
+    ).resolves.toBe(false);
+
+    expect(usageTable.update).not.toHaveBeenCalled();
+  });
+});
