@@ -7,7 +7,8 @@
       "name": "project-setup",
       "status": "completed",
       "started_at": "2026-06-04T11:01:44+0900",
-      "summary": "Next.js 15 App Router, Tailwind CSS v4, strict TypeScript, Vitest smoke test, and ESLint flat layer guards scaffolded."
+      "summary": "Next.js 15 App Router, Tailwind CSS v4, strict TypeScript, Vitest smoke test, and ESLint flat layer guards scaffolded.",
+      "completed_at": "2026-06-04T11:14:45+0900"
     },
     {
       "step": 1,
