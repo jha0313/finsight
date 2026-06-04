@@ -17,7 +17,8 @@
     },
     {
       "dir": "3-billing",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-06-04T13:44:54+0900"
     }
   ]
 }
