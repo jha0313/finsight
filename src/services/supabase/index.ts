@@ -14,11 +14,34 @@ const DAILY_AI_QUOTA_BY_TIER: Record<Tier, number> = {
   pro: 20,
 };
 const MAX_QUOTA_CONSUME_ATTEMPTS = 3;
+const DEFAULT_AUTH_REDIRECT_PATH = "/dashboard";
+const LOGIN_PATH = "/login";
+const PROTECTED_PATH_PREFIXES = ["/dashboard"];
 
 type CookieToSet = {
   name: string;
   value: string;
   options: CookieOptions;
+};
+
+type SupabaseCookieMethods = {
+  getAll: () =>
+    | { name: string; value: string }[]
+    | Promise<{ name: string; value: string }[]>;
+  setAll: (cookiesToSet: CookieToSet[]) => void | Promise<void>;
+};
+
+type MiddlewareRequest = {
+  cookies: {
+    getAll: () => { name: string; value: string }[];
+    set: (name: string, value: string) => void;
+  };
+};
+
+type MiddlewareResponse = {
+  cookies: {
+    set: (name: string, value: string, options: CookieOptions) => void;
+  };
 };
 
 type SupabaseError = {
@@ -56,14 +79,151 @@ type RpcTransaction = {
 };
 
 export function createServerSupabaseClient(): SupabaseClient {
+  return createSupabaseClientWithCookies({
+    getAll: getAllRequestCookies,
+    setAll: setAllResponseCookies,
+  });
+}
+
+export function createMiddlewareSupabaseClient<Response extends MiddlewareResponse>(
+  request: MiddlewareRequest,
+  createResponse: () => Response,
+): {
+  supabase: SupabaseClient;
+  getResponse: () => Response;
+} {
+  let response = createResponse();
+  const supabase = createSupabaseClientWithCookies({
+    getAll() {
+      return request.cookies.getAll().map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+      }));
+    },
+    setAll(cookiesToSet) {
+      for (const { name, value } of cookiesToSet) {
+        request.cookies.set(name, value);
+      }
+
+      response = createResponse();
+
+      for (const { name, value, options } of cookiesToSet) {
+        response.cookies.set(name, value, options);
+      }
+    },
+  });
+
+  return {
+    supabase,
+    getResponse() {
+      return response;
+    },
+  };
+}
+
+export async function createGoogleOAuthUrl(
+  redirectTo: string,
+): Promise<string | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+    },
+  });
+
+  if (error !== null) {
+    return null;
+  }
+
+  return data.url ?? null;
+}
+
+export async function exchangeAuthCodeForSession(
+  code: string,
+): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  return error === null;
+}
+
+export type MiddlewareAuthDecision =
+  | { type: "next" }
+  | { type: "redirect"; pathname: string; search: string };
+
+export function resolveMiddlewareAuthDecision(input: {
+  isAuthenticated: boolean;
+  pathname: string;
+  search: string;
+}): MiddlewareAuthDecision {
+  if (input.isAuthenticated || !isProtectedPath(input.pathname)) {
+    return { type: "next" };
+  }
+
+  const nextPath = sanitizeRedirectPath(`${input.pathname}${input.search}`);
+  const searchParams = new URLSearchParams({ next: nextPath });
+
+  return {
+    type: "redirect",
+    pathname: LOGIN_PATH,
+    search: `?${searchParams.toString()}`,
+  };
+}
+
+export async function resolveAuthCallbackRedirect(input: {
+  exchangeCodeForSession: (code: string) => Promise<boolean>;
+  requestUrl: string;
+}): Promise<URL> {
+  const requestUrl = new URL(input.requestUrl);
+  const code = requestUrl.searchParams.get("code");
+  const nextPath = sanitizeRedirectPath(requestUrl.searchParams.get("next"));
+
+  if (code === null || code === "") {
+    return createLoginRedirectUrl(requestUrl.origin, "missing_code", nextPath);
+  }
+
+  const exchanged = await input.exchangeCodeForSession(code);
+
+  if (!exchanged) {
+    return createLoginRedirectUrl(requestUrl.origin, "oauth", nextPath);
+  }
+
+  return new URL(nextPath, requestUrl.origin);
+}
+
+export function sanitizeRedirectPath(path: string | null | undefined): string {
+  if (path === null || path === undefined) {
+    return DEFAULT_AUTH_REDIRECT_PATH;
+  }
+
+  const trimmed = path.trim();
+
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return DEFAULT_AUTH_REDIRECT_PATH;
+  }
+
+  try {
+    const redirectUrl = new URL(trimmed, "https://finsight.local");
+
+    if (redirectUrl.origin !== "https://finsight.local") {
+      return DEFAULT_AUTH_REDIRECT_PATH;
+    }
+
+    return `${redirectUrl.pathname}${redirectUrl.search}${redirectUrl.hash}`;
+  } catch {
+    return DEFAULT_AUTH_REDIRECT_PATH;
+  }
+}
+
+function createSupabaseClientWithCookies(
+  cookieMethods: SupabaseCookieMethods,
+): SupabaseClient {
   const supabaseUrl = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
   const publishableKey = requireEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
 
   return createServerClient(supabaseUrl, publishableKey, {
-    cookies: {
-      getAll: getAllRequestCookies,
-      setAll: setAllResponseCookies,
-    },
+    cookies: cookieMethods,
   });
 }
 
@@ -204,6 +364,24 @@ function requireEnv(name: string): string {
   }
 
   return value;
+}
+
+function isProtectedPath(pathname: string): boolean {
+  return PROTECTED_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function createLoginRedirectUrl(
+  origin: string,
+  error: string,
+  nextPath: string,
+): URL {
+  const redirectUrl = new URL(LOGIN_PATH, origin);
+  redirectUrl.searchParams.set("error", error);
+  redirectUrl.searchParams.set("next", nextPath);
+
+  return redirectUrl;
 }
 
 async function getAllRequestCookies(): Promise<{ name: string; value: string }[]> {

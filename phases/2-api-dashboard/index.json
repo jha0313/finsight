@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "auth-flow",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T12:40:41+0900",
+      "summary": "getUser 기반 Supabase 세션 미들웨어, 구글 OAuth 로그인 페이지, 코드 교환 콜백 라우트 구현",
+      "completed_at": "2026-06-04T12:48:00+0900"
     },
     {
       "step": 3,

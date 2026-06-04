@@ -4,16 +4,24 @@ import type { SaveStatementAnalysisInput } from "@/types/ports";
 
 import {
   createAiUsage,
+  createGoogleOAuthUrl,
+  createMiddlewareSupabaseClient,
   createServerSupabaseClient,
   createStatementRepository,
   createSubscriptionGateway,
+  exchangeAuthCodeForSession,
   getCurrentUser,
+  resolveAuthCallbackRedirect,
+  resolveMiddlewareAuthDecision,
+  sanitizeRedirectPath,
 } from "./index";
 
 const supabaseMocks = vi.hoisted(() => {
   const createServerClient = vi.fn();
+  const authExchangeCodeForSession = vi.fn();
   const authGetSession = vi.fn();
   const authGetUser = vi.fn();
+  const authSignInWithOAuth = vi.fn();
   const eq = vi.fn();
   const gt = vi.fn();
   const insert = vi.fn();
@@ -27,16 +35,20 @@ const supabaseMocks = vi.hoisted(() => {
 
   const client = {
     auth: {
+      exchangeCodeForSession: authExchangeCodeForSession,
       getSession: authGetSession,
       getUser: authGetUser,
+      signInWithOAuth: authSignInWithOAuth,
     },
     from,
     rpc,
   };
 
   return {
+    authExchangeCodeForSession,
     authGetSession,
     authGetUser,
+    authSignInWithOAuth,
     client,
     createServerClient,
     eq,
@@ -105,6 +117,14 @@ describe("supabase adapter", () => {
       data: { session: { user: { id: "session-user" } } },
       error: null,
     });
+    supabaseMocks.authExchangeCodeForSession.mockResolvedValue({
+      data: { session: { user: { id: "user-1" } } },
+      error: null,
+    });
+    supabaseMocks.authSignInWithOAuth.mockResolvedValue({
+      data: { url: "https://accounts.google.com/oauth" },
+      error: null,
+    });
   });
 
   it("does not create a Supabase client at import time", async () => {
@@ -140,6 +160,135 @@ describe("supabase adapter", () => {
     expect(user).toEqual({ id: "user-1" });
     expect(supabaseMocks.authGetUser).toHaveBeenCalledTimes(1);
     expect(supabaseMocks.authGetSession).not.toHaveBeenCalled();
+  });
+
+  it("starts Google OAuth through Supabase with the provided callback URL", async () => {
+    await expect(
+      createGoogleOAuthUrl(
+        "https://finsight.test/auth/callback?next=%2Fdashboard",
+      ),
+    ).resolves.toBe("https://accounts.google.com/oauth");
+
+    expect(supabaseMocks.authSignInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "https://finsight.test/auth/callback?next=%2Fdashboard",
+      },
+    });
+  });
+
+  it("exchanges OAuth codes through the lazy Supabase server client", async () => {
+    await expect(exchangeAuthCodeForSession("oauth-code")).resolves.toBe(true);
+
+    expect(supabaseMocks.authExchangeCodeForSession).toHaveBeenCalledWith(
+      "oauth-code",
+    );
+  });
+
+  it("sanitizes post-auth redirect paths to internal paths only", () => {
+    expect(sanitizeRedirectPath("/dashboard?tab=upload")).toBe(
+      "/dashboard?tab=upload",
+    );
+    expect(sanitizeRedirectPath("https://evil.test/dashboard")).toBe(
+      "/dashboard",
+    );
+    expect(sanitizeRedirectPath("//evil.test/dashboard")).toBe("/dashboard");
+    expect(sanitizeRedirectPath("dashboard")).toBe("/dashboard");
+  });
+
+  it("redirects unauthenticated protected paths to login with next preserved", () => {
+    expect(
+      resolveMiddlewareAuthDecision({
+        isAuthenticated: false,
+        pathname: "/dashboard",
+        search: "?tab=upload",
+      }),
+    ).toEqual({
+      type: "redirect",
+      pathname: "/login",
+      search: "?next=%2Fdashboard%3Ftab%3Dupload",
+    });
+  });
+
+  it("lets authenticated protected paths and public paths continue", () => {
+    expect(
+      resolveMiddlewareAuthDecision({
+        isAuthenticated: true,
+        pathname: "/dashboard",
+        search: "",
+      }),
+    ).toEqual({ type: "next" });
+    expect(
+      resolveMiddlewareAuthDecision({
+        isAuthenticated: false,
+        pathname: "/login",
+        search: "",
+      }),
+    ).toEqual({ type: "next" });
+  });
+
+  it("uses middleware cookies without creating the client at import time", () => {
+    const request = {
+      cookies: {
+        getAll: vi.fn().mockReturnValue([{ name: "sb", value: "request" }]),
+        set: vi.fn(),
+      },
+    };
+    const response = {
+      cookies: {
+        set: vi.fn(),
+      },
+    };
+    const createResponse = vi.fn().mockReturnValue(response);
+
+    createMiddlewareSupabaseClient(request, createResponse);
+
+    const cookieMethods = supabaseMocks.createServerClient.mock.calls.at(-1)?.[2]
+      .cookies;
+    expect(cookieMethods.getAll()).toEqual([{ name: "sb", value: "request" }]);
+
+    cookieMethods.setAll([
+      {
+        name: "sb",
+        value: "response",
+        options: { path: "/" },
+      },
+    ]);
+
+    expect(request.cookies.set).toHaveBeenCalledWith("sb", "response");
+    expect(response.cookies.set).toHaveBeenCalledWith("sb", "response", {
+      path: "/",
+    });
+    expect(createResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it("resolves OAuth callback redirects after exchanging the code", async () => {
+    const exchangeCodeForSession = vi.fn().mockResolvedValue(true);
+
+    const redirectUrl = await resolveAuthCallbackRedirect({
+      exchangeCodeForSession,
+      requestUrl:
+        "https://finsight.test/auth/callback?code=oauth-code&next=%2Fdashboard%3Ftab%3Dupload",
+    });
+
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("oauth-code");
+    expect(redirectUrl.toString()).toBe(
+      "https://finsight.test/dashboard?tab=upload",
+    );
+  });
+
+  it("sends failed OAuth callbacks back to login without open redirects", async () => {
+    const exchangeCodeForSession = vi.fn().mockResolvedValue(false);
+
+    const redirectUrl = await resolveAuthCallbackRedirect({
+      exchangeCodeForSession,
+      requestUrl:
+        "https://finsight.test/auth/callback?code=oauth-code&next=https%3A%2F%2Fevil.test",
+    });
+
+    expect(redirectUrl.toString()).toBe(
+      "https://finsight.test/login?error=oauth&next=%2Fdashboard",
+    );
   });
 
   it("returns null when getUser has no verified user", async () => {

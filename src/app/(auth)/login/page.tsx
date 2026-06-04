@@ -1,0 +1,83 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import {
+  createGoogleOAuthUrl,
+  sanitizeRedirectPath,
+} from "@/services/supabase";
+
+type LoginPageProps = {
+  searchParams?: Promise<{
+    error?: string | string[];
+    next?: string | string[];
+  }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const nextPath = sanitizeRedirectPath(firstParam(params?.next));
+  const hasError = firstParam(params?.error) !== undefined;
+
+  return (
+    <main className="min-h-screen bg-surface-soft px-base py-xxl">
+      <section className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[480px] items-center">
+        <div className="w-full rounded-card border border-hairline bg-canvas p-xl">
+          <p className="caption-strong text-primary">finsight</p>
+          <h1 className="title-lg mt-lg">로그인</h1>
+          <p className="body-md mt-sm">구글 계정으로 계속하세요.</p>
+          {hasError ? (
+            <p className="body-sm mt-base text-semantic-down">
+              로그인 연결을 완료하지 못했습니다.
+            </p>
+          ) : null}
+          <form action={signInWithGoogle} className="mt-xl">
+            <input name="next" type="hidden" value={nextPath} />
+            <button
+              className="btn-label w-full rounded-action bg-primary px-lg py-base text-on-primary transition-colors hover:bg-primary-active"
+              type="submit"
+            >
+              Google로 계속하기
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+async function signInWithGoogle(formData: FormData): Promise<void> {
+  "use server";
+
+  const nextPath = sanitizeRedirectPath(formData.get("next")?.toString());
+  const origin = await getRequestOrigin();
+  const callbackUrl = new URL("/auth/callback", origin);
+  callbackUrl.searchParams.set("next", nextPath);
+
+  const oauthUrl = await createGoogleOAuthUrl(callbackUrl.toString());
+
+  if (oauthUrl === null) {
+    const loginUrl = new URL("/login", origin);
+    loginUrl.searchParams.set("error", "oauth");
+    loginUrl.searchParams.set("next", nextPath);
+    redirect(loginUrl.toString());
+  }
+
+  redirect(oauthUrl);
+}
+
+async function getRequestOrigin(): Promise<string> {
+  const headerStore = await headers();
+  const host =
+    headerStore.get("x-forwarded-host") ??
+    headerStore.get("host") ??
+    "localhost:3000";
+  const protocol =
+    headerStore.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
+
+  return `${protocol}://${host}`;
+}
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
