@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ProInsights } from "@/types/analysis";
 import type {
   AiUsageGateway,
+  CheckoutGateway,
   InsightProvider,
   StatementRepository,
   SubscriptionGateway,
@@ -10,7 +11,7 @@ import type {
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
 
-import { runAnalysis, runAnalyzeRequest } from "./index";
+import { runAnalysis, runAnalyzeRequest, runCheckoutRequest } from "./index";
 
 const STANDARD_CSV = `date,merchant,amount,currency,account
 2026-06-01,스타벅스,5500,KRW,1234-5678-9012-3456
@@ -102,6 +103,31 @@ function createAnalyzeRequestDeps(input: {
     insightProvider,
     statementRepository,
     subscriptionGateway,
+  };
+}
+
+function createCheckoutRequestDeps(input: { userId?: string | null }) {
+  const checkout: CheckoutGateway & {
+    calls: Parameters<CheckoutGateway["create"]>[0][];
+  } = {
+    calls: [],
+    async create(createInput) {
+      this.calls.push(createInput);
+
+      return { url: "https://polar.sh/checkout/session-1" };
+    },
+  };
+
+  return {
+    deps: {
+      async getCurrentUser() {
+        return input.userId === null
+          ? null
+          : { id: input.userId ?? "user-1" };
+      },
+      checkout,
+    },
+    checkout,
   };
 }
 
@@ -441,5 +467,42 @@ describe("runAnalyzeRequest", () => {
       summary: "캐시된 심층 분석",
       insights: ["이미 계산된 인사이트"],
     });
+  });
+});
+
+describe("runCheckoutRequest", () => {
+  it("returns 401 for unauthenticated users before creating checkout", async () => {
+    const { deps, checkout } = createCheckoutRequestDeps({ userId: null });
+
+    const result = await runCheckoutRequest({
+      deps,
+      productId: "product-1",
+    });
+
+    expect(result).toEqual({
+      status: 401,
+      body: { error: "unauthorized" },
+    });
+    expect(checkout.calls).toEqual([]);
+  });
+
+  it("creates checkout with the server session user id as customerExternalId", async () => {
+    const { deps, checkout } = createCheckoutRequestDeps({ userId: "user-42" });
+
+    const result = await runCheckoutRequest({
+      deps,
+      productId: "product-1",
+    });
+
+    expect(result).toEqual({
+      status: 303,
+      redirectUrl: "https://polar.sh/checkout/session-1",
+    });
+    expect(checkout.calls).toEqual([
+      {
+        customerExternalId: "user-42",
+        productId: "product-1",
+      },
+    ]);
   });
 });

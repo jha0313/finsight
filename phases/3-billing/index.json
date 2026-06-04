@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "checkout-route",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T13:29:39+0900",
+      "summary": "Added authenticated Polar checkout route that forces customerExternalId from the server user id.",
+      "completed_at": "2026-06-03T21:32:49-0700"
     },
     {
       "step": 2,

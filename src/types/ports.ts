@@ -25,6 +25,13 @@ export interface AiUsageGateway {
   tryConsumeDailyQuota(userId: string, tier: Tier): Promise<boolean>;
 }
 
+export interface CheckoutGateway {
+  create(input: {
+    customerExternalId: string;
+    productId?: string;
+  }): Promise<{ url: string }>;
+}
+
 export interface SaveStatementAnalysisInput {
   userId: string;
   statement: {

@@ -7,6 +7,7 @@ import type { AnalyzeResponse, ProInsights } from "@/types/analysis";
 import type { ParsedTransaction } from "@/types/csv";
 import type {
   AiUsageGateway,
+  CheckoutGateway,
   InsightProvider,
   StatementRepository,
   SubscriptionGateway,
@@ -35,6 +36,11 @@ export interface AnalyzeRequestDeps {
   aiUsage: AiUsageGateway;
   statementRepository: StatementRepository;
   insightProviderFactory: () => InsightProvider;
+}
+
+export interface CheckoutRequestDeps {
+  getCurrentUser: () => Promise<{ id: string } | null>;
+  checkout: CheckoutGateway;
 }
 
 export async function runAnalysis(input: {
@@ -175,6 +181,33 @@ export async function runAnalyzeRequest(input: {
   return {
     status: 200,
     body: analysisResult.response,
+  };
+}
+
+export async function runCheckoutRequest(input: {
+  productId?: string;
+  deps: CheckoutRequestDeps;
+}): Promise<
+  | { status: 303; redirectUrl: string }
+  | { status: 401; body: { error: "unauthorized" } }
+> {
+  const user = await input.deps.getCurrentUser();
+
+  if (user === null) {
+    return {
+      status: 401,
+      body: { error: "unauthorized" },
+    };
+  }
+
+  const checkout = await input.deps.checkout.create({
+    customerExternalId: user.id,
+    productId: input.productId,
+  });
+
+  return {
+    status: 303,
+    redirectUrl: checkout.url,
   };
 }
 
