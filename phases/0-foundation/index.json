@@ -1,0 +1,29 @@
+{
+  "project": "finsight",
+  "phase": "0-foundation",
+  "steps": [
+    {
+      "step": 0,
+      "name": "project-setup",
+      "status": "completed",
+      "started_at": "2026-06-04T11:01:44+0900",
+      "summary": "Next.js 15 App Router, Tailwind CSS v4, strict TypeScript, Vitest smoke test, and ESLint flat layer guards scaffolded."
+    },
+    {
+      "step": 1,
+      "name": "core-types",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "db-migrations",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "design-tokens",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-06-04T11:01:44+0900"
+}
