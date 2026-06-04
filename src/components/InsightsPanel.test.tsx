@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { ProInsights } from "@/types/analysis";
 
@@ -11,6 +11,10 @@ const insights: ProInsights = {
 };
 
 describe("InsightsPanel", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders active Pro insight summary and insight bullets", () => {
     render(<InsightsPanel status="active" insights={insights} />);
 
@@ -18,11 +22,40 @@ describe("InsightsPanel", () => {
       screen.getByText("식비와 교통비가 지출의 대부분을 차지합니다."),
     ).toBeInTheDocument();
     expect(screen.getByText("반복 결제를 먼저 점검하세요.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pro로 업그레이드" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("renders a locked state without requiring insights", () => {
+  it("renders a locked state with a checkout upgrade CTA", () => {
     render(<InsightsPanel status="locked" />);
 
     expect(screen.getByText("Pro 분석 잠금")).toBeInTheDocument();
+
+    const upgradeButton = screen.getByRole("button", {
+      name: "Pro로 업그레이드",
+    });
+    expect(upgradeButton).toBeInTheDocument();
+    expect(screen.getByText("Polar가 결제와 세금 처리를 담당합니다.")).toBeInTheDocument();
+
+    const checkoutForm = upgradeButton.closest("form");
+    expect(checkoutForm).toHaveAttribute("action", "/api/checkout");
+    expect(checkoutForm).toHaveAttribute("method", "post");
+  });
+
+  it("renders unavailable copy without the upgrade CTA", () => {
+    render(<InsightsPanel status="unavailable" />);
+
+    expect(
+      screen.getByText("AI 인사이트를 사용할 수 없습니다"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "지금은 Pro 분석을 시작할 수 없습니다. 규칙 기반 분석은 그대로 유지됩니다.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pro로 업그레이드" }),
+    ).not.toBeInTheDocument();
   });
 });

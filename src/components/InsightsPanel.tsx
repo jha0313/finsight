@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { CircleAlert, Lock, Sparkles } from "lucide-react";
+import { ArrowUpRight, CircleAlert, Lock, Sparkles } from "lucide-react";
 
 import type { ProInsights } from "@/types/analysis";
 import type { ProStatus } from "@/types/tier";
@@ -8,6 +8,8 @@ export interface InsightsPanelProps {
   status: ProStatus;
   insights?: ProInsights;
 }
+
+const checkoutAction = "/api/checkout";
 
 export function InsightsPanel({ status, insights }: InsightsPanelProps) {
   if (status === "locked") {
@@ -20,6 +22,7 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
           Free 분석 결과를 먼저 표시합니다. Pro 구독이 활성화되면 Opus
           심층 분석을 이어서 표시합니다.
         </p>
+        <UpgradeCta action={checkoutAction} />
       </InsightShell>
     );
   }
@@ -31,7 +34,8 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
         title="AI 인사이트를 사용할 수 없습니다"
       >
         <p className="body-sm">
-          규칙 기반 분석은 유지되며, AI 응답 실패는 별도로 격리됩니다.
+          지금은 Pro 분석을 시작할 수 없습니다. 규칙 기반 분석은 그대로
+          유지됩니다.
         </p>
       </InsightShell>
     );
@@ -55,6 +59,23 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
         ))}
       </ul>
     </InsightShell>
+  );
+}
+
+function UpgradeCta({ action }: { action: string }) {
+  return (
+    <div className="mt-base flex flex-col gap-sm sm:flex-row sm:items-center">
+      <form action={action} method="post">
+        <button
+          className="btn-label inline-flex min-h-11 items-center justify-center gap-xs rounded-action bg-primary px-lg text-on-primary transition-colors hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          type="submit"
+        >
+          Pro로 업그레이드
+          <ArrowUpRight aria-hidden="true" size={18} strokeWidth={2} />
+        </button>
+      </form>
+      <p className="caption">Polar가 결제와 세금 처리를 담당합니다.</p>
+    </div>
   );
 }
 
