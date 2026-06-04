@@ -1,0 +1,39 @@
+{
+  "project": "finsight",
+  "phase": "2-api-dashboard",
+  "steps": [
+    {
+      "step": 0,
+      "name": "claude-adapter",
+      "status": "completed",
+      "started_at": "2026-06-04T12:25:04+0900",
+      "summary": "Claude InsightProvider 어댑터를 lazy init, structured output schema, Free/Sonnet·Pro/Opus 라우팅으로 구현"
+    },
+    {
+      "step": 1,
+      "name": "supabase-adapter",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "auth-flow",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "analyze-route",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "ui-kit",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "dashboard-page",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-06-04T12:25:04+0900"
+}
