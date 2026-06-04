@@ -6,7 +6,13 @@ export type {
   ProInsights,
   TrendPoint,
 } from "./analysis";
-export type { CanonicalField, CsvMapping, CsvMappingSource } from "./csv";
+export type {
+  CanonicalField,
+  CsvMapping,
+  CsvMappingSource,
+  ParsedTransaction,
+  ParseResult,
+} from "./csv";
 export type {
   InsightProvider,
   SaveStatementAnalysisInput,

@@ -10,6 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "csv-parse": "^6.2.1",
+    "iconv-lite": "^0.7.2",
     "next": "15",
     "react": "19",
     "react-dom": "19"

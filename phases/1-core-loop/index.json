@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "csv-parse",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T11:46:40+0900",
+      "summary": "Standard CSV parser added with generic header mapping, summary-row filtering, date normalization, and step0 money normalization reuse.",
+      "completed_at": "2026-06-03T19:51:42-0700"
     },
     {
       "step": 2,
