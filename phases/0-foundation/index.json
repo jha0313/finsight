@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "core-types",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T11:14:45+0900",
+      "summary": "Type-only domain models and ports added for transactions, statements, CSV mapping, tier gating, analysis responses, and repositories.",
+      "completed_at": "2026-06-03T19:16:26-0700"
     },
     {
       "step": 2,
