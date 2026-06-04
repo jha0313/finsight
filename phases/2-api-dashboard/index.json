@@ -40,7 +40,7 @@
       "status": "completed",
       "started_at": "2026-06-04T12:57:31+0900",
       "summary": "대시보드 포매터, dumb UI 컴포넌트, jsdom 렌더 테스트 인프라 구현",
-      "completed_at": "2026-06-03T21:08:30-0700"
+      "completed_at": "2026-06-04T13:09:36+0900"
     },
     {
       "step": 5,
