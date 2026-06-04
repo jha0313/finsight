@@ -5,13 +5,21 @@ import type {
   AiUsageGateway,
   CheckoutGateway,
   InsightProvider,
+  SubscriptionUpsertPayload,
   StatementRepository,
   SubscriptionGateway,
+  WebhookEvent,
+  WebhookSubscriptionRepository,
 } from "@/types/ports";
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
 
-import { runAnalysis, runAnalyzeRequest, runCheckoutRequest } from "./index";
+import {
+  runAnalysis,
+  runAnalyzeRequest,
+  runCheckoutRequest,
+  runPolarWebhookRequest,
+} from "./index";
 
 const STANDARD_CSV = `date,merchant,amount,currency,account
 2026-06-01,스타벅스,5500,KRW,1234-5678-9012-3456
@@ -128,6 +136,68 @@ function createCheckoutRequestDeps(input: { userId?: string | null }) {
       checkout,
     },
     checkout,
+  };
+}
+
+function createWebhookRequestDeps(input: {
+  eventState?: "inserted" | "already_processed";
+  verifyThrows?: boolean;
+  upsert?: SubscriptionUpsertPayload | null;
+}) {
+  const verifiedEvent: WebhookEvent = {
+    eventId: "evt_1",
+    type: "subscription.active",
+    data: { id: "sub_1" },
+  };
+  const repository: WebhookSubscriptionRepository & {
+    markCalls: string[];
+    upsertCalls: SubscriptionUpsertPayload[];
+  } = {
+    markCalls: [],
+    upsertCalls: [],
+    async markEventProcessed(eventId) {
+      this.markCalls.push(eventId);
+
+      return input.eventState ?? "inserted";
+    },
+    async upsertSubscription(upsertInput) {
+      this.upsertCalls.push(upsertInput);
+    },
+  };
+  const verifyCalls: Array<{
+    rawBody: string;
+    headers: Record<string, string>;
+  }> = [];
+  const upsertCalls: WebhookEvent[] = [];
+
+  return {
+    repository,
+    upsertCalls,
+    verifyCalls,
+    deps: {
+      verifyWebhook(rawBody: string, headers: Record<string, string>) {
+        verifyCalls.push({ rawBody, headers });
+
+        if (input.verifyThrows === true) {
+          throw new Error("invalid signature");
+        }
+
+        return verifiedEvent;
+      },
+      toSubscriptionUpsert(event: WebhookEvent) {
+        upsertCalls.push(event);
+
+        return input.upsert === undefined
+          ? {
+              userId: "user-1",
+              polarSubscriptionId: "sub_1",
+              status: "active",
+              currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+            }
+          : input.upsert;
+      },
+      subscriptionRepository: repository,
+    },
   };
 }
 
@@ -504,5 +574,102 @@ describe("runCheckoutRequest", () => {
         productId: "product-1",
       },
     ]);
+  });
+});
+
+describe("runPolarWebhookRequest", () => {
+  it("returns 401 before idempotency when signature verification fails", async () => {
+    const { deps, repository, verifyCalls } = createWebhookRequestDeps({
+      verifyThrows: true,
+    });
+
+    const result = await runPolarWebhookRequest({
+      rawBody: "{\"type\":\"subscription.active\"}",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 401,
+      body: { error: "invalid_signature" },
+    });
+    expect(verifyCalls).toEqual([
+      {
+        rawBody: "{\"type\":\"subscription.active\"}",
+        headers: { "webhook-id": "evt_1" },
+      },
+    ]);
+    expect(repository.markCalls).toEqual([]);
+    expect(repository.upsertCalls).toEqual([]);
+  });
+
+  it("returns 200 without upsert when the event_id was already inserted", async () => {
+    const { deps, repository, upsertCalls } = createWebhookRequestDeps({
+      eventState: "already_processed",
+    });
+
+    const result = await runPolarWebhookRequest({
+      rawBody: "raw-body",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true, duplicate: true },
+    });
+    expect(repository.markCalls).toEqual(["evt_1"]);
+    expect(upsertCalls).toEqual([]);
+    expect(repository.upsertCalls).toEqual([]);
+  });
+
+  it("pre-inserts the event_id before upserting a new subscription event", async () => {
+    const { deps, repository, upsertCalls } = createWebhookRequestDeps({});
+
+    const result = await runPolarWebhookRequest({
+      rawBody: "raw-body",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true },
+    });
+    expect(repository.markCalls).toEqual(["evt_1"]);
+    expect(upsertCalls).toEqual([
+      {
+        eventId: "evt_1",
+        type: "subscription.active",
+        data: { id: "sub_1" },
+      },
+    ]);
+    expect(repository.upsertCalls).toEqual([
+      {
+        userId: "user-1",
+        polarSubscriptionId: "sub_1",
+        status: "active",
+        currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("keeps non-subscription webhook events idempotent without subscription upsert", async () => {
+    const { deps, repository } = createWebhookRequestDeps({
+      upsert: null,
+    });
+
+    const result = await runPolarWebhookRequest({
+      rawBody: "raw-body",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true },
+    });
+    expect(repository.markCalls).toEqual(["evt_1"]);
+    expect(repository.upsertCalls).toEqual([]);
   });
 });

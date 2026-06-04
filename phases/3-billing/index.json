@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "webhook-route",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-06-04T13:34:07+0900",
+      "summary": "Added Polar webhook route with raw-body verification, event_id pre-insert idempotency, and service_role subscription upsert.",
+      "completed_at": "2026-06-04T13:39:34+0900"
     },
     {
       "step": 3,

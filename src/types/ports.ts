@@ -32,6 +32,26 @@ export interface CheckoutGateway {
   }): Promise<{ url: string }>;
 }
 
+export interface WebhookEvent {
+  eventId: string;
+  type: string;
+  data: unknown;
+}
+
+export interface SubscriptionUpsertPayload {
+  userId: string;
+  polarSubscriptionId: string;
+  status: string;
+  currentPeriodEnd: string | null;
+}
+
+export interface WebhookSubscriptionRepository {
+  markEventProcessed(
+    eventId: string,
+  ): Promise<"inserted" | "already_processed">;
+  upsertSubscription(input: SubscriptionUpsertPayload): Promise<void>;
+}
+
 export interface SaveStatementAnalysisInput {
   userId: string;
   statement: {

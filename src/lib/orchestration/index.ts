@@ -9,8 +9,11 @@ import type {
   AiUsageGateway,
   CheckoutGateway,
   InsightProvider,
+  SubscriptionUpsertPayload,
   StatementRepository,
   SubscriptionGateway,
+  WebhookEvent,
+  WebhookSubscriptionRepository,
 } from "@/types/ports";
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
@@ -41,6 +44,17 @@ export interface AnalyzeRequestDeps {
 export interface CheckoutRequestDeps {
   getCurrentUser: () => Promise<{ id: string } | null>;
   checkout: CheckoutGateway;
+}
+
+export interface PolarWebhookRequestDeps {
+  verifyWebhook: (
+    rawBody: string,
+    headers: Record<string, string>,
+  ) => WebhookEvent;
+  toSubscriptionUpsert: (
+    event: Pick<WebhookEvent, "type" | "data">,
+  ) => SubscriptionUpsertPayload | null;
+  subscriptionRepository: WebhookSubscriptionRepository;
 }
 
 export async function runAnalysis(input: {
@@ -208,6 +222,47 @@ export async function runCheckoutRequest(input: {
   return {
     status: 303,
     redirectUrl: checkout.url,
+  };
+}
+
+export async function runPolarWebhookRequest(input: {
+  rawBody: string;
+  headers: Record<string, string>;
+  deps: PolarWebhookRequestDeps;
+}): Promise<
+  | { status: 200; body: { received: true; duplicate?: true } }
+  | { status: 401; body: { error: "invalid_signature" } }
+> {
+  let event: WebhookEvent;
+
+  try {
+    event = input.deps.verifyWebhook(input.rawBody, input.headers);
+  } catch {
+    return {
+      status: 401,
+      body: { error: "invalid_signature" },
+    };
+  }
+
+  const eventState =
+    await input.deps.subscriptionRepository.markEventProcessed(event.eventId);
+
+  if (eventState === "already_processed") {
+    return {
+      status: 200,
+      body: { received: true, duplicate: true },
+    };
+  }
+
+  const upsert = input.deps.toSubscriptionUpsert(event);
+
+  if (upsert !== null) {
+    await input.deps.subscriptionRepository.upsertSubscription(upsert);
+  }
+
+  return {
+    status: 200,
+    body: { received: true },
   };
 }
 
