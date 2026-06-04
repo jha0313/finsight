@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--canvas);display:flex;flex-direction:column;gap:18px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .btn{font-family:var(--font-sans);font-weight:600;font-size:16px;line-height:1.15;border:none;cursor:pointer;border-radius:var(--radius-pill);padding:12px 20px;height:44px;display:inline-flex;align-items:center}
+  .b-primary{background:var(--primary);color:var(--on-primary)}
+  .b-active{background:var(--primary-active);color:var(--on-primary)}
+  .b-disabled{background:var(--primary-disabled);color:#fff;cursor:not-allowed}
+  .b-sec{background:var(--surface-strong);color:var(--ink)}
+  .b-text{background:transparent;color:var(--primary);padding-left:4px;padding-right:4px}
+  .b-cta{height:56px;padding:0 32px;background:var(--primary);color:#fff}
+  .lbl{font-family:var(--font-mono);font-size:11px;color:var(--muted);width:90px;flex:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="row"><span class="lbl">light</span>
+    <button class="btn b-primary">Get started</button>
+    <button class="btn b-active">Active</button>
+    <button class="btn b-disabled">Disabled</button>
+    <button class="btn b-sec">Sign in</button>
+    <button class="btn b-text">Learn more →</button>
+  </div>
+  <div class="row"><span class="lbl">hero pill</span>
+    <button class="btn b-cta">Get started</button>
+    <span class="caption">56px tall · 16×32 padding · a prouder stance for the homepage hero</span>
+  </div>
+</div>
+</body>
+</html>

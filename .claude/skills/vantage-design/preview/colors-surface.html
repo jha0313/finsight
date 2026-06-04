@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:24px;background:var(--canvas);font-family:var(--font-sans)}
+  .row{display:flex;gap:12px}
+  .sw{flex:1;display:flex;flex-direction:column;gap:8px}
+  .chip{height:64px;border-radius:var(--radius-lg);border:1px solid var(--hairline)}
+  .meta{display:flex;flex-direction:column;gap:1px}
+  .nm{font-size:13px;font-weight:600;color:var(--ink)}
+  .hx{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="row">
+    <div class="sw"><div class="chip" style="background:var(--canvas)"></div><div class="meta"><span class="nm">Canvas</span><span class="hx">--canvas · #ffffff</span></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-soft)"></div><div class="meta"><span class="nm">Surface Soft</span><span class="hx">--surface-soft · #f7f7f7</span></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-strong)"></div><div class="meta"><span class="nm">Surface Strong</span><span class="hx">--surface-strong · #eef0f3</span></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-dark)"></div><div class="meta"><span class="nm">Surface Dark</span><span class="hx">--surface-dark · #0a0b0d</span></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-dark-elevated)"></div><div class="meta"><span class="nm">Dark Elevated</span><span class="hx">--surface-dark-elevated · #16181c</span></div></div>
+  </div>
+</div>
+</body>
+</html>

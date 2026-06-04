@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--canvas)}
+  .rows{display:flex;flex-direction:column;gap:9px}
+  .r{display:flex;align-items:center;gap:14px}
+  .bar{height:16px;background:var(--primary);border-radius:3px}
+  .nm{font-family:var(--font-mono);font-size:12px;color:var(--ink);width:96px;flex:none}
+  .vl{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="rows">
+    <div class="r"><span class="nm">xxs</span><span class="bar" style="width:4px"></span><span class="vl">4px</span></div>
+    <div class="r"><span class="nm">xs</span><span class="bar" style="width:8px"></span><span class="vl">8px</span></div>
+    <div class="r"><span class="nm">sm</span><span class="bar" style="width:12px"></span><span class="vl">12px</span></div>
+    <div class="r"><span class="nm">base</span><span class="bar" style="width:16px"></span><span class="vl">16px</span></div>
+    <div class="r"><span class="nm">md</span><span class="bar" style="width:20px"></span><span class="vl">20px</span></div>
+    <div class="r"><span class="nm">lg</span><span class="bar" style="width:24px"></span><span class="vl">24px · cards inside bands</span></div>
+    <div class="r"><span class="nm">xl</span><span class="bar" style="width:32px"></span><span class="vl">32px · card internal padding</span></div>
+    <div class="r"><span class="nm">xxl</span><span class="bar" style="width:48px"></span><span class="vl">48px</span></div>
+    <div class="r"><span class="nm">section</span><span class="bar" style="width:96px"></span><span class="vl">96px · between editorial bands</span></div>
+  </div>
+</div>
+</body>
+</html>

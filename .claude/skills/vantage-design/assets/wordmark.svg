@@ -1,0 +1,7 @@
+<svg width="200" height="40" viewBox="0 0 200 40" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vantage">
+  
+  <rect x="0" y="4" width="32" height="32" rx="9999" fill="#0052ff"></rect>
+  <path d="M9 24.5 L16 13 L23 24.5" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+  
+  <text x="44" y="27.5" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="600" letter-spacing="-0.5" fill="#0a0b0d">Vantage</text>
+</svg>

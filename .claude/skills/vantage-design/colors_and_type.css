@@ -1,0 +1,142 @@
+/* ============================================================================
+   VANTAGE DESIGN SYSTEM — colors_and_type.css
+   Editorial-institutional fintech. AI-driven financial intelligence.
+   Single accent voltage (Vantage Blue), white canvas + ink, dark editorial
+   heroes. Inherits the documented foundations of the source brand spec, built
+   as an original system.
+
+   Fonts: Inter (display + sans) and JetBrains Mono (tabular numerals) are
+   OPEN-SOURCE SUBSTITUTES for the licensed display/sans/mono families named
+   in the spec. See README "Known Gaps".
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   1. FONTS  (Google Fonts — substitutes; swap for licensed faces in prod)
+   ---------------------------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ==========================================================================
+     2. COLOR — BASE PALETTE  (never inline a hex; reference these tokens)
+     ========================================================================== */
+
+  /* Brand & accent — the single action color of the system */
+  --primary:            #0052ff;   /* Vantage Blue — every primary CTA, wordmark, brand link */
+  --primary-active:     #003ecc;   /* press-state darken */
+  --primary-disabled:   #a8b8cc;   /* faded-blue tint, disabled CTAs */
+  --accent-yellow:      #f4b000;   /* illustrative-only sub-accent (asset glyphs). NOT an action color */
+
+  /* Surface */
+  --canvas:               #ffffff; /* default page floor */
+  --surface-soft:         #f7f7f7; /* alternating band */
+  --surface-strong:       #eef0f3; /* secondary buttons, search pills, icon plates */
+  --surface-dark:         #0a0b0d; /* full-bleed dark heroes & CTA bands */
+  --surface-dark-elevated:#16181c; /* floating product-UI mockup cards on dark */
+
+  /* Hairlines */
+  --hairline:           #dee1e6;   /* default 1px divider on white */
+  --hairline-soft:      #eef0f3;   /* lighter divider */
+
+  /* Text */
+  --ink:                #0a0b0d;   /* display headings, primary nav, emphasis */
+  --body:               #5b616e;   /* default running text — cool gray */
+  --body-strong:        #0a0b0d;   /* stronger emphasis (= ink) */
+  --muted:              #7c828a;   /* sub-titles, breadcrumbs, footer secondary */
+  --muted-soft:         #a8acb3;   /* disabled link text */
+  --on-primary:         #ffffff;   /* text on blue CTAs */
+  --on-dark:            #ffffff;   /* text on dark heroes */
+  --on-dark-soft:       #a8acb3;   /* muted off-white on dark */
+
+  /* Trading semantics — TEXT COLOR ONLY, never background fills */
+  --semantic-up:        #05b169;   /* price up */
+  --semantic-down:      #cf202f;   /* price down */
+
+  /* ==========================================================================
+     3. TYPOGRAPHY — FAMILIES
+     ========================================================================== */
+  --font-display: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:    'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Display family is set at weight 400 and slightly tightened — the signature
+     "calm institutional" choice. Never bold display copy. */
+  --display-weight: 400;
+  --display-tracking: -0.015em; /* ~ -1.5% */
+
+  /* ==========================================================================
+     4. SPACING — base unit 4px
+     ========================================================================== */
+  --space-xxs: 4px;
+  --space-xs:  8px;
+  --space-sm:  12px;
+  --space-base:16px;
+  --space-md:  20px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-xxl: 48px;
+  --space-section: 96px;  /* every major editorial band */
+
+  --container-max: 1200px;
+  --card-pad: 32px;
+
+  /* ==========================================================================
+     5. RADIUS
+     ========================================================================== */
+  --radius-none: 0px;     /* reserved — essentially unused */
+  --radius-xs:   4px;     /* inline tags */
+  --radius-sm:   8px;     /* compact rows */
+  --radius-md:   12px;    /* form inputs */
+  --radius-lg:   16px;    /* mid-size cards */
+  --radius-xl:   24px;    /* feature cards, product-UI mockups, pricing tiers */
+  --radius-pill: 100px;   /* all CTAs, search pills, badges */
+  --radius-full: 9999px;  /* asset icons, avatars */
+
+  /* ==========================================================================
+     6. ELEVATION — one shadow tier only
+     ========================================================================== */
+  --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
+
+  /* ==========================================================================
+     7. TYPE SCALE TOKENS — { size / weight / line-height / tracking }
+        Use the semantic classes below; these raw vars are for reference.
+     ========================================================================== */
+}
+
+/* ============================================================================
+   8. SEMANTIC TYPE CLASSES
+   Display uses --font-display @ 400 with negative tracking. Body stays at 0.
+   Numbers ALWAYS render mono via .num.
+   ============================================================================ */
+
+.display-mega { font-family: var(--font-display); font-weight: 400; font-size: 80px; line-height: 1.0;  letter-spacing: -0.025em; color: var(--ink); }
+.display-xl   { font-family: var(--font-display); font-weight: 400; font-size: 64px; line-height: 1.0;  letter-spacing: -0.025em; color: var(--ink); }
+.display-lg   { font-family: var(--font-display); font-weight: 400; font-size: 52px; line-height: 1.0;  letter-spacing: -0.025em; color: var(--ink); }
+.display-md   { font-family: var(--font-display); font-weight: 400; font-size: 44px; line-height: 1.09; letter-spacing: -0.022em; color: var(--ink); }
+.display-sm   { font-family: var(--font-sans);    font-weight: 400; font-size: 36px; line-height: 1.11; letter-spacing: -0.014em; color: var(--ink); }
+
+.title-lg { font-family: var(--font-sans); font-weight: 400; font-size: 32px; line-height: 1.13; letter-spacing: -0.0125em; color: var(--ink); }
+.title-md { font-family: var(--font-sans); font-weight: 600; font-size: 18px; line-height: 1.33; color: var(--ink); }
+.title-sm { font-family: var(--font-sans); font-weight: 600; font-size: 16px; line-height: 1.25; color: var(--ink); }
+
+.body-md      { font-family: var(--font-sans); font-weight: 400; font-size: 16px; line-height: 1.5; color: var(--body); }
+.body-strong  { font-family: var(--font-sans); font-weight: 700; font-size: 16px; line-height: 1.5; color: var(--ink); }
+.body-sm      { font-family: var(--font-sans); font-weight: 400; font-size: 14px; line-height: 1.5; color: var(--body); }
+.caption      { font-family: var(--font-sans); font-weight: 400; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.caption-strong { font-family: var(--font-sans); font-weight: 600; font-size: 12px; line-height: 1.5; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink); }
+
+.nav-link { font-family: var(--font-sans); font-weight: 500; font-size: 14px; line-height: 1.4; color: var(--ink); }
+.btn-label{ font-family: var(--font-sans); font-weight: 600; font-size: 16px; line-height: 1.15; }
+
+/* Tabular numerals — asset prices, % changes, anything numeric */
+.num { font-family: var(--font-mono); font-weight: 500; font-size: 18px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.num.up   { color: var(--semantic-up); }
+.num.down { color: var(--semantic-down); }
+
+/* ============================================================================
+   9. BASE ELEMENT DEFAULTS
+   ============================================================================ */
+body { font-family: var(--font-sans); color: var(--body); background: var(--canvas); -webkit-font-smoothing: antialiased; }
+h1 { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.025em; color: var(--ink); }
+h2, h3 { font-family: var(--font-sans); font-weight: 600; color: var(--ink); }
+a { color: var(--primary); text-decoration: none; }
+code, kbd, samp { font-family: var(--font-mono); }

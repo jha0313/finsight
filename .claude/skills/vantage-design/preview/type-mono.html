@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--canvas)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .cell{padding:16px;border:1px solid var(--hairline);border-radius:var(--radius-lg)}
+  .k{font-size:13px;color:var(--muted);margin-bottom:6px}
+  .lbl{font-family:var(--font-mono);font-size:11px;color:var(--muted);display:block;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="lbl">number-display · JetBrains Mono · 18/500 · tabular-nums</span>
+  <div class="grid">
+    <div class="cell"><div class="k">BTC / USD</div><div class="num" style="font-size:22px;color:var(--ink)">$67,412.08</div></div>
+    <div class="cell"><div class="k">24h change</div><div class="num up" style="font-size:22px">+2.41%</div></div>
+    <div class="cell"><div class="k">24h change</div><div class="num down" style="font-size:22px">−1.08%</div></div>
+  </div>
+  <p class="caption" style="margin:16px 0 0">Every numeric value — prices, percentages, volumes — renders in mono. Substitute for the licensed mono face.</p>
+</div>
+</body>
+</html>

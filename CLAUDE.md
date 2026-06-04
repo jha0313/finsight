@@ -1,6 +1,6 @@
 # 프로젝트: finsight
 
-임의의 카드/은행 명세서 CSV를 업로드하면 Claude로 분석해 지출 구조·이상 거래·절약 인사이트를 대시보드로 보여주는 글로벌 핀테크 SaaS MVP. 자세한 내용은 docs/PRD.md, docs/ARCHITECTURE.md, docs/ADR.md 참고.
+임의의 카드/은행 명세서 CSV를 업로드하면 Claude로 분석해 지출 구조·이상 거래·절약 인사이트를 대시보드로 보여주는 글로벌 핀테크 SaaS MVP. 자세한 내용은 docs/PRD.md, docs/ARCHITECTURE.md, docs/ADR.md, docs/DESIGN.md 참고.
 
 ## 기술 스택
 - Next.js 15 (App Router + Route Handlers)
@@ -11,6 +11,7 @@
 - 인증/DB: Supabase (`@supabase/ssr`, Postgres RLS, 구글 OAuth)
 - 결제: Polar.sh (`@polar-sh/nextjs`, Merchant of Record)
 - 배포: Vercel (CLI 자동배포) · UI 언어 한국어 우선(글로벌 확장 지향, i18n 후속)
+- 디자인: **Vantage 디자인 시스템**(`docs/DESIGN.md`) · 폰트 Pretendard(한글)+JetBrains Mono(숫자)+Inter(라틴) · 아이콘 Lucide · 토큰 정본 `.claude/skills/vantage-design/colors_and_type.css`
 
 ## 티어
 - Free: 규칙·통계 분석(카테고리 분류·기간 추이·이상거래/구독누수 탐지) + Claude **Sonnet**(`claude-sonnet-4-6`) 자연어 요약·인사이트.
@@ -30,6 +31,7 @@
 - AI 분석 결과는 `analyses`에 **`unique(user_id, input_hash)`** 로 캐시 — 동일 입력(거래 단위 입력+모델+프롬프트 버전) 재분석 시 재호출을 skip한다. Claude 호출(Free=Sonnet/Pro=Opus)은 `ai_usage_daily` 원자 카운터로 **tier별 일일 quota**를 적용한다.
 - 웹훅은 **raw body 서명검증** + `processed_webhook_events.event_id` 선삽입으로 멱등 처리한다.
 - 컴포넌트는 props만 받는 dumb으로 만들고, 계산·포맷·파싱·마스킹 로직은 `lib/`로 분리(TDD 대상)한다. 디렉토리: `src/{app,components,lib,services,types}`.
+- CRITICAL: UI는 Vantage 디자인 시스템(`docs/DESIGN.md`·`.claude/skills/vantage-design/`)을 따른다. 색은 **토큰만 참조**하고 hex를 인라인하지 마라. accent는 `--primary` #0052ff **단일**(CTA·링크·워드마크만), display는 **weight 400**, 모든 숫자는 **JetBrains Mono(tabular)**, 트레이딩 그린/레드는 텍스트 색으로만(배경 fill 금지). 한글은 **Pretendard**. 화면에 'Vantage' 노출 금지(제품명 = finsight).
 
 ## 개발 프로세스
 - CRITICAL: 비즈니스 로직(`lib/`·`services/`)은 테스트를 먼저 작성하고, 통과하는 구현을 작성하라(TDD).

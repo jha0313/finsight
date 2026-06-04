@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;display:flex}
+  .half{flex:1;padding:36px;display:flex;flex-direction:column;gap:8px;justify-content:center}
+  .light{background:var(--canvas);border:1px solid var(--hairline)}
+  .dark{background:var(--surface-dark)}
+  img{height:34px;width:auto}
+  .lbl{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+  .dark .lbl{color:var(--on-dark-soft)}
+  .marks{display:flex;align-items:center;gap:18px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="half light">
+    <span class="lbl">wordmark · on light</span>
+    <div class="marks"><img src="../assets/wordmark.svg" alt="Vantage"/><img src="../assets/mark.svg" alt="mark" style="height:36px"/></div>
+  </div>
+  <div class="half dark">
+    <span class="lbl">wordmark · on dark</span>
+    <div class="marks"><img src="../assets/wordmark-on-dark.svg" alt="Vantage"/></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;height:330px;box-sizing:border-box;padding:36px;background:var(--surface-dark);position:relative;overflow:hidden}
+  .lbl{font-family:var(--font-mono);font-size:11px;color:var(--on-dark-soft);position:absolute;top:18px;left:36px}
+  /* stacked product-ui cards */
+  .ui{position:absolute;background:var(--surface-dark-elevated);border-radius:var(--radius-xl);padding:24px;box-sizing:border-box;border:1px solid rgba(255,255,255,.06)}
+  .ui-back{width:300px;height:200px;right:34px;top:78px;transform:rotate(4deg);opacity:.75}
+  .ui-front{width:340px;height:210px;left:36px;top:88px}
+  .h{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .h .t{color:var(--on-dark);font-weight:600;font-size:15px}
+  .h .p{color:var(--on-dark-soft);font-size:12px;font-family:var(--font-mono)}
+  .big{color:var(--on-dark);font-size:34px;font-family:var(--font-mono);font-weight:500;letter-spacing:-.01em}
+  .sub{color:var(--semantic-up);font-family:var(--font-mono);font-size:14px;margin-top:4px}
+  .spark{display:flex;align-items:flex-end;gap:5px;height:48px;margin-top:18px}
+  .spark i{flex:1;background:linear-gradient(var(--primary),rgba(0,82,255,.25));border-radius:3px 3px 0 0;display:block}
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="lbl">product-ui-card-dark — layered floating mockups</span>
+  <div class="ui ui-back">
+    <div class="h"><span class="t">Allocation</span><span class="p">AI · live</span></div>
+    <div class="big" style="font-size:26px">7 signals</div>
+    <div class="sub">Rebalance suggested</div>
+  </div>
+  <div class="ui ui-front">
+    <div class="h"><span class="t">Portfolio</span><span class="p">24h</span></div>
+    <div class="big">$1.24M</div>
+    <div class="sub">+ $28,400 · +2.34%</div>
+    <div class="spark">
+      <i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:85%"></i><i style="height:78%"></i><i style="height:100%"></i>
+    </div>
+  </div>
+</div>
+</body>
+</html>

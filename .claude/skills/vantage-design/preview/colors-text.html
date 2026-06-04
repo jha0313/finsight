@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:24px;background:var(--canvas);font-family:var(--font-sans)}
+  .row{display:flex;gap:10px}
+  .sw{flex:1;display:flex;flex-direction:column;gap:8px}
+  .chip{height:56px;border-radius:var(--radius-md);border:1px solid var(--hairline);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px}
+  .meta{display:flex;flex-direction:column;gap:1px}
+  .nm{font-size:12px;font-weight:600;color:var(--ink)}
+  .hx{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="row">
+    <div class="sw"><div class="chip" style="background:#fff;color:var(--ink)">Ink</div><div class="meta"><span class="nm">Ink</span><span class="hx">#0a0b0d</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;color:var(--body)">Body</div><div class="meta"><span class="nm">Body</span><span class="hx">#5b616e</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;color:var(--muted)">Muted</div><div class="meta"><span class="nm">Muted</span><span class="hx">#7c828a</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;color:var(--muted-soft)">Muted Soft</div><div class="meta"><span class="nm">Muted Soft</span><span class="hx">#a8acb3</span></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-dark);color:var(--on-dark)">On Dark</div><div class="meta"><span class="nm">On Dark</span><span class="hx">#ffffff</span></div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-dark);color:var(--on-dark-soft)">On Dark Soft</div><div class="meta"><span class="nm">On Dark Soft</span><span class="hx">#a8acb3</span></div></div>
+  </div>
+</div>
+</body>
+</html>

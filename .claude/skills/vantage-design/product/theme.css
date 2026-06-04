@@ -1,0 +1,81 @@
+/* ============================================================================
+   VANTAGE — Dark Cyan-Glow product theme
+   Derived from the reference: deep near-black canvas, glossy dark cards,
+   cyan→electric-blue glowing gradient on primary actions, cyan accent on
+   links/toggles/checks. Numbers in mono.
+   ============================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Canvas & surfaces (cool near-black) */
+  --bg:            #06080b;   /* page floor */
+  --bg-2:          #080b10;   /* alt band */
+  --surface:       #0d1117;   /* cards / panels */
+  --surface-2:     #11161e;   /* elevated within a card */
+  --surface-3:     #161c26;   /* hover / inputs-on-card */
+  --input:         #0a0e13;   /* form field fill */
+
+  /* Borders / hairlines */
+  --border:        rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.12);
+
+  /* Accent — cyan→blue gradient + solid cyan */
+  --accent:        #22d3ee;   /* cyan */
+  --accent-2:      #2a9dff;   /* electric blue */
+  --accent-soft:   #38bdf8;
+  --grad:          linear-gradient(105deg, #2ee6f6 0%, #22b8ee 45%, #2a8dff 100%);
+  --grad-faint:    linear-gradient(105deg, rgba(46,230,246,.16), rgba(42,141,255,.16));
+  --glow:          0 8px 28px rgba(34,211,238,0.38), 0 2px 8px rgba(42,141,255,0.30);
+  --glow-strong:   0 0 0 1px rgba(120,240,255,.25) inset, 0 10px 36px rgba(34,211,238,0.55);
+
+  /* Text */
+  --text:          #eef3f8;
+  --text-2:        #aeb8c6;
+  --text-3:        #7b8696;
+  --text-faint:    #586273;
+  --on-accent:     #04222b;   /* dark ink on bright cyan button */
+
+  /* Semantic (brightened for dark) */
+  --up:            #34d399;
+  --down:          #fb7185;
+  --warn:          #fbbf24;
+
+  /* Type */
+  --font: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Geometry (tweakable) */
+  --r-card: 20px;
+  --r-input: 12px;
+  --r-btn: 13px;
+  --r-pill: 100px;
+
+  /* Spacing base 4 */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px; --s12:48px; --s16:64px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(34,211,238,.3); }
+
+/* Numbers */
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+
+/* Scrollbar */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.16); background-clip: padding-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Ambient glows used behind hero/sections */
+.glow-orb {
+  position: absolute; border-radius: 9999px; filter: blur(80px); pointer-events: none; z-index: 0;
+}

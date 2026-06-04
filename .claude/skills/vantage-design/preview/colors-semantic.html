@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--canvas);display:flex;gap:32px;align-items:center}
+  .demo{flex:1;display:flex;flex-direction:column;gap:14px}
+  .arow{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--hairline)}
+  .a-name{display:flex;align-items:center;gap:12px}
+  .glyph{width:32px;height:32px;border-radius:var(--radius-full);background:var(--surface-strong);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:600;font-size:13px;color:var(--ink)}
+  .tk{font-weight:600;font-size:15px;color:var(--ink)}
+  .note{font-size:13px;color:var(--muted);max-width:200px;line-height:1.5}
+  .note b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="demo">
+    <div class="arow"><div class="a-name"><span class="glyph">B</span><span class="tk">BTC</span></div><span class="num up">+2.41%</span></div>
+    <div class="arow" style="border:none"><div class="a-name"><span class="glyph">E</span><span class="tk">ETH</span></div><span class="num down">−1.08%</span></div>
+  </div>
+  <div class="note">Trading semantics are <b>text color only</b> — never background fills. Up <b style="color:var(--semantic-up)">#05b169</b>, Down <b style="color:var(--semantic-down)">#cf202f</b>. Rendered in mono.</div>
+</div>
+</body>
+</html>

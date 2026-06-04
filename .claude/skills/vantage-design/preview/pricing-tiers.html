@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--canvas);display:flex;gap:16px}
+  .tier{flex:1;border-radius:var(--radius-xl);padding:26px;border:1px solid var(--hairline)}
+  .tier.feat{background:var(--surface-dark);border-color:var(--surface-dark)}
+  .nm{font-size:14px;font-weight:600;color:var(--ink);margin:0 0 10px}
+  .feat .nm{color:var(--on-dark)}
+  .price{font-family:var(--font-mono);font-size:30px;font-weight:500;color:var(--ink);letter-spacing:-.01em}
+  .feat .price{color:var(--on-dark)}
+  .per{font-size:13px;color:var(--muted)}
+  .feat .per{color:var(--on-dark-soft)}
+  ul{list-style:none;padding:0;margin:16px 0 18px;display:flex;flex-direction:column;gap:8px}
+  li{font-size:13px;color:var(--body);display:flex;gap:8px;align-items:center}
+  .feat li{color:var(--on-dark-soft)}
+  li svg{color:var(--primary);flex:none}
+  .btn{width:100%;box-sizing:border-box;text-align:center;border:none;border-radius:var(--radius-pill);height:44px;font-weight:600;font-size:15px;cursor:pointer}
+  .b-sec{background:var(--surface-strong);color:var(--ink)}
+  .b-pri{background:var(--primary);color:#fff}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="tier">
+    <p class="nm">Desk</p>
+    <span class="price">$0</span><span class="per"> / mo</span>
+    <ul>
+      <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>Up to 3 portfolios</li>
+      <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>Daily signals</li>
+    </ul>
+    <button class="btn b-sec">Start free</button>
+  </div>
+  <div class="tier feat">
+    <p class="nm">Institution</p>
+    <span class="price">$2,400</span><span class="per"> / mo</span>
+    <ul>
+      <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>Unlimited portfolios</li>
+      <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>Real-time AI insight</li>
+      <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 6"/></svg>Audit + custody</li>
+    </ul>
+    <button class="btn b-pri">Talk to sales</button>
+  </div>
+</div>
+</body>
+</html>

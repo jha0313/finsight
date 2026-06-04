@@ -54,3 +54,8 @@ MVP 속도 최우선. "작동하는 최소"가 미덕 — 운영하다 필요해
 **결정**: ①기반(Next.js+Supabase Auth+스키마) → ②핵심 루프(업로드→표준파싱/폴백→마스킹→규칙·통계 분석→Sonnet AI 인사이트→대시보드) → ③랜딩+샘플 데모 → ④Polar 결제+게이팅+Pro Opus 심층 분석.
 **이유**: 최대 리스크는 "임의 CSV → 신뢰할 만한 분석"이 실제로 작동하느냐. 그게 검증돼야 랜딩·결제가 의미를 가짐. 규칙·통계 루프가 먼저 서고, Sonnet(Free)·Opus(Pro)는 그 위에 얹는다.
 **트레이드오프**: 수익화(결제·Pro)가 뒤로 밀림. 대신 작동하지 않는 제품에 결제를 붙이는 위험을 회피.
+
+### ADR-011: 디자인 시스템 = Vantage 시스템 채택
+**결정**: UI 비주얼 랭귀지로 **Vantage 디자인 시스템**(`.claude/skills/vantage-design/`)을 채택한다. 토큰(색·타이포·spacing·radius·elevation)·컴포넌트 패턴·브랜드 마크를 단일 출처로 삼고, 상세 규칙은 `docs/DESIGN.md`에 둔다. 제품명은 **finsight 유지**(Vantage는 디자인 시스템 코드네임), 카피는 **한국어 우선**, 폰트는 한글 대응을 위해 **Pretendard**(본문/디스플레이) + **JetBrains Mono**(숫자) + Inter(라틴 fallback)로 둔다.
+**이유**: finsight의 도메인("AI 기반 금융 인텔리전스 SaaS")이 Vantage 시스템의 타깃과 정확히 일치해 그대로 쓸 수 있다. 토큰·컴포넌트가 갖춰진 시스템을 채택하면 UI step마다 디자인을 즉흥 결정하지 않고 harness 가드레일(`docs/*.md` 주입)로 일관된 브랜드를 강제할 수 있다. 단일 accent(#0052ff)·display weight 400·숫자 mono 같은 규칙이 핀테크 신뢰감(미니멀·에디토리얼)이라는 PRD 디자인 목표와 부합한다.
+**트레이드오프**: 원본 스킬은 영문 마케팅 사이트 기준이라 (1) 카피를 한국어로 (2) Inter→Pretendard로 (3) Vantage→finsight 브랜드명으로 오버라이드해야 한다(→ `docs/DESIGN.md`). 폰트·아이콘(Lucide)은 라이선스 폰트/브랜드셋의 오픈소스 대체이므로 production 전 reconcile 필요. 전체 다크모드 토글은 범위 밖(다크는 랜딩 히어로 device로만).

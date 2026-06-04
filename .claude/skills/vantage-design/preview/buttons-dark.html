@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--surface-dark);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .btn{font-family:var(--font-sans);font-weight:600;font-size:16px;line-height:1.15;border:none;cursor:pointer;border-radius:var(--radius-pill);padding:12px 20px;height:44px;display:inline-flex;align-items:center}
+  .b-primary{background:var(--primary);color:var(--on-primary)}
+  .b-sec{background:var(--surface-dark-elevated);color:var(--on-dark)}
+  .b-outline{background:transparent;color:var(--on-dark);border:1px solid rgba(255,255,255,.4)}
+  .lbl{font-family:var(--font-mono);font-size:11px;color:var(--on-dark-soft);width:100%;margin:0}
+</style>
+</head>
+<body>
+<div class="card">
+  <p class="lbl">Buttons on dark heroes</p>
+  <button class="btn b-primary">Get started</button>
+  <button class="btn b-sec">Secondary</button>
+  <button class="btn b-outline">View demo</button>
+</div>
+</body>
+</html>

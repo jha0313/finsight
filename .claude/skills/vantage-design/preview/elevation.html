@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:32px;background:var(--surface-soft);display:flex;gap:20px}
+  .e{flex:1;height:96px;border-radius:var(--radius-xl);background:var(--canvas);display:flex;flex-direction:column;justify-content:center;padding:18px;box-sizing:border-box}
+  .e.flat{}
+  .e.hair{border:1px solid var(--hairline)}
+  .e.soft{box-shadow:var(--shadow-soft)}
+  .nm{font-size:14px;font-weight:600;color:var(--ink)}
+  .d{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:4px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="e flat"><span class="nm">Flat</span><span class="d">no shadow · 80% of surfaces</span></div>
+  <div class="e hair"><span class="nm">Hairline</span><span class="d">1px #dee1e6</span></div>
+  <div class="e soft"><span class="nm">Soft drop</span><span class="d">0 4px 12px rgba(0,0,0,.04)</span></div>
+</div>
+</body>
+</html>

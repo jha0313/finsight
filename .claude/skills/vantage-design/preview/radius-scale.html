@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0}
+  .card{width:700px;box-sizing:border-box;padding:28px;background:var(--canvas)}
+  .grid{display:flex;gap:16px;align-items:flex-end}
+  .item{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .box{width:64px;height:64px;background:var(--surface-strong);border:1px solid var(--hairline)}
+  .nm{font-family:var(--font-mono);font-size:11px;color:var(--ink)}
+  .vl{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+  .lbl{display:flex;flex-direction:column;align-items:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="grid">
+    <div class="item"><div class="box" style="border-radius:var(--radius-xs)"></div><div class="lbl"><span class="nm">xs</span><span class="vl">4px</span></div></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-sm)"></div><div class="lbl"><span class="nm">sm</span><span class="vl">8px</span></div></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-md)"></div><div class="lbl"><span class="nm">md</span><span class="vl">12px · inputs</span></div></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-lg)"></div><div class="lbl"><span class="nm">lg</span><span class="vl">16px</span></div></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-xl)"></div><div class="lbl"><span class="nm">xl</span><span class="vl">24px · cards</span></div></div>
+    <div class="item"><div class="box" style="width:96px;border-radius:var(--radius-pill)"></div><div class="lbl"><span class="nm">pill</span><span class="vl">100px · CTAs</span></div></div>
+    <div class="item"><div class="box" style="border-radius:var(--radius-full)"></div><div class="lbl"><span class="nm">full</span><span class="vl">icons</span></div></div>
+  </div>
+  <p class="caption" style="margin:18px 0 0">Pill for interactive, 24px card-radius for containers, full circle for icons. Sharp corners absent.</p>
+</div>
+</body>
+</html>

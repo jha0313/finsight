@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vantage — AI-native finance</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  #root { min-height: 100vh; }
+  @media (max-width: 960px) {
+    .lp-hero { grid-template-columns: 1fr !important; gap: 36px !important; }
+    .lp-h1 { font-size: 44px !important; }
+    .lp-ai { grid-template-columns: 1fr !important; gap: 32px !important; }
+    .lp-feat-grid { grid-template-columns: 1fr 1fr !important; }
+    .lp-price-grid { grid-template-columns: 1fr !important; max-width: 440px; margin: 0 auto; }
+    .lp-footer-grid { grid-template-columns: 1fr 1fr !important; }
+    .db-kpis { grid-template-columns: 1fr !important; }
+    .db-main { grid-template-columns: 1fr !important; }
+  }
+  @media (max-width: 600px) {
+    .lp-navlinks, .lp-navcta a { display: none !important; }
+    .lp-feat-grid { grid-template-columns: 1fr !important; }
+    .lp-h1 { font-size: 36px !important; }
+    .db-search span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#06080b"/>
+    <rect x="34" y="30" width="32" height="32" rx="10" fill="#22c5ee"/>
+    <path d="M42 56 50 40 58 56" fill="none" stroke="#04222b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</template>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="Kit.jsx"></script>
+<script type="text/babel" src="Charts.jsx"></script>
+<script type="text/babel" src="Landing.jsx"></script>
+<script type="text/babel" src="Dashboard.jsx"></script>
+<script type="text/babel" src="TransferModal.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accent": ["#2ee6f6", "#22b8ee", "#2a8dff"],
+    "glow": 1,
+    "radius": 20
+  }/*EDITMODE-END*/;
+
+  function hexA(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n>>16)&255}, ${(n>>8)&255}, ${n&255}, ${a})`;
+  }
+
+  function App() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+    const [screen, setScreen] = React.useState("landing");
+    const [page, setPage] = React.useState("Overview");
+    const [modal, setModal] = React.useState(false);
+
+    React.useEffect(() => {
+      const r = document.documentElement.style;
+      const [a, b, c] = t.accent;
+      r.setProperty("--accent", a);
+      r.setProperty("--accent-2", c);
+      r.setProperty("--grad", `linear-gradient(105deg, ${a} 0%, ${b} 45%, ${c} 100%)`);
+      r.setProperty("--grad-faint", `linear-gradient(105deg, ${hexA(a,.16)}, ${hexA(c,.16)})`);
+      const g = t.glow;
+      r.setProperty("--glow", `0 8px ${28*g}px ${hexA(a,.38*g)}, 0 2px 8px ${hexA(c,.30*g)}`);
+      r.setProperty("--glow-strong", `0 0 0 1px ${hexA(a,.25)} inset, 0 10px ${36*g}px ${hexA(a,.55*g)}`);
+      r.setProperty("--r-card", t.radius + "px");
+      r.setProperty("--r-input", Math.max(8, t.radius - 8) + "px");
+      r.setProperty("--r-btn", Math.max(8, t.radius - 7) + "px");
+    }, [t]);
+
+    const enter = () => { setScreen("app"); window.scrollTo(0, 0); };
+    const exit = () => { setScreen("landing"); window.scrollTo(0, 0); };
+
+    return (
+      <React.Fragment>
+        {screen === "landing"
+          ? <Landing onEnter={enter} />
+          : <Dashboard onExit={exit} onTransfer={() => setModal(true)} page={page} setPage={setPage} />}
+        <TransferModal open={modal} onClose={() => setModal(false)} />
+
+        <TweaksPanel>
+          <TweakSection label="Brand accent" />
+          <TweakColor label="Accent" value={t.accent}
+            options={[
+              ["#2ee6f6", "#22b8ee", "#2a8dff"],
+              ["#7c8bff", "#6a5bff", "#4f7bff"],
+              ["#34e3a8", "#10c5b0", "#0aa3d6"],
+              ["#fb9bce", "#f472b6", "#a855f7"]
+            ]}
+            onChange={(v) => setTweak("accent", v)} />
+          <TweakSection label="Depth & shape" />
+          <TweakSlider label="Glow intensity" value={t.glow} min={0} max={1.6} step={0.1}
+            onChange={(v) => setTweak("glow", v)} />
+          <TweakSlider label="Card radius" value={t.radius} min={8} max={28} step={1} unit="px"
+            onChange={(v) => setTweak("radius", v)} />
+        </TweaksPanel>
+      </React.Fragment>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
