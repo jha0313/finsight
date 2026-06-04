@@ -9,6 +9,8 @@ import {
   Siren,
 } from "lucide-react";
 
+import { getSampleDemoAnalysis } from "@/app/_demo/sample-demo";
+import { SampleDemoSection } from "@/app/_demo/SampleDemoSection";
 import { FeatureGrid } from "@/components/FeatureGrid";
 import { Hero } from "@/components/Hero";
 import { PricingTable } from "@/components/PricingTable";
@@ -105,7 +107,9 @@ const plans = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const sampleDemoAnalysis = await getSampleDemoAnalysis();
+
   return (
     <main className="min-h-screen bg-canvas">
       <Hero
@@ -114,9 +118,9 @@ export default function Home() {
         ctaLabel="Google로 시작"
         demoSlot={{
           description:
-            "다음 step에서 실제 샘플 명세서 흐름을 이 영역에 연결합니다.",
+            "아래 샘플 영역에서 실제 분석 결과를 먼저 확인할 수 있습니다.",
           label: "샘플 데모",
-          title: "샘플 명세서 데모 영역",
+          title: "샘플 명세서 미리보기",
         }}
         description="CSV 명세서를 올리면 지출 구조와 이상 거래를 먼저 정리하고, AI가 절약 인사이트를 덧붙입니다."
         headline="명세서에서 지출의 구조를 읽습니다"
@@ -135,12 +139,7 @@ export default function Home() {
       />
 
       <FeatureGrid
-        demoSlot={{
-          description:
-            "샘플 분석 실행과 결과 채우기는 다음 step에서 구현합니다.",
-          label: "데모 슬롯",
-          title: "샘플 명세서 분석 자리",
-        }}
+        demoSlot={<SampleDemoSection analysis={sampleDemoAnalysis} />}
         description="업로드된 명세서를 결정론적으로 파싱한 뒤, 지출 구조와 이상 거래를 먼저 보여주고 AI 요약을 붙입니다."
         eyebrow="핵심 가치"
         features={features}

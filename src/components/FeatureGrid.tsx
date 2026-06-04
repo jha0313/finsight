@@ -6,14 +6,14 @@ export interface FeatureGridItem {
   title: string;
 }
 
-export interface FeatureGridDemoSlot {
+export interface FeatureGridDemoSlotContent {
   description: string;
   label: string;
   title: string;
 }
 
 export interface FeatureGridProps {
-  demoSlot: FeatureGridDemoSlot;
+  demoSlot: FeatureGridDemoSlotContent | ReactNode;
   description: string;
   eyebrow: string;
   features: FeatureGridItem[];
@@ -53,12 +53,28 @@ export function FeatureGrid({
           ))}
         </div>
 
-        <aside className="mt-lg rounded-card border border-hairline bg-surface-soft p-xl">
-          <p className="caption-strong">{demoSlot.label}</p>
-          <h3 className="title-lg mt-sm">{demoSlot.title}</h3>
-          <p className="body-md mt-sm">{demoSlot.description}</p>
-        </aside>
+        {isDemoSlotContent(demoSlot) ? (
+          <aside className="mt-lg rounded-card border border-hairline bg-surface-soft p-xl">
+            <p className="caption-strong">{demoSlot.label}</p>
+            <h3 className="title-lg mt-sm">{demoSlot.title}</h3>
+            <p className="body-md mt-sm">{demoSlot.description}</p>
+          </aside>
+        ) : (
+          demoSlot
+        )}
       </div>
     </section>
+  );
+}
+
+function isDemoSlotContent(
+  demoSlot: FeatureGridProps["demoSlot"],
+): demoSlot is FeatureGridDemoSlotContent {
+  return (
+    typeof demoSlot === "object" &&
+    demoSlot !== null &&
+    "description" in demoSlot &&
+    "label" in demoSlot &&
+    "title" in demoSlot
   );
 }
