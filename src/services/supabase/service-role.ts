@@ -2,10 +2,7 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type {
-  SubscriptionUpsertPayload,
-  WebhookSubscriptionRepository,
-} from "@/types/ports";
+import type { WebhookSubscriptionRepository } from "@/types/ports";
 
 type SupabaseError = {
   code?: string;
@@ -49,28 +46,18 @@ export function createPolarWebhookRepository(): WebhookSubscriptionRepository {
     },
 
     async upsertSubscription(input) {
-      const { error } = await getSupabase()
-        .from("subscriptions")
-        .upsert(toSubscriptionRow(input), { onConflict: "user_id" });
+      // 조건부 upsert RPC가 event_ts 기준으로 stale 이벤트를 무시한다.
+      // (순서 보장이 없는 웹훅에서 취소→활성 역전으로 인한 Pro 오부여 방지)
+      const { error } = await getSupabase().rpc("upsert_subscription", {
+        p_user_id: input.userId,
+        p_polar_subscription_id: input.polarSubscriptionId,
+        p_status: input.status,
+        p_current_period_end: input.currentPeriodEnd,
+        p_event_ts: input.eventTimestamp,
+      });
 
-      throwIfSupabaseError(error, "subscriptions upsert failed");
+      throwIfSupabaseError(error, "upsert_subscription RPC failed");
     },
-  };
-}
-
-function toSubscriptionRow(input: SubscriptionUpsertPayload): {
-  user_id: string;
-  polar_subscription_id: string;
-  status: string;
-  current_period_end: string | null;
-  updated_at: string;
-} {
-  return {
-    user_id: input.userId,
-    polar_subscription_id: input.polarSubscriptionId,
-    status: input.status,
-    current_period_end: input.currentPeriodEnd,
-    updated_at: new Date().toISOString(),
   };
 }
 

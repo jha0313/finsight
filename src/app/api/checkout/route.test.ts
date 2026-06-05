@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "./route";
@@ -40,11 +39,7 @@ describe("checkout route", () => {
   });
 
   it("redirects to the checkout url with lazy route adapters", async () => {
-    const request = new NextRequest("https://finsight.test/api/checkout", {
-      method: "POST",
-    });
-
-    const response = await POST(request);
+    const response = await POST();
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(
@@ -65,27 +60,20 @@ describe("checkout route", () => {
       status: 401,
       body: { error: "unauthorized" },
     });
-    const request = new NextRequest("https://finsight.test/api/checkout", {
-      method: "POST",
-    });
 
-    const response = await POST(request);
+    const response = await POST();
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: "unauthorized" });
   });
 
-  it("does not read client-provided customer identifiers", async () => {
-    const request = new NextRequest(
-      "https://finsight.test/api/checkout?customerExternalId=attacker",
-      {
-        method: "POST",
-        body: JSON.stringify({ customerExternalId: "attacker" }),
-        headers: { "content-type": "application/json" },
-      },
-    );
+  it("takes no request argument, so client-provided identifiers cannot reach the handler", async () => {
+    // POST의 시그니처가 인자 0개이므로 쿼리·본문의 customerExternalId가
+    // 구조적으로 핸들러에 도달할 수 없다. (customerExternalId 강제는
+    // orchestration 레벨에서 getCurrentUser().id로 검증한다)
+    expect(POST.length).toBe(0);
 
-    await POST(request);
+    await POST();
 
     expect(checkoutRouteMocks.runCheckoutRequest).toHaveBeenCalledWith({
       productId: process.env.POLAR_PRODUCT_ID,

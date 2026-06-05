@@ -73,9 +73,11 @@ function createAnalyzeRequestDeps(input: {
   const aiUsage: AiUsageGateway & {
     cacheCalls: Array<{ userId: string; inputHash: string }>;
     quotaCalls: Array<{ userId: string; tier: Tier }>;
+    releaseCalls: Array<{ userId: string; tier: Tier }>;
   } = {
     cacheCalls: [],
     quotaCalls: [],
+    releaseCalls: [],
     async getCachedInsights(userId, inputHash) {
       this.cacheCalls.push({ userId, inputHash });
 
@@ -85,6 +87,9 @@ function createAnalyzeRequestDeps(input: {
       this.quotaCalls.push({ userId, tier });
 
       return input.quotaOk ?? true;
+    },
+    async releaseDailyQuota(userId, tier) {
+      this.releaseCalls.push({ userId, tier });
     },
   };
   const insightProvider =
@@ -142,6 +147,7 @@ function createCheckoutRequestDeps(input: { userId?: string | null }) {
 function createWebhookRequestDeps(input: {
   eventState?: "inserted" | "already_processed";
   verifyThrows?: boolean;
+  upsertThrows?: boolean;
   upsert?: SubscriptionUpsertPayload | null;
 }) {
   const verifiedEvent: WebhookEvent = {
@@ -161,6 +167,10 @@ function createWebhookRequestDeps(input: {
       return input.eventState ?? "inserted";
     },
     async upsertSubscription(upsertInput) {
+      if (input.upsertThrows === true) {
+        throw new Error("subscriptions upsert failed");
+      }
+
       this.upsertCalls.push(upsertInput);
     },
   };
@@ -193,6 +203,7 @@ function createWebhookRequestDeps(input: {
               polarSubscriptionId: "sub_1",
               status: "active",
               currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+              eventTimestamp: "2026-06-15T00:00:00.000Z",
             }
           : input.upsert;
       },
@@ -493,9 +504,36 @@ describe("runAnalyzeRequest", () => {
       { period: "2026-06", total: "7000.00" },
     ]);
     expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(aiUsage.releaseCalls).toEqual([]);
     expect(insightProviderCreated).toBe(false);
     expect(statementRepository.calls).toHaveLength(1);
     expect(statementRepository.calls[0].analysis).toBeUndefined();
+  });
+
+  it("refunds the daily quota when the Claude call fails so retries are not penalized", async () => {
+    const provider = new FakeInsightProvider(async () => {
+      throw new Error("Claude unavailable");
+    });
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      insightProvider: provider,
+    });
+
+    const result = await runAnalyzeRequest({ csv: STANDARD_CSV, deps });
+
+    expect(result.status).toBe(200);
+    expect(result.body.pro).toEqual({ status: "unavailable" });
+    expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(aiUsage.releaseCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(statementRepository.calls[0].analysis).toBeUndefined();
+  });
+
+  it("does not refund the quota when the Claude call succeeds", async () => {
+    const { deps, aiUsage } = createAnalyzeRequestDeps({ tier: "pro" });
+
+    await runAnalyzeRequest({ csv: STANDARD_CSV, deps });
+
+    expect(aiUsage.releaseCalls).toEqual([]);
   });
 
   it("uses cached insights without consuming quota or creating a Claude provider", async () => {
@@ -603,7 +641,7 @@ describe("runPolarWebhookRequest", () => {
     expect(repository.upsertCalls).toEqual([]);
   });
 
-  it("returns 200 without upsert when the event_id was already inserted", async () => {
+  it("re-applies the idempotent upsert and reports duplicate for replayed events", async () => {
     const { deps, repository, upsertCalls } = createWebhookRequestDeps({
       eventState: "already_processed",
     });
@@ -619,11 +657,17 @@ describe("runPolarWebhookRequest", () => {
       body: { received: true, duplicate: true },
     });
     expect(repository.markCalls).toEqual(["evt_1"]);
-    expect(upsertCalls).toEqual([]);
-    expect(repository.upsertCalls).toEqual([]);
+    expect(upsertCalls).toEqual([
+      {
+        eventId: "evt_1",
+        type: "subscription.active",
+        data: { id: "sub_1" },
+      },
+    ]);
+    expect(repository.upsertCalls).toHaveLength(1);
   });
 
-  it("pre-inserts the event_id before upserting a new subscription event", async () => {
+  it("upserts the subscription before marking the event processed", async () => {
     const { deps, repository, upsertCalls } = createWebhookRequestDeps({});
 
     const result = await runPolarWebhookRequest({
@@ -650,8 +694,25 @@ describe("runPolarWebhookRequest", () => {
         polarSubscriptionId: "sub_1",
         status: "active",
         currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+        eventTimestamp: "2026-06-15T00:00:00.000Z",
       },
     ]);
+  });
+
+  it("does not mark the event processed when the subscription upsert fails", async () => {
+    const { deps, repository } = createWebhookRequestDeps({
+      upsertThrows: true,
+    });
+
+    await expect(
+      runPolarWebhookRequest({
+        rawBody: "raw-body",
+        headers: { "webhook-id": "evt_1" },
+        deps,
+      }),
+    ).rejects.toThrow();
+
+    expect(repository.markCalls).toEqual([]);
   });
 
   it("keeps non-subscription webhook events idempotent without subscription upsert", async () => {

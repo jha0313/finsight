@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import {
   createGoogleOAuthUrl,
+  isSupabaseConfigured,
   sanitizeRedirectPath,
 } from "@/services/supabase";
 
@@ -50,19 +51,31 @@ async function signInWithGoogle(formData: FormData): Promise<void> {
 
   const nextPath = sanitizeRedirectPath(formData.get("next")?.toString());
   const origin = await getRequestOrigin();
+
+  // Supabase 미설정 환경에서는 getCurrentUser·middleware와 동일하게 우아하게
+  // 강등한다(500 throw 대신 에러 표시된 로그인 페이지로 redirect).
+  if (!isSupabaseConfigured()) {
+    redirect(buildLoginErrorUrl(origin, nextPath));
+  }
+
   const callbackUrl = new URL("/auth/callback", origin);
   callbackUrl.searchParams.set("next", nextPath);
 
   const oauthUrl = await createGoogleOAuthUrl(callbackUrl.toString());
 
   if (oauthUrl === null) {
-    const loginUrl = new URL("/login", origin);
-    loginUrl.searchParams.set("error", "oauth");
-    loginUrl.searchParams.set("next", nextPath);
-    redirect(loginUrl.toString());
+    redirect(buildLoginErrorUrl(origin, nextPath));
   }
 
   redirect(oauthUrl);
+}
+
+function buildLoginErrorUrl(origin: string, nextPath: string): string {
+  const loginUrl = new URL("/login", origin);
+  loginUrl.searchParams.set("error", "oauth");
+  loginUrl.searchParams.set("next", nextPath);
+
+  return loginUrl.toString();
 }
 
 async function getRequestOrigin(): Promise<string> {

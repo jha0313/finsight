@@ -1,3 +1,4 @@
+import iconv from "iconv-lite";
 import { describe, expect, it } from "vitest";
 
 import { mapColumns, parseCsv } from "./index";
@@ -96,6 +97,48 @@ describe("parseCsv", () => {
     ]);
   });
 
+  it("keeps merchant names that contain summary keywords as substrings", () => {
+    const result = parseCsv(`date,merchant,amount
+2026-06-01,종합계좌이체,1000
+2026-06-02,소계,2000
+2026-06-03,누계관리,3000`);
+
+    expect(result.transactions.map((transaction) => transaction.merchant)).toEqual([
+      "종합계좌이체",
+      "누계관리",
+    ]);
+  });
+
+  it("masks account and card numbers embedded in merchant cells", () => {
+    const result = parseCsv(`date,merchant,amount
+2026-06-01,홍길동 110-123-456789 이체,10000`);
+
+    expect(result.transactions[0].merchant).toBe("홍길동 **** **** 6789 이체");
+  });
+
+  it("skips rows with malformed amounts instead of failing the whole parse", () => {
+    const result = parseCsv(`date,merchant,amount
+2026-06-01,Cafe,1.2.3
+2026-06-02,Bookstore,5000`);
+
+    expect(result.transactions.map((transaction) => transaction.merchant)).toEqual([
+      "Bookstore",
+    ]);
+    expect(
+      result.warnings.some((warning) => warning.includes("invalid amount")),
+    ).toBe(true);
+  });
+
+  it("parses European decimal-comma amounts in CSV cells", () => {
+    const result = parseCsv(`date,merchant,amount,currency
+2026-06-01,Café,"1.234,56",EUR`);
+
+    expect(result.transactions[0]).toMatchObject({
+      signedAmount: "1234.56",
+      currency: "EUR",
+    });
+  });
+
   it("delegates quoted comma tokenization to the CSV parser", () => {
     const result = parseCsv(`date,merchant,amount,currency
 2026-06-01,"Amazon, Marketplace","$1,234.56",USD`);
@@ -125,6 +168,28 @@ describe("parseCsv", () => {
       merchant: "택시",
       signedAmount: "18000.00",
     });
+  });
+
+  it("decodes cp949/euc-kr encoded CSV buffers when encoding is provided", () => {
+    const csv = `날짜,가맹점,금액\n2026-06-01,스타벅스,5500`;
+    const buffer = iconv.encode(csv, "cp949");
+
+    const result = parseCsv(buffer, { encoding: "cp949" });
+
+    expect(result.needsFallback).toBe(false);
+    expect(result.transactions[0]).toMatchObject({
+      merchant: "스타벅스",
+      signedAmount: "5500.00",
+    });
+  });
+
+  it("falls back when a non-UTF8 buffer is decoded without an encoding hint", () => {
+    const csv = `날짜,가맹점,금액\n2026-06-01,스타벅스,5500`;
+    const buffer = iconv.encode(csv, "cp949");
+
+    const result = parseCsv(buffer);
+
+    expect(result.needsFallback).toBe(true);
   });
 
   it("returns needsFallback without parsing when standard mapping fails", () => {

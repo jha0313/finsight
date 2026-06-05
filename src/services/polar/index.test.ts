@@ -59,6 +59,7 @@ function subscriptionData(
     id: "sub_123",
     status: "active",
     currentPeriodEnd: new Date("2026-07-01T00:00:00.000Z"),
+    modifiedAt: new Date("2026-06-15T00:00:00.000Z"),
     customer: {
       externalId: "user_123",
     },
@@ -179,7 +180,17 @@ describe("toSubscriptionUpsert", () => {
       polarSubscriptionId: "sub_123",
       status: "active",
       currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      eventTimestamp: "2026-06-15T00:00:00.000Z",
     });
+  });
+
+  it("falls back to a null event timestamp when none is present", () => {
+    const upsert = toSubscriptionUpsert({
+      type: "subscription.active",
+      data: subscriptionData({ modifiedAt: undefined }),
+    });
+
+    expect(upsert?.eventTimestamp).toBeNull();
   });
 
   it("normalizes updated, canceled, and revoked subscription statuses", () => {

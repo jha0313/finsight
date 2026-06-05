@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 
+import { formatMinorUnits, parseMinorUnits } from "../money";
 import type { ParsedTransaction } from "@/types/csv";
 
 const HASH_VERSION = "mask:v1";
 const MASK_GROUP = "****";
 const IDENTIFIER_VISIBLE_CHARS = 4;
 const IDENTIFIER_GROUP_SIZE = 4;
-const ZERO_MINOR_UNITS = BigInt("0");
-const ONE_MINOR_UNIT = BigInt("1");
-const MINOR_UNIT = BigInt("100");
+const EMBEDDED_IDENTIFIER = /\d[\d\s-]*\d/g;
+const MIN_EMBEDDED_IDENTIFIER_DIGITS = 7;
 
 export function maskAccount(raw: string): string {
   const normalized = normalizeIdentifier(raw);
@@ -29,6 +29,18 @@ export function maskAccount(raw: string): string {
     ...Array<string>(maskedGroupCount).fill(MASK_GROUP),
     visible,
   ].join(" ");
+}
+
+// 가맹점명/적요 같은 자유 텍스트에 임베드된 계좌·카드·전화번호(연속 7자리
+// 이상)를 적재 전에 마스킹한다. 짧은 매장코드(예: 1234점)는 보존한다.
+export function scrubIdentifiers(text: string): string {
+  return text.replace(EMBEDDED_IDENTIFIER, (match) => {
+    const digits = match.replace(/\D/g, "");
+
+    return digits.length >= MIN_EMBEDDED_IDENTIFIER_DIGITS
+      ? maskAccount(match)
+      : match;
+  });
 }
 
 export function rowHash(transaction: ParsedTransaction): string {
@@ -129,64 +141,8 @@ function normalizeText(raw: string): string {
   return raw.normalize("NFKC").trim().replace(/\s+/g, " ");
 }
 
+// 금액 정규화는 money 모듈의 로케일 인식 파서를 단일 출처로 재사용한다.
+// (dedup/cache 해시가 분석 금액과 동일한 규칙을 따르도록 보장)
 function normalizeDecimal(raw: string): string {
-  const compact = raw.normalize("NFKC").trim();
-
-  if (compact === "") {
-    return "0.00";
-  }
-
-  const sanitized = compact.replace(/[^\d.+\-()]/g, "");
-
-  if (!/\d/.test(sanitized)) {
-    return "0.00";
-  }
-
-  const isNegative = isNegativeToken(sanitized);
-  const numericToken = sanitized.replace(/[()+-]/g, "");
-  const parts = numericToken.split(".");
-
-  if (parts.length > 2) {
-    throw new Error(`Invalid decimal amount: ${raw}`);
-  }
-
-  const wholePart = parts[0] ?? "0";
-  const fractionalPart = parts[1] ?? "";
-
-  if (!/^\d*$/.test(wholePart) || !/^\d*$/.test(fractionalPart)) {
-    throw new Error(`Invalid decimal amount: ${raw}`);
-  }
-
-  const wholeMinorUnits =
-    BigInt(trimLeadingZeroes(wholePart) || "0") * MINOR_UNIT;
-  const paddedFraction = `${fractionalPart}00`;
-  const cents = BigInt(paddedFraction.slice(0, 2));
-  const shouldRoundUp = (fractionalPart[2] ?? "0") >= "5";
-  const absoluteMinorUnits =
-    wholeMinorUnits + cents + (shouldRoundUp ? ONE_MINOR_UNIT : ZERO_MINOR_UNITS);
-
-  if (absoluteMinorUnits === ZERO_MINOR_UNITS) {
-    return "0.00";
-  }
-
-  const sign = isNegative ? "-" : "";
-  const whole = absoluteMinorUnits / MINOR_UNIT;
-  const fraction = absoluteMinorUnits % MINOR_UNIT;
-  const fractionText = fraction < BigInt("10") ? `0${fraction}` : `${fraction}`;
-
-  return `${sign}${whole}.${fractionText}`;
-}
-
-function isNegativeToken(token: string): boolean {
-  const withoutWhitespace = token.replace(/\s/g, "");
-
-  return (
-    (withoutWhitespace.startsWith("(") && withoutWhitespace.endsWith(")")) ||
-    withoutWhitespace.startsWith("-") ||
-    withoutWhitespace.endsWith("-")
-  );
-}
-
-function trimLeadingZeroes(value: string): string {
-  return value.replace(/^0+/, "");
+  return formatMinorUnits(parseMinorUnits(raw));
 }
