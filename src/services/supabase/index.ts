@@ -14,7 +14,6 @@ const DAILY_AI_QUOTA_BY_TIER: Record<Tier, number> = {
   free: 3,
   pro: 20,
 };
-const MAX_QUOTA_CONSUME_ATTEMPTS = 3;
 const DEFAULT_AUTH_REDIRECT_PATH = "/dashboard";
 const LOGIN_PATH = "/login";
 const PROTECTED_PATH_PREFIXES = ["/dashboard"];
@@ -53,10 +52,6 @@ type SupabaseError = {
 type SubscriptionRow = {
   status: string | null;
   current_period_end: string | null;
-};
-
-type UsageRow = {
-  count: number;
 };
 
 type SaveStatementAnalysisRpcRow = {
@@ -324,47 +319,25 @@ export function createAiUsage(): AiUsageGateway {
 
     async tryConsumeDailyQuota(userId, tier) {
       const supabase = createServerSupabaseClient();
-      const usageDate = todayIsoDate();
-      const quota = DAILY_AI_QUOTA_BY_TIER[tier];
+      const { data, error } = await supabase.rpc("consume_ai_quota", {
+        p_user_id: userId,
+        p_usage_date: todayIsoDate(),
+        p_quota: DAILY_AI_QUOTA_BY_TIER[tier],
+      });
 
-      for (let attempt = 0; attempt < MAX_QUOTA_CONSUME_ATTEMPTS; attempt += 1) {
-        const currentCount = await getDailyUsageCount(
-          supabase,
-          userId,
-          usageDate,
-        );
+      throwIfSupabaseError(error, "consume_ai_quota RPC failed");
 
-        if (currentCount === null) {
-          const inserted = await insertFirstDailyUsage(
-            supabase,
-            userId,
-            usageDate,
-          );
+      return data === true;
+    },
 
-          if (inserted) {
-            return true;
-          }
+    async releaseDailyQuota(userId) {
+      const supabase = createServerSupabaseClient();
+      const { error } = await supabase.rpc("release_ai_quota", {
+        p_user_id: userId,
+        p_usage_date: todayIsoDate(),
+      });
 
-          continue;
-        }
-
-        if (currentCount >= quota) {
-          return false;
-        }
-
-        const consumed = await incrementDailyUsageCount(
-          supabase,
-          userId,
-          usageDate,
-          currentCount,
-        );
-
-        if (consumed) {
-          return true;
-        }
-      }
-
-      return false;
+      throwIfSupabaseError(error, "release_ai_quota RPC failed");
     },
   };
 }
@@ -450,73 +423,8 @@ function firstRpcRow(data: unknown): SaveStatementAnalysisRpcRow | null {
   return data === null ? null : (data as SaveStatementAnalysisRpcRow);
 }
 
-async function getDailyUsageCount(
-  supabase: SupabaseClient,
-  userId: string,
-  usageDate: string,
-): Promise<number | null> {
-  const { data, error } = await supabase
-    .from("ai_usage_daily")
-    .select("count")
-    .eq("user_id", userId)
-    .eq("usage_date", usageDate)
-    .maybeSingle<UsageRow>();
-
-  throwIfSupabaseError(error, "ai_usage_daily lookup failed");
-
-  return data?.count ?? null;
-}
-
-async function insertFirstDailyUsage(
-  supabase: SupabaseClient,
-  userId: string,
-  usageDate: string,
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("ai_usage_daily")
-    .insert({
-      user_id: userId,
-      usage_date: usageDate,
-      count: 1,
-    })
-    .select("count")
-    .single<UsageRow>();
-
-  if (isUniqueViolation(error)) {
-    return false;
-  }
-
-  throwIfSupabaseError(error, "ai_usage_daily insert failed");
-
-  return data?.count === 1;
-}
-
-async function incrementDailyUsageCount(
-  supabase: SupabaseClient,
-  userId: string,
-  usageDate: string,
-  currentCount: number,
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from("ai_usage_daily")
-    .update({ count: currentCount + 1 })
-    .eq("user_id", userId)
-    .eq("usage_date", usageDate)
-    .eq("count", currentCount)
-    .select("count")
-    .maybeSingle<UsageRow>();
-
-  throwIfSupabaseError(error, "ai_usage_daily increment failed");
-
-  return data?.count === currentCount + 1;
-}
-
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function isUniqueViolation(error: SupabaseError | null): boolean {
-  return error?.code === "23505";
 }
 
 function throwIfSupabaseError(

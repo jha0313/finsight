@@ -47,6 +47,7 @@ describe("Polar webhook route", () => {
       polarSubscriptionId: "sub_1",
       status: "active",
       currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      eventTimestamp: "2026-06-15T00:00:00.000Z",
     });
   });
 
@@ -85,7 +86,7 @@ describe("Polar webhook route", () => {
     expect(webhookRouteMocks.upsertSubscription).not.toHaveBeenCalled();
   });
 
-  it("returns 200 and skips upsert for an already processed event_id", async () => {
+  it("returns 200 duplicate after re-applying the idempotent upsert for a replayed event_id", async () => {
     webhookRouteMocks.markEventProcessed.mockResolvedValueOnce(
       "already_processed",
     );
@@ -110,11 +111,13 @@ describe("Polar webhook route", () => {
       duplicate: true,
     });
     expect(webhookRouteMocks.markEventProcessed).toHaveBeenCalledWith("evt_1");
-    expect(webhookRouteMocks.toSubscriptionUpsert).not.toHaveBeenCalled();
-    expect(webhookRouteMocks.upsertSubscription).not.toHaveBeenCalled();
+    // 멱등 upsert는 재전송에도 다시 적용되며(onConflict·event_ts 가드로 안전),
+    // 그 뒤 마킹이 already_processed를 반환해 duplicate로 응답한다.
+    expect(webhookRouteMocks.toSubscriptionUpsert).toHaveBeenCalled();
+    expect(webhookRouteMocks.upsertSubscription).toHaveBeenCalled();
   });
 
-  it("pre-inserts a new event_id before upserting the subscription", async () => {
+  it("upserts the subscription before marking the event processed", async () => {
     const request = new NextRequest(
       "https://finsight.test/api/webhook/polar",
       {
@@ -143,11 +146,12 @@ describe("Polar webhook route", () => {
       polarSubscriptionId: "sub_1",
       status: "active",
       currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      eventTimestamp: "2026-06-15T00:00:00.000Z",
     });
     expect(
-      webhookRouteMocks.markEventProcessed.mock.invocationCallOrder[0],
-    ).toBeLessThan(
       webhookRouteMocks.upsertSubscription.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      webhookRouteMocks.markEventProcessed.mock.invocationCallOrder[0],
     );
   });
 });

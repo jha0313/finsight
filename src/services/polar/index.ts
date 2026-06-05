@@ -20,6 +20,7 @@ type SubscriptionUpsert = {
   polarSubscriptionId: string;
   status: string;
   currentPeriodEnd: string | null;
+  eventTimestamp: string | null;
 };
 
 const SUBSCRIPTION_EVENT_TYPES = new Set([
@@ -110,6 +111,12 @@ export function toSubscriptionUpsert(event: {
     status: getRequiredStringField(data, "status", "subscription status"),
     currentPeriodEnd: normalizePeriodEnd(
       data.currentPeriodEnd ?? data.current_period_end,
+    ),
+    eventTimestamp: normalizeEventTimestamp(
+      data.modifiedAt ??
+        data.modified_at ??
+        data.createdAt ??
+        data.created_at,
     ),
   };
 }
@@ -203,6 +210,18 @@ function normalizePeriodEnd(value: unknown): string | null {
   }
 
   throw new Error("Polar subscription currentPeriodEnd is invalid.");
+}
+
+function normalizeEventTimestamp(value: unknown): string | null {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string" && value !== "") {
+    return value;
+  }
+
+  return null;
 }
 
 function asRecord(value: unknown, context: string): Record<string, unknown> {

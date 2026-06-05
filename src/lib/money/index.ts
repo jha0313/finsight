@@ -72,38 +72,20 @@ export function compareMoney(a: string, b: string): -1 | 0 | 1 {
   return left > right ? 1 : -1;
 }
 
-function parseMinorUnits(raw: string): bigint {
-  const compact = raw.trim();
+export function parseMinorUnits(raw: string): bigint {
+  const compact = raw.normalize("NFKC").trim();
 
-  if (compact === "") {
+  if (compact === "" || !/\d/.test(compact)) {
     return ZERO_MINOR_UNITS;
   }
 
-  const sanitized = compact.replace(/[^\d.+\-()]/g, "");
-
-  if (!/\d/.test(sanitized)) {
-    return ZERO_MINOR_UNITS;
-  }
-
-  const isNegative = isNegativeToken(sanitized);
-  const numericToken = sanitized.replace(/[()+-]/g, "");
-  const [wholePart = "0", fractionalPart = "", unexpected] =
-    numericToken.split(".");
-
-  if (unexpected !== undefined || !/^\d*$/.test(wholePart)) {
-    throw new Error(`Invalid money amount: ${raw}`);
-  }
-
-  if (!/^\d*$/.test(fractionalPart)) {
-    throw new Error(`Invalid money amount: ${raw}`);
-  }
-
-  const wholeMinorUnits = BigInt(wholePart === "" ? "0" : wholePart);
-  const paddedFraction = `${fractionalPart}00`;
+  const { isNegative, whole, fraction } = parseDecimalToken(compact);
+  const wholeMinorUnits = BigInt(whole === "" ? "0" : whole) * MINOR_UNIT;
+  const paddedFraction = `${fraction}00`;
   const cents = BigInt(paddedFraction.slice(0, 2));
-  const shouldRoundUp = (fractionalPart[2] ?? "0") >= "5";
+  const shouldRoundUp = (fraction[2] ?? "0") >= "5";
   const roundedCents = shouldRoundUp ? cents + ONE_MINOR_UNIT : cents;
-  const absoluteMinorUnits = wholeMinorUnits * MINOR_UNIT + roundedCents;
+  const absoluteMinorUnits = wholeMinorUnits + roundedCents;
 
   if (absoluteMinorUnits === ZERO_MINOR_UNITS) {
     return ZERO_MINOR_UNITS;
@@ -112,7 +94,104 @@ function parseMinorUnits(raw: string): bigint {
   return isNegative ? -absoluteMinorUnits : absoluteMinorUnits;
 }
 
-function formatMinorUnits(minorUnits: bigint): string {
+// 통화기호·부호를 제거하고 콤마/점의 역할(소수점 vs 천단위)을 로케일
+// 휴리스틱으로 판별한다. 글로벌 명세서(유럽식 1.234,56)도 손실 없이 파싱한다.
+function parseDecimalToken(compact: string): {
+  isNegative: boolean;
+  whole: string;
+  fraction: string;
+} {
+  const isNegative = isNegativeToken(compact);
+  const token = compact.replace(/[^\d.,]/g, "");
+
+  if (token === "") {
+    return { isNegative, whole: "", fraction: "" };
+  }
+
+  const lastDot = token.lastIndexOf(".");
+  const lastComma = token.lastIndexOf(",");
+  let decimalSep = "";
+
+  if (lastDot >= 0 && lastComma >= 0) {
+    // 둘 다 있으면 더 오른쪽이 소수 구분자, 나머지는 천단위.
+    decimalSep = lastDot > lastComma ? "." : ",";
+  } else if (lastComma >= 0) {
+    // 콤마만: 1개이고 뒤 1~2자리면 소수점, 그 외(여러 개·3자리)는 천단위.
+    decimalSep = isSingleDecimalComma(token) ? "," : "";
+  } else if (lastDot >= 0) {
+    // 점만: 1개면 소수점(자릿수 무관), 여러 개면 천단위 그룹으로 본다.
+    // (이미 정규화된 "1234.567" 같은 값이 천단위로 오해되지 않게 한다.)
+    decimalSep = token.split(".").length - 1 === 1 ? "." : "";
+  }
+
+  if (decimalSep === "") {
+    return { isNegative, whole: stripThousands(token), fraction: "" };
+  }
+
+  const splitIndex = token.lastIndexOf(decimalSep);
+  const fraction = token.slice(splitIndex + 1);
+
+  if (!/^\d+$/.test(fraction)) {
+    throw new Error(`Invalid money amount: ${compact}`);
+  }
+
+  return {
+    isNegative,
+    whole: stripThousands(token.slice(0, splitIndex)),
+    fraction,
+  };
+}
+
+// 콤마가 1개이고 뒤가 1~2자리이면 소수점(유럽식 1234,56), 그 외(여러 개·
+// 3자리 그룹)는 천단위로 본다. 금액 소수부는 사실상 항상 2자리이다.
+function isSingleDecimalComma(token: string): boolean {
+  if (token.split(",").length - 1 !== 1) {
+    return false;
+  }
+
+  const fractionLength = token.length - token.lastIndexOf(",") - 1;
+
+  return fractionLength === 1 || fractionLength === 2;
+}
+
+// 천단위 구분자를 검증하며 제거한다. 첫 그룹은 1~3자리, 이후 그룹은 정확히
+// 3자리여야 한다. 비정상 배치(예: "1.2.3")는 throw해 호출부가 행을 격리한다.
+function stripThousands(intPart: string): string {
+  if (intPart === "") {
+    return "0";
+  }
+
+  if (!/[.,]/.test(intPart)) {
+    if (!/^\d+$/.test(intPart)) {
+      throw new Error(`Invalid money amount: ${intPart}`);
+    }
+
+    return intPart;
+  }
+
+  const hasDot = intPart.includes(".");
+  const hasComma = intPart.includes(",");
+
+  if (hasDot && hasComma) {
+    throw new Error(`Invalid money amount: ${intPart}`);
+  }
+
+  const groups = intPart.split(hasDot ? "." : ",");
+
+  if (!/^\d{1,3}$/.test(groups[0])) {
+    throw new Error(`Invalid money amount: ${intPart}`);
+  }
+
+  for (let index = 1; index < groups.length; index += 1) {
+    if (!/^\d{3}$/.test(groups[index])) {
+      throw new Error(`Invalid money amount: ${intPart}`);
+    }
+  }
+
+  return groups.join("");
+}
+
+export function formatMinorUnits(minorUnits: bigint): string {
   if (minorUnits === ZERO_MINOR_UNITS) {
     return ZERO_MONEY;
   }

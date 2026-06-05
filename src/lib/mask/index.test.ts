@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ParsedTransaction } from "@/types/csv";
-import { maskAccount, rowHash, sourceHash } from "./index";
+import { maskAccount, rowHash, scrubIdentifiers, sourceHash } from "./index";
 
 const baseTransaction: ParsedTransaction = {
   date: "2026-06-01",
@@ -32,6 +32,26 @@ describe("maskAccount", () => {
   it("does not expose identifiers that are four characters or shorter", () => {
     expect(maskAccount("1234")).toBe("****");
     expect(maskAccount("")).toBe("");
+  });
+});
+
+describe("scrubIdentifiers", () => {
+  it("masks account and card numbers embedded in free-text fields", () => {
+    expect(scrubIdentifiers("홍길동 110-123-456789 이체")).toBe(
+      "홍길동 **** **** 6789 이체",
+    );
+    expect(scrubIdentifiers("CARD 1234-5678-9012-3456 결제")).toBe(
+      "CARD **** **** **** 3456 결제",
+    );
+    expect(scrubIdentifiers("계좌 110 123 456789")).toBe(
+      "계좌 **** **** 6789",
+    );
+  });
+
+  it("keeps short numeric tokens like store codes and names intact", () => {
+    expect(scrubIdentifiers("스타벅스 1234점")).toBe("스타벅스 1234점");
+    expect(scrubIdentifiers("GS25 역삼점")).toBe("GS25 역삼점");
+    expect(scrubIdentifiers("Amazon, Marketplace")).toBe("Amazon, Marketplace");
   });
 });
 

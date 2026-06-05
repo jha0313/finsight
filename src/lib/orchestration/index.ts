@@ -244,6 +244,15 @@ export async function runPolarWebhookRequest(input: {
     };
   }
 
+  // 구독 upsert를 먼저 수행하고, 성공한 뒤에야 event_id를 멱등 마킹한다.
+  // upsert가 실패하면 마킹되지 않으므로 Polar 재전송이 실제로 재처리되어
+  // 결제 이벤트가 영구 유실되지 않는다. (upsert는 onConflict로 멱등)
+  const upsert = input.deps.toSubscriptionUpsert(event);
+
+  if (upsert !== null) {
+    await input.deps.subscriptionRepository.upsertSubscription(upsert);
+  }
+
   const eventState =
     await input.deps.subscriptionRepository.markEventProcessed(event.eventId);
 
@@ -252,12 +261,6 @@ export async function runPolarWebhookRequest(input: {
       status: 200,
       body: { received: true, duplicate: true },
     };
-  }
-
-  const upsert = input.deps.toSubscriptionUpsert(event);
-
-  if (upsert !== null) {
-    await input.deps.subscriptionRepository.upsertSubscription(upsert);
   }
 
   return {
@@ -277,19 +280,32 @@ async function runAnalysisWithoutCache(input: {
     input.tier,
   );
 
-  return runAnalysis({
+  if (!quotaOk) {
+    return runAnalysis({
+      csv: input.csv,
+      tier: input.tier,
+      deps: { skipInsights: true },
+    });
+  }
+
+  const result = await runAnalysis({
     csv: input.csv,
     tier: input.tier,
-    deps: quotaOk
-      ? {
-          insightProvider: createLazyInsightProvider(
-            input.deps.insightProviderFactory,
-          ),
-        }
-      : {
-          skipInsights: true,
-        },
+    deps: {
+      insightProvider: createLazyInsightProvider(
+        input.deps.insightProviderFactory,
+      ),
+    },
   });
+
+  // Claude 호출이 인사이트를 만들지 못했으면(타임아웃·에러·fallback) 소모한
+  // quota를 환불해, 캐시가 비어 있는 동일 입력의 재시도가 quota를 영구
+  // 소진시키지 않게 한다.
+  if (result.response.pro.insights === undefined) {
+    await input.deps.aiUsage.releaseDailyQuota(input.userId, input.tier);
+  }
+
+  return result;
 }
 
 function createLazyInsightProvider(
@@ -350,14 +366,18 @@ function toCachedInsights(value: unknown): ProInsights | null {
   };
 }
 
+// 캐시 키는 원본 CSV 텍스트가 아니라 파싱·정규화된 '거래 단위' 입력으로
+// 만든다(컬럼 순서·공백·요약행 차이는 동일 거래면 같은 키 → 불필요한 재호출
+// 방지). CLAUDE.md의 unique(user_id, input_hash) 캐시 규칙과 일치한다.
 function analysisInputHash(input: {
   csv: string | Buffer;
   tier: Tier;
 }): string {
+  const parsed = parseCsv(input.csv);
   const payload = JSON.stringify([
     AI_PROMPT_VERSION,
     MODEL_BY_TIER[input.tier],
-    sourceHash(csvSourceText(input.csv)),
+    sourceHash(parsed.transactions),
   ]);
 
   return createHash("sha256").update(payload, "utf8").digest("hex");

@@ -23,6 +23,8 @@ export interface StatementRepository {
 export interface AiUsageGateway {
   getCachedInsights(userId: string, inputHash: string): Promise<unknown | null>;
   tryConsumeDailyQuota(userId: string, tier: Tier): Promise<boolean>;
+  // 완료되지 못한 Claude 호출(타임아웃·에러·fallback)에 소모된 quota를 환불한다.
+  releaseDailyQuota(userId: string, tier: Tier): Promise<void>;
 }
 
 export interface CheckoutGateway {
@@ -43,6 +45,9 @@ export interface SubscriptionUpsertPayload {
   polarSubscriptionId: string;
   status: string;
   currentPeriodEnd: string | null;
+  // 구독 객체의 변경 시각. 순서 보장이 없는 웹훅에서 stale 이벤트가 최신
+  // 상태를 덮어쓰지 않도록 조건부 upsert의 기준으로 쓴다. (없으면 null)
+  eventTimestamp: string | null;
 }
 
 export interface WebhookSubscriptionRepository {

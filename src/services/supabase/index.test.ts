@@ -456,69 +456,47 @@ describe("supabase adapter", () => {
     expect(supabaseMocks.eq).toHaveBeenCalledWith("input_hash", "input-1");
   });
 
-  it("consumes free daily quota with an atomic compare-and-swap update", async () => {
-    const usageSelectChain = {
-      eq: vi.fn(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { count: 0 },
-        error: null,
-      }),
-    };
-    usageSelectChain.eq.mockReturnValue(usageSelectChain);
-    const updateResultChain = {
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { count: 1 },
-        error: null,
-      }),
-    };
-    const updateChain = {
-      eq: vi.fn(),
-      select: vi.fn().mockReturnValue(updateResultChain),
-    };
-    updateChain.eq.mockReturnValue(updateChain);
-    const usageTable = {
-      insert: supabaseMocks.insert,
-      select: vi.fn().mockReturnValue(usageSelectChain),
-      update: vi.fn().mockReturnValue(updateChain),
-      upsert: supabaseMocks.upsert,
-    };
-    supabaseMocks.from.mockReturnValue(usageTable);
+  it("consumes daily quota through the atomic consume_ai_quota RPC", async () => {
+    supabaseMocks.rpc.mockResolvedValueOnce({ data: true, error: null });
 
     await expect(
       createAiUsage().tryConsumeDailyQuota("user-1", "free"),
     ).resolves.toBe(true);
 
-    expect(supabaseMocks.from).toHaveBeenCalledWith("ai_usage_daily");
-    expect(usageTable.update).toHaveBeenCalledWith({ count: 1 });
-    expect(updateChain.eq).toHaveBeenCalledWith("user_id", "user-1");
-    expect(updateChain.eq).toHaveBeenCalledWith(
-      "usage_date",
-      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-    );
-    expect(updateChain.eq).toHaveBeenCalledWith("count", 0);
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("consume_ai_quota", {
+      p_user_id: "user-1",
+      p_usage_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      p_quota: 3,
+    });
   });
 
-  it("does not consume quota after the tier limit is reached", async () => {
-    const usageSelectChain = {
-      eq: vi.fn(),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { count: 3 },
-        error: null,
-      }),
-    };
-    usageSelectChain.eq.mockReturnValue(usageSelectChain);
-    const usageTable = {
-      insert: supabaseMocks.insert,
-      select: vi.fn().mockReturnValue(usageSelectChain),
-      update: vi.fn(),
-      upsert: supabaseMocks.upsert,
-    };
-    supabaseMocks.from.mockReturnValue(usageTable);
+  it("passes the pro tier limit to the consume_ai_quota RPC", async () => {
+    supabaseMocks.rpc.mockResolvedValueOnce({ data: true, error: null });
+
+    await createAiUsage().tryConsumeDailyQuota("user-1", "pro");
+
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith(
+      "consume_ai_quota",
+      expect.objectContaining({ p_quota: 20 }),
+    );
+  });
+
+  it("returns false when the consume_ai_quota RPC reports the limit is reached", async () => {
+    supabaseMocks.rpc.mockResolvedValueOnce({ data: false, error: null });
 
     await expect(
       createAiUsage().tryConsumeDailyQuota("user-1", "free"),
     ).resolves.toBe(false);
+  });
 
-    expect(usageTable.update).not.toHaveBeenCalled();
+  it("refunds quota through the release_ai_quota RPC", async () => {
+    supabaseMocks.rpc.mockResolvedValueOnce({ data: null, error: null });
+
+    await createAiUsage().releaseDailyQuota("user-1", "pro");
+
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith("release_ai_quota", {
+      p_user_id: "user-1",
+      p_usage_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
   });
 });

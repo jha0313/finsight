@@ -2,6 +2,7 @@ import iconv from "iconv-lite";
 import { parse as parseRecords } from "csv-parse/sync";
 
 import { deriveSignedAmount } from "../money";
+import { scrubIdentifiers } from "../mask";
 import type {
   CanonicalField,
   CsvMapping,
@@ -97,8 +98,13 @@ const HEADER_ALIASES: Record<CanonicalField, string[]> = {
   ],
 };
 
-const SUMMARY_KEYWORDS_KO = ["합계", "소계", "누계", "총계"];
-const SUMMARY_KEYWORDS_EN = new Set([
+// 셀 전체가 정확히 요약 키워드일 때만 요약행으로 본다. 부분일치(includes)는
+// "종합계좌이체"·"누계관리" 같은 정상 가맹점명을 조용히 삭제하므로 금지.
+const SUMMARY_KEYWORDS = new Set([
+  "합계",
+  "소계",
+  "누계",
+  "총계",
   "total",
   "subtotal",
   "grandtotal",
@@ -164,7 +170,9 @@ export function parseCsv(
       continue;
     }
 
-    const merchant = readMappedCell(row, mapping, "merchant").trim();
+    const merchant = scrubIdentifiers(
+      readMappedCell(row, mapping, "merchant").trim(),
+    );
 
     if (merchant === "") {
       warnings.push(`Skipped row ${rowNumber}: missing merchant.`);
@@ -181,7 +189,16 @@ export function parseCsv(
       debit: readMappedCell(row, mapping, "debit"),
       credit: readMappedCell(row, mapping, "credit"),
     };
-    const signed = deriveSignedAmount(amountInput);
+
+    let signed: ReturnType<typeof deriveSignedAmount>;
+
+    try {
+      signed = deriveSignedAmount(amountInput);
+    } catch {
+      warnings.push(`Skipped row ${rowNumber}: invalid amount.`);
+      continue;
+    }
+
     const account = readMappedCell(row, mapping, "account").trim();
     const transaction: ParsedTransaction = {
       date,
@@ -353,18 +370,7 @@ function isEmptyRow(cells: string[]): boolean {
 }
 
 function isSummaryRow(cells: string[]): boolean {
-  return cells.some((cell) => {
-    const compact = normalizeSummaryCell(cell);
-
-    if (compact === "") {
-      return false;
-    }
-
-    return (
-      SUMMARY_KEYWORDS_KO.some((keyword) => compact.includes(keyword)) ||
-      SUMMARY_KEYWORDS_EN.has(compact)
-    );
-  });
+  return cells.some((cell) => SUMMARY_KEYWORDS.has(normalizeSummaryCell(cell)));
 }
 
 function normalizeSummaryCell(cell: string): string {

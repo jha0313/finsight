@@ -28,6 +28,26 @@ describe("parseAmount", () => {
     expect(parseAmount("")).toBe("0.00");
     expect(parseAmount("   ")).toBe("0.00");
   });
+
+  it("parses European decimal-comma and dot-thousands notation", () => {
+    expect(parseAmount("1.234,56")).toBe("1234.56");
+    expect(parseAmount("1234,56")).toBe("1234.56");
+    expect(parseAmount("€1.234,56")).toBe("1234.56");
+    expect(parseAmount("1.234.567,89")).toBe("1234567.89");
+    expect(parseAmount("1.234.567")).toBe("1234567.00");
+    expect(parseAmount("2.000,00")).toBe("2000.00");
+  });
+
+  it("keeps US thousands-comma and decimal-dot notation intact", () => {
+    expect(parseAmount("1,234.56")).toBe("1234.56");
+    expect(parseAmount("2,000,000")).toBe("2000000.00");
+    expect(parseAmount("1,234")).toBe("1234.00");
+  });
+
+  it("throws on malformed amounts so callers can isolate the row", () => {
+    expect(() => parseAmount("1.2.3")).toThrow();
+    expect(() => parseAmount("1,2,3")).toThrow();
+  });
 });
 
 describe("deriveSignedAmount", () => {
@@ -60,6 +80,17 @@ describe("deriveSignedAmount", () => {
     expect(deriveSignedAmount({ amount: "(2,500)" })).toEqual({
       signedAmount: "-2500.00",
       direction: "refund",
+    });
+  });
+
+  it("classifies netted-to-zero and zero amounts as a zero-value debit", () => {
+    expect(deriveSignedAmount({ debit: "1,000", credit: "1,000" })).toEqual({
+      signedAmount: "0.00",
+      direction: "debit",
+    });
+    expect(deriveSignedAmount({ amount: "0" })).toEqual({
+      signedAmount: "0.00",
+      direction: "debit",
     });
   });
 });

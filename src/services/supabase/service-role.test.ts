@@ -10,9 +10,11 @@ const serviceRoleMocks = vi.hoisted(() => {
   const from = vi.fn();
   const insert = vi.fn();
   const upsert = vi.fn();
+  const rpc = vi.fn();
 
   const client = {
     from,
+    rpc,
   };
 
   return {
@@ -21,6 +23,7 @@ const serviceRoleMocks = vi.hoisted(() => {
     from,
     insert,
     upsert,
+    rpc,
   };
 });
 
@@ -50,6 +53,7 @@ describe("Supabase service_role webhook adapter", () => {
     serviceRoleMocks.from.mockReturnValue(table());
     serviceRoleMocks.insert.mockResolvedValue({ error: null });
     serviceRoleMocks.upsert.mockResolvedValue({ error: null });
+    serviceRoleMocks.rpc.mockResolvedValue({ data: null, error: null });
   });
 
   it("does not create a service_role client at import time", async () => {
@@ -102,7 +106,7 @@ describe("Supabase service_role webhook adapter", () => {
     );
   });
 
-  it("upserts subscription state by webhook customerExternalId user id", async () => {
+  it("upserts subscription state through the conditional upsert_subscription RPC", async () => {
     const repository = createPolarWebhookRepository();
 
     await expect(
@@ -111,19 +115,16 @@ describe("Supabase service_role webhook adapter", () => {
         polarSubscriptionId: "sub_1",
         status: "active",
         currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+        eventTimestamp: "2026-06-15T00:00:00.000Z",
       }),
     ).resolves.toBeUndefined();
 
-    expect(serviceRoleMocks.from).toHaveBeenCalledWith("subscriptions");
-    expect(serviceRoleMocks.upsert).toHaveBeenCalledWith(
-      {
-        user_id: "user-1",
-        polar_subscription_id: "sub_1",
-        status: "active",
-        current_period_end: "2026-07-01T00:00:00.000Z",
-        updated_at: expect.any(String),
-      },
-      { onConflict: "user_id" },
-    );
+    expect(serviceRoleMocks.rpc).toHaveBeenCalledWith("upsert_subscription", {
+      p_user_id: "user-1",
+      p_polar_subscription_id: "sub_1",
+      p_status: "active",
+      p_current_period_end: "2026-07-01T00:00:00.000Z",
+      p_event_ts: "2026-06-15T00:00:00.000Z",
+    });
   });
 });
