@@ -64,6 +64,9 @@ export interface SubscriptionUpsertPayload {
   polarSubscriptionId: string;
   status: string;
   currentPeriodEnd: string | null;
+  // 기간 말 취소 예약 여부. status는 active로 유지되므로 게이팅에는 영향을
+  // 주지 않지만, "기간 종료 후 Free 전환 예정" 표시를 위해 보존한다.
+  cancelAtPeriodEnd: boolean;
   // 구독 객체의 변경 시각. 순서 보장이 없는 웹훅에서 stale 이벤트가 최신
   // 상태를 덮어쓰지 않도록 조건부 upsert의 기준으로 쓴다. (없으면 null)
   eventTimestamp: string | null;

@@ -3,11 +3,12 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, Settings } from "lucide-react";
 
 import type { Tier } from "@/types/tier";
 
 import { PlanBadge } from "./PlanBadge";
+import { UserMenu } from "./UserMenu";
 
 interface NavItem {
   href: string;
@@ -23,10 +24,18 @@ const NAV_ITEMS: NavItem[] = [
 export interface SidebarProps {
   email: string | null;
   tier: Tier;
+  cancelAtPeriodEnd: boolean;
+  renewalLabel: string | null;
   signOutAction: () => Promise<void>;
 }
 
-export function Sidebar({ email, tier, signOutAction }: SidebarProps) {
+export function Sidebar({
+  email,
+  tier,
+  cancelAtPeriodEnd,
+  renewalLabel,
+  signOutAction,
+}: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -62,22 +71,14 @@ export function Sidebar({ email, tier, signOutAction }: SidebarProps) {
         })}
       </nav>
 
-      <div className="hidden border-t border-hairline px-base py-base lg:block">
-        <PlanBadge tier={tier} />
-        {email !== null ? (
-          <p className="caption mt-sm truncate text-muted" title={email}>
-            {email}
-          </p>
-        ) : null}
-        <form action={signOutAction} className="mt-sm">
-          <button
-            className="nav-link inline-flex items-center gap-xs rounded-field px-xs py-xxs text-muted transition-colors hover:text-ink"
-            type="submit"
-          >
-            <LogOut aria-hidden="true" size={16} strokeWidth={2} />
-            로그아웃
-          </button>
-        </form>
+      <div className="hidden border-t border-hairline p-xs lg:block">
+        <UserMenu
+          cancelAtPeriodEnd={cancelAtPeriodEnd}
+          email={email}
+          renewalLabel={renewalLabel}
+          signOutAction={signOutAction}
+          tier={tier}
+        />
       </div>
     </aside>
   );

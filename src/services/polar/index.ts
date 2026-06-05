@@ -20,6 +20,7 @@ type SubscriptionUpsert = {
   polarSubscriptionId: string;
   status: string;
   currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
   eventTimestamp: string | null;
 };
 
@@ -112,6 +113,7 @@ export function toSubscriptionUpsert(event: {
     currentPeriodEnd: normalizePeriodEnd(
       data.currentPeriodEnd ?? data.current_period_end,
     ),
+    cancelAtPeriodEnd: readCancelAtPeriodEnd(data),
     eventTimestamp: normalizeEventTimestamp(
       data.modifiedAt ??
         data.modified_at ??
@@ -119,6 +121,36 @@ export function toSubscriptionUpsert(event: {
         data.created_at,
     ),
   };
+}
+
+// 기간 말 취소 예약/철회. cancel=true면 현재 기간 종료 시 Free로 전환되도록
+// 예약하고, false면 예약을 철회한다. 게이팅의 진실 원천인 DB는 웹훅이 동기화한다.
+export async function cancelSubscriptionAtPeriodEnd(
+  subscriptionId: string,
+  cancel: boolean,
+): Promise<{
+  status: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}> {
+  const id = requireNonEmpty(subscriptionId, "subscriptionId");
+  const subscription = await createPolarClient().subscriptions.update({
+    id,
+    subscriptionUpdate: { cancelAtPeriodEnd: cancel },
+  });
+  const record = asRecord(subscription, "Polar subscription response");
+
+  return {
+    status: getRequiredStringField(record, "status", "subscription status"),
+    currentPeriodEnd: normalizePeriodEnd(
+      record.currentPeriodEnd ?? record.current_period_end,
+    ),
+    cancelAtPeriodEnd: readCancelAtPeriodEnd(record),
+  };
+}
+
+function readCancelAtPeriodEnd(data: Record<string, unknown>): boolean {
+  return (data.cancelAtPeriodEnd ?? data.cancel_at_period_end) === true;
 }
 
 function createPolarClient(): Polar {

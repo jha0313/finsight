@@ -45,6 +45,19 @@ export interface CheckoutRequestDeps {
   checkout: CheckoutGateway;
 }
 
+export interface SubscriptionCancelRequestDeps {
+  getCurrentUser: () => Promise<{ id: string } | null>;
+  // 본인 구독의 tier와 Polar 구독 ID. Pro가 아니거나 ID가 없으면 취소 불가.
+  getSubscription: (
+    userId: string,
+  ) => Promise<{ tier: Tier; polarSubscriptionId: string | null }>;
+  // cancel=true면 기간 말 취소 예약, false면 예약 철회.
+  cancelSubscription: (
+    subscriptionId: string,
+    cancel: boolean,
+  ) => Promise<unknown>;
+}
+
 export interface PolarWebhookRequestDeps {
   verifyWebhook: (
     rawBody: string,
@@ -314,6 +327,41 @@ export async function runCheckoutRequest(input: {
     status: 303,
     redirectUrl: checkout.url,
   };
+}
+
+// 기간 말 취소(cancel=true) 또는 취소 철회(cancel=false)를 본인 구독에만
+// 적용한다. tier·구독ID는 서버 세션 user.id로 조회해 클라이언트 입력을 신뢰하지
+// 않는다. DB 상태는 Polar 웹훅이 동기화하므로 여기서는 Polar 호출만 수행한다.
+export async function runSubscriptionCancelRequest(input: {
+  cancel: boolean;
+  redirectUrl: string;
+  deps: SubscriptionCancelRequestDeps;
+}): Promise<
+  | { status: 303; redirectUrl: string }
+  | { status: 401; body: { error: "unauthorized" } }
+  | { status: 409; body: { error: "no_active_subscription" } }
+> {
+  const user = await input.deps.getCurrentUser();
+
+  if (user === null) {
+    return { status: 401, body: { error: "unauthorized" } };
+  }
+
+  const subscription = await input.deps.getSubscription(user.id);
+
+  if (
+    subscription.tier !== "pro" ||
+    subscription.polarSubscriptionId === null
+  ) {
+    return { status: 409, body: { error: "no_active_subscription" } };
+  }
+
+  await input.deps.cancelSubscription(
+    subscription.polarSubscriptionId,
+    input.cancel,
+  );
+
+  return { status: 303, redirectUrl: input.redirectUrl };
 }
 
 export async function runPolarWebhookRequest(input: {

@@ -115,6 +115,7 @@ describe("Supabase service_role webhook adapter", () => {
         polarSubscriptionId: "sub_1",
         status: "active",
         currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+        cancelAtPeriodEnd: true,
         eventTimestamp: "2026-06-15T00:00:00.000Z",
       }),
     ).resolves.toBeUndefined();
@@ -125,6 +126,7 @@ describe("Supabase service_role webhook adapter", () => {
       p_status: "active",
       p_current_period_end: "2026-07-01T00:00:00.000Z",
       p_event_ts: "2026-06-15T00:00:00.000Z",
+      p_cancel_at_period_end: true,
     });
   });
 });

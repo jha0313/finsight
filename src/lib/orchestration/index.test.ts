@@ -22,6 +22,7 @@ import {
   runCheckoutRequest,
   runLatestAnalysisRequest,
   runPolarWebhookRequest,
+  runSubscriptionCancelRequest,
 } from "./index";
 
 const STANDARD_CSV = `date,merchant,amount,currency,account
@@ -1012,5 +1013,124 @@ describe("runPolarWebhookRequest", () => {
     });
     expect(repository.markCalls).toEqual(["evt_1"]);
     expect(repository.upsertCalls).toEqual([]);
+  });
+});
+
+function createSubscriptionCancelRequestDeps(input: {
+  userId?: string | null;
+  tier?: Tier;
+  polarSubscriptionId?: string | null;
+}) {
+  const cancelCalls: { subscriptionId: string; cancel: boolean }[] = [];
+
+  return {
+    cancelCalls,
+    deps: {
+      async getCurrentUser() {
+        return input.userId === null ? null : { id: input.userId ?? "user-1" };
+      },
+      async getSubscription() {
+        return {
+          tier: input.tier ?? "pro",
+          polarSubscriptionId:
+            input.polarSubscriptionId === undefined
+              ? "sub_1"
+              : input.polarSubscriptionId,
+        };
+      },
+      async cancelSubscription(subscriptionId: string, cancel: boolean) {
+        cancelCalls.push({ subscriptionId, cancel });
+
+        return {
+          status: "active",
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: cancel,
+        };
+      },
+    },
+  };
+}
+
+describe("runSubscriptionCancelRequest", () => {
+  it("returns 401 for unauthenticated users without touching Polar", async () => {
+    const { deps, cancelCalls } = createSubscriptionCancelRequestDeps({
+      userId: null,
+    });
+
+    const result = await runSubscriptionCancelRequest({
+      cancel: true,
+      redirectUrl: "https://app.test/dashboard/settings?sub=canceled",
+      deps,
+    });
+
+    expect(result).toEqual({ status: 401, body: { error: "unauthorized" } });
+    expect(cancelCalls).toEqual([]);
+  });
+
+  it("returns 409 when the user has no active Pro subscription", async () => {
+    const { deps, cancelCalls } = createSubscriptionCancelRequestDeps({
+      tier: "free",
+      polarSubscriptionId: null,
+    });
+
+    const result = await runSubscriptionCancelRequest({
+      cancel: true,
+      redirectUrl: "https://app.test/dashboard/settings?sub=canceled",
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 409,
+      body: { error: "no_active_subscription" },
+    });
+    expect(cancelCalls).toEqual([]);
+  });
+
+  it("returns 409 when the Pro subscription has no Polar id", async () => {
+    const { deps } = createSubscriptionCancelRequestDeps({
+      tier: "pro",
+      polarSubscriptionId: null,
+    });
+
+    const result = await runSubscriptionCancelRequest({
+      cancel: true,
+      redirectUrl: "https://app.test/dashboard/settings?sub=canceled",
+      deps,
+    });
+
+    expect(result.status).toBe(409);
+  });
+
+  it("schedules cancellation at period end and redirects", async () => {
+    const { deps, cancelCalls } = createSubscriptionCancelRequestDeps({
+      userId: "user-42",
+      polarSubscriptionId: "sub_42",
+    });
+
+    const result = await runSubscriptionCancelRequest({
+      cancel: true,
+      redirectUrl: "https://app.test/dashboard/settings?sub=canceled",
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 303,
+      redirectUrl: "https://app.test/dashboard/settings?sub=canceled",
+    });
+    expect(cancelCalls).toEqual([{ subscriptionId: "sub_42", cancel: true }]);
+  });
+
+  it("resumes a scheduled cancellation when cancel is false", async () => {
+    const { deps, cancelCalls } = createSubscriptionCancelRequestDeps({
+      polarSubscriptionId: "sub_7",
+    });
+
+    await runSubscriptionCancelRequest({
+      cancel: false,
+      redirectUrl: "https://app.test/dashboard/settings?sub=resumed",
+      deps,
+    });
+
+    expect(cancelCalls).toEqual([{ subscriptionId: "sub_7", cancel: false }]);
   });
 });
