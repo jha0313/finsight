@@ -39,7 +39,7 @@ export function FeatureGrid({
         <div className="mt-xxl grid gap-lg md:grid-cols-2 xl:grid-cols-4">
           {features.map((feature) => (
             <article
-              className="rounded-card border border-hairline bg-canvas p-xl"
+              className="rounded-card border border-hairline bg-canvas p-xl transition-shadow hover:shadow-card"
               key={feature.title}
             >
               {feature.icon === undefined ? null : (

@@ -18,6 +18,7 @@
 
   --hairline: #dee1e6;
   --hairline-soft: #eef0f3;
+  --hairline-faint: rgb(255 255 255 / 0.08);
 
   --ink: #0a0b0d;
   --body: #5b616e;
@@ -61,6 +62,7 @@
   --radius-full: 9999px;
 
   --shadow-soft: 0 4px 12px rgb(0 0 0 / 0.04);
+  --elevation-float: 0 24px 60px rgb(0 0 0 / 0.45);
 }
 
 @theme inline {
@@ -75,6 +77,7 @@
   --color-surface-dark-elevated: var(--surface-dark-elevated);
   --color-hairline: var(--hairline);
   --color-hairline-soft: var(--hairline-soft);
+  --color-hairline-faint: var(--hairline-faint);
   --color-ink: var(--ink);
   --color-body: var(--body);
   --color-body-strong: var(--body-strong);
@@ -109,6 +112,7 @@
   --radius-circle: var(--radius-full);
 
   --shadow-card: var(--shadow-soft);
+  --shadow-float: var(--elevation-float);
 }
 
 * {

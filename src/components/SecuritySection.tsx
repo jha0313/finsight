@@ -31,7 +31,7 @@ export function SecuritySection({
         <div className="grid gap-lg">
           {items.map((item) => (
             <article
-              className="rounded-card border border-hairline bg-canvas p-xl"
+              className="rounded-card border border-hairline bg-canvas p-xl transition-shadow hover:shadow-card"
               key={item.title}
             >
               <div className="flex items-start gap-base">

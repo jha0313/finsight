@@ -11,6 +11,7 @@ import {
 
 import { getSampleDemoAnalysis } from "@/app/_demo/sample-demo";
 import { SampleDemoSection } from "@/app/_demo/SampleDemoSection";
+import { CtaBand } from "@/components/CtaBand";
 import { FeatureGrid } from "@/components/FeatureGrid";
 import { Hero } from "@/components/Hero";
 import { PricingTable } from "@/components/PricingTable";
@@ -92,6 +93,7 @@ const plans = [
     price: "₩0",
   },
   {
+    badge: "추천",
     ctaHref: "/login",
     ctaLabel: "Pro 시작",
     description:
@@ -123,6 +125,7 @@ export default async function Home() {
           title: "샘플 명세서 미리보기",
         }}
         description="CSV 명세서를 올리면 지출 구조와 이상 거래를 먼저 정리하고, AI가 절약 인사이트를 덧붙입니다."
+        eyebrow="AI 절약 인사이트"
         headline="명세서에서 지출의 구조를 읽습니다"
         preview={{
           amount: "₩2,480,000",
@@ -135,6 +138,7 @@ export default async function Home() {
             { label: "환불", tone: "up", value: "-₩24,000" },
           ],
           title: "정적 대시보드 미리보기",
+          trend: [38, 52, 45, 63, 58, 78, 70, 92],
         }}
       />
 
@@ -158,6 +162,13 @@ export default async function Home() {
         eyebrow="가격"
         plans={plans}
         title="필요한 깊이만 선택합니다"
+      />
+
+      <CtaBand
+        ctaHref="/login"
+        ctaLabel="Google로 시작"
+        description="Google 계정으로 시작하면 업로드부터 분석까지 한 흐름으로 이어집니다."
+        title="첫 명세서로 지출 구조를 확인합니다"
       />
     </main>
   );
