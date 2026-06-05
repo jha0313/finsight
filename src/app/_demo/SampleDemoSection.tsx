@@ -1,17 +1,8 @@
-import { FileSpreadsheet, Siren, WalletCards } from "lucide-react";
-
 import { DashboardResults } from "@/components/DashboardResults";
-import { StatCard } from "@/components/StatCard";
-import { formatMoney } from "@/lib/format";
 import { sumMoney } from "@/lib/money";
 
+import { SampleDemoStats } from "./SampleDemoStats";
 import type { SampleDemoAnalysis } from "./sample-demo";
-
-const iconProps = {
-  "aria-hidden": "true",
-  size: 20,
-  strokeWidth: 2,
-} as const;
 
 export function SampleDemoSection({
   analysis,
@@ -38,26 +29,12 @@ export function SampleDemoSection({
           </p>
         </div>
 
-        <div className="grid gap-base sm:grid-cols-3">
-          <StatCard
-            detail="번들 CSV"
-            icon={<FileSpreadsheet {...iconProps} />}
-            label="거래 수"
-            value={`${transactions.length}`}
-          />
-          <StatCard
-            detail="3개월 합계"
-            icon={<WalletCards {...iconProps} />}
-            label="샘플 지출"
-            value={formatMoney(totalSpend)}
-          />
-          <StatCard
-            detail={`구독 후보 ${subscriptionLeakCount}`}
-            icon={<Siren {...iconProps} />}
-            label="탐지 알림"
-            value={`${response.free.anomalies.length}`}
-          />
-        </div>
+        <SampleDemoStats
+          anomalyCount={response.free.anomalies.length}
+          subscriptionLeakCount={subscriptionLeakCount}
+          totalSpend={totalSpend}
+          transactionCount={transactions.length}
+        />
       </div>
 
       <div className="mt-xl">

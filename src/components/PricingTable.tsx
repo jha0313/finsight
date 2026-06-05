@@ -110,7 +110,7 @@ function planCardClassName(featured: boolean): string {
   const base = "flex flex-col rounded-card p-xl";
 
   if (featured) {
-    return `${base} bg-surface-dark`;
+    return `${base} ai-border-gradient ai-glow bg-surface-dark`;
   }
 
   return `${base} border border-hairline bg-canvas transition-shadow hover:shadow-card`;

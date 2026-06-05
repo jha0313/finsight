@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
+import { FeatureGridCards } from "./FeatureGridCards";
+
 export interface FeatureGridItem {
+  ai?: boolean;
   description: string;
   icon?: ReactNode;
   title: string;
@@ -36,22 +39,7 @@ export function FeatureGrid({
           <p className="body-md mt-base">{description}</p>
         </div>
 
-        <div className="mt-xxl grid gap-lg md:grid-cols-2 xl:grid-cols-4">
-          {features.map((feature) => (
-            <article
-              className="rounded-card border border-hairline bg-canvas p-xl transition-shadow hover:shadow-card"
-              key={feature.title}
-            >
-              {feature.icon === undefined ? null : (
-                <div className="mb-md flex size-11 items-center justify-center rounded-circle bg-surface-strong text-ink">
-                  {feature.icon}
-                </div>
-              )}
-              <h3 className="title-md">{feature.title}</h3>
-              <p className="body-sm mt-sm">{feature.description}</p>
-            </article>
-          ))}
-        </div>
+        <FeatureGridCards features={features} />
 
         {isDemoSlotContent(demoSlot) ? (
           <aside className="mt-lg rounded-card border border-hairline bg-surface-soft p-xl">

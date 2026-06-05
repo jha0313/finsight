@@ -9,13 +9,15 @@ import {
   Siren,
 } from "lucide-react";
 
-import { getSampleDemoAnalysis } from "@/app/_demo/sample-demo";
+import { getSampleDemoAnalysis, sampleStatementCsv } from "@/app/_demo/sample-demo";
 import { SampleDemoSection } from "@/app/_demo/SampleDemoSection";
+import { AiInsightShowcase } from "@/components/AiInsightShowcase";
 import { CtaBand } from "@/components/CtaBand";
 import { FeatureGrid } from "@/components/FeatureGrid";
 import { Hero } from "@/components/Hero";
 import { PricingTable } from "@/components/PricingTable";
 import { SecuritySection } from "@/components/SecuritySection";
+import { previewCsvRows, selectInsightTabs } from "@/lib/landing-insights";
 
 const iconProps = {
   "aria-hidden": "true",
@@ -43,6 +45,7 @@ const features = [
     title: "이상 거래",
   },
   {
+    ai: true,
     description:
       "Free는 Sonnet 요약을 제공하고, Pro는 Opus로 절약 판단을 더 깊게 확장합니다.",
     icon: <CircleDollarSign {...iconProps} />,
@@ -111,10 +114,24 @@ const plans = [
 
 export default async function Home() {
   const sampleDemoAnalysis = await getSampleDemoAnalysis();
+  const insightTabs = selectInsightTabs(sampleDemoAnalysis);
+  const csvPreview = previewCsvRows(sampleStatementCsv, 5);
+
+  // Hero 카드는 가장 강한 신호(이상 거래)를 띄운다 — 아래 sparkline의 6월
+  // 급등과 직접 연결되어 "AI가 찾은 것"의 임팩트를 살린다.
+  const heroTab =
+    insightTabs.find((tab) => tab.key === "anomaly") ?? insightTabs[0];
 
   return (
     <main className="min-h-screen bg-canvas">
       <Hero
+        aiInsight={{
+          amount: heroTab.headlineNumber,
+          amountValue: 780000,
+          caption: heroTab.caption,
+          label: "AI가 찾은 것",
+          lines: [heroTab.insight],
+        }}
         brandName="finsight"
         ctaHref="/login"
         ctaLabel="Google로 시작"
@@ -127,19 +144,7 @@ export default async function Home() {
         description="CSV 명세서를 올리면 지출 구조와 이상 거래를 먼저 정리하고, AI가 절약 인사이트를 덧붙입니다."
         eyebrow="AI 절약 인사이트"
         headline="명세서에서 지출의 구조를 읽습니다"
-        preview={{
-          amount: "₩2,480,000",
-          amountLabel: "이번 달 지출",
-          delta: "-18%",
-          period: "2026.06",
-          rows: [
-            { label: "식비", tone: "down", value: "₩842,000" },
-            { label: "교통", value: "₩184,000" },
-            { label: "환불", tone: "up", value: "-₩24,000" },
-          ],
-          title: "정적 대시보드 미리보기",
-          trend: [38, 52, 45, 63, 58, 78, 70, 92],
-        }}
+        trend={[34, 41, 38, 52, 46, 63, 71, 100]}
       />
 
       <FeatureGrid
@@ -148,6 +153,14 @@ export default async function Home() {
         eyebrow="핵심 가치"
         features={features}
         title="임의의 명세서를 이해 가능한 지출 화면으로 바꿉니다"
+      />
+
+      <AiInsightShowcase
+        csvPreview={csvPreview}
+        description="원본 CSV는 그대로, 마스킹된 거래 단위만 AI에게 전달해 구독 누수·이상 거래·카테고리 비중을 정리합니다."
+        eyebrow="AI 인사이트"
+        tabs={insightTabs}
+        title="같은 명세서에서 AI가 무엇을 찾아내는지 보여줍니다"
       />
 
       <SecuritySection

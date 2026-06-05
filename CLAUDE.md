@@ -31,7 +31,7 @@
 - AI 분석 결과는 `analyses`에 **`unique(user_id, input_hash)`** 로 캐시 — 동일 입력(거래 단위 입력+모델+프롬프트 버전) 재분석 시 재호출을 skip한다. Claude 호출(Free=Sonnet/Pro=Opus)은 `ai_usage_daily` 원자 카운터로 **tier별 일일 quota**를 적용한다.
 - 웹훅은 **raw body 서명검증** + `processed_webhook_events.event_id` 선삽입으로 멱등 처리한다.
 - 컴포넌트는 props만 받는 dumb으로 만들고, 계산·포맷·파싱·마스킹 로직은 `lib/`로 분리(TDD 대상)한다. 디렉토리: `src/{app,components,lib,services,types}`.
-- CRITICAL: UI는 Vantage 디자인 시스템(`docs/DESIGN.md`·`.claude/skills/vantage-design/`)을 따른다. 색은 **토큰만 참조**하고 hex를 인라인하지 마라. accent는 `--primary` #0052ff **단일**(CTA·링크·워드마크만), display는 **weight 400**, 모든 숫자는 **JetBrains Mono(tabular)**, 트레이딩 그린/레드는 텍스트 색으로만(배경 fill 금지). 한글은 **Pretendard**. 화면에 'Vantage' 노출 금지(제품명 = finsight).
+- CRITICAL: UI는 Vantage 디자인 시스템(`docs/DESIGN.md`·`.claude/skills/vantage-design/`)을 따른다. 색은 **토큰만 참조**하고 hex를 인라인하지 마라. accent는 `--primary` #0052ff **단일**(CTA·링크·워드마크만), display는 **weight 400**, 모든 숫자는 **JetBrains Mono(tabular)**, 트레이딩 그린/레드는 텍스트 색으로만(배경 fill 금지). 한글은 **Pretendard**. 화면에 'Vantage' 노출 금지(제품명 = finsight). 예외: **토큰화된 AI 시그니처 그라데이션(`--ai-gradient`)·글로우(`--ai-glow`)·`--ai-violet`**은 **AI 맥락(인사이트/Pro)·다크 밴드에서만** 허용(일반 CTA·링크는 `--primary` 단일 유지, hex 인라인은 여전히 금지).
 
 ## 개발 프로세스
 - CRITICAL: 비즈니스 로직(`lib/`·`services/`)은 테스트를 먼저 작성하고, 통과하는 구현을 작성하라(TDD).
