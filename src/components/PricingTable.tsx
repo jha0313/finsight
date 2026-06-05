@@ -121,8 +121,8 @@ function pricingCtaClassName(featured: boolean): string {
     "btn-label mt-xl inline-flex min-h-12 w-full items-center justify-center rounded-action px-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2";
 
   if (featured) {
-    return `${base} bg-primary text-on-primary hover:bg-primary-active focus-visible:outline-primary`;
+    return `${base} bg-primary !text-on-primary hover:bg-primary-active focus-visible:outline-primary`;
   }
 
-  return `${base} bg-surface-strong text-ink hover:bg-hairline-soft focus-visible:outline-ink`;
+  return `${base} bg-surface-strong !text-ink hover:bg-hairline-soft focus-visible:outline-ink`;
 }
