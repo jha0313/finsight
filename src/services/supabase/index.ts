@@ -132,6 +132,10 @@ export function createMiddlewareSupabaseClient<Response extends MiddlewareRespon
 export async function createGoogleOAuthUrl(
   redirectTo: string,
 ): Promise<string | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

@@ -180,6 +180,20 @@ describe("supabase adapter", () => {
     expect(supabaseMocks.authGetUser).not.toHaveBeenCalled();
   });
 
+  it("returns a null OAuth url without throwing when Supabase is not configured", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    supabaseMocks.createServerClient.mockClear();
+
+    await expect(
+      createGoogleOAuthUrl(
+        "https://finsight.test/auth/callback?next=%2Fdashboard",
+      ),
+    ).resolves.toBeNull();
+    expect(supabaseMocks.createServerClient).not.toHaveBeenCalled();
+    expect(supabaseMocks.authSignInWithOAuth).not.toHaveBeenCalled();
+  });
+
   it("starts Google OAuth through Supabase with the provided callback URL", async () => {
     await expect(
       createGoogleOAuthUrl(
