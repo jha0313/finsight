@@ -53,7 +53,7 @@ describe("checkout route", () => {
     expect(checkoutRouteMocks.runCheckoutRequest).toHaveBeenCalledTimes(1);
     expect(checkoutRouteMocks.runCheckoutRequest).toHaveBeenCalledWith({
       productId: process.env.POLAR_PRODUCT_ID,
-      successUrl: "https://app.example/dashboard",
+      successUrl: "https://app.example/dashboard?checkout=success",
       deps: {
         getCurrentUser: checkoutRouteMocks.getCurrentUser,
         checkout: { kind: "polar-checkout" },
@@ -83,7 +83,7 @@ describe("checkout route", () => {
 
     expect(checkoutRouteMocks.runCheckoutRequest).toHaveBeenCalledWith({
       productId: process.env.POLAR_PRODUCT_ID,
-      successUrl: "https://app.example/dashboard",
+      successUrl: "https://app.example/dashboard?checkout=success",
       deps: {
         getCurrentUser: checkoutRouteMocks.getCurrentUser,
         checkout: { kind: "polar-checkout" },

@@ -54,6 +54,7 @@ export function createPolarWebhookRepository(): WebhookSubscriptionRepository {
         p_status: input.status,
         p_current_period_end: input.currentPeriodEnd,
         p_event_ts: input.eventTimestamp,
+        p_cancel_at_period_end: input.cancelAtPeriodEnd,
       });
 
       throwIfSupabaseError(error, "upsert_subscription RPC failed");

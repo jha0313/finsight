@@ -9,7 +9,20 @@ vi.mock("next/navigation", () => ({
   usePathname: navigationMocks.usePathname,
 }));
 
-import { Sidebar } from "./Sidebar";
+import { Sidebar, type SidebarProps } from "./Sidebar";
+
+function renderSidebar(overrides: Partial<SidebarProps> = {}) {
+  render(
+    <Sidebar
+      cancelAtPeriodEnd={false}
+      email="ava@example.com"
+      renewalLabel={null}
+      signOutAction={vi.fn()}
+      tier="free"
+      {...overrides}
+    />,
+  );
+}
 
 describe("Sidebar", () => {
   afterEach(() => {
@@ -20,7 +33,7 @@ describe("Sidebar", () => {
   it("renders dashboard and settings navigation links", () => {
     navigationMocks.usePathname.mockReturnValue("/dashboard");
 
-    render(<Sidebar email="ava@example.com" tier="free" signOutAction={vi.fn()} />);
+    renderSidebar();
 
     expect(screen.getByRole("link", { name: "대시보드" })).toHaveAttribute(
       "href",
@@ -35,7 +48,7 @@ describe("Sidebar", () => {
   it("marks the active route with aria-current based on the pathname", () => {
     navigationMocks.usePathname.mockReturnValue("/dashboard/settings");
 
-    render(<Sidebar email="ava@example.com" tier="free" signOutAction={vi.fn()} />);
+    renderSidebar();
 
     expect(screen.getByRole("link", { name: "설정" })).toHaveAttribute(
       "aria-current",
@@ -49,29 +62,29 @@ describe("Sidebar", () => {
   it("keeps the dashboard link inactive on nested routes", () => {
     navigationMocks.usePathname.mockReturnValue("/dashboard/settings");
 
-    render(<Sidebar email="ava@example.com" tier="pro" signOutAction={vi.fn()} />);
+    renderSidebar({ tier: "pro" });
 
     expect(screen.getByRole("link", { name: "대시보드" })).not.toHaveAttribute(
       "aria-current",
     );
   });
 
-  it("shows the plan badge and the account email", () => {
+  it("shows the plan badge and the account email through the user menu", () => {
     navigationMocks.usePathname.mockReturnValue("/dashboard");
 
-    render(<Sidebar email="ava@example.com" tier="pro" signOutAction={vi.fn()} />);
+    renderSidebar({ tier: "pro" });
 
     expect(screen.getAllByText("Pro").length).toBeGreaterThan(0);
     expect(screen.getByText("ava@example.com")).toBeInTheDocument();
   });
 
-  it("renders a logout control", () => {
+  it("renders the account menu trigger", () => {
     navigationMocks.usePathname.mockReturnValue("/dashboard");
 
-    render(<Sidebar email={null} tier="free" signOutAction={vi.fn()} />);
+    renderSidebar({ email: null });
 
     expect(
-      screen.getByRole("button", { name: "로그아웃" }),
+      screen.getByRole("button", { name: "계정 메뉴 열기" }),
     ).toBeInTheDocument();
   });
 });

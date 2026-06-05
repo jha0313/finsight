@@ -11,6 +11,13 @@ import type { AnalyzeResponse } from "@/types/analysis";
 
 import { UploadPanel } from "./UploadPanel";
 
+// 실제 useRouter처럼 안정적인 참조를 반환해야 useEffect 의존성이 흔들리지 않는다.
+const navMocks = vi.hoisted(() => ({ refresh: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => navMocks,
+}));
+
 const analyzeResponse: AnalyzeResponse = {
   tier: "free",
   free: {
@@ -36,6 +43,8 @@ describe("UploadPanel", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
+    sessionStorage.clear();
+    window.history.replaceState(null, "", "/");
   });
 
   afterEach(() => {
@@ -44,7 +53,7 @@ describe("UploadPanel", () => {
   });
 
   it("renders the initial upload state", () => {
-    render(<UploadPanel />);
+    render(<UploadPanel serverTier="free" />);
 
     expect(screen.getByLabelText("CSV 또는 PDF 파일")).toBeInTheDocument();
     expect(
@@ -60,7 +69,7 @@ describe("UploadPanel", () => {
         status: 200,
       }),
     );
-    render(<UploadPanel />);
+    render(<UploadPanel serverTier="free" />);
 
     selectCsvFile();
     fireEvent.click(screen.getByRole("button", { name: "명세서 분석" }));
@@ -86,7 +95,7 @@ describe("UploadPanel", () => {
         status: 500,
       }),
     );
-    render(<UploadPanel />);
+    render(<UploadPanel serverTier="free" />);
 
     selectCsvFile();
     fireEvent.click(screen.getByRole("button", { name: "명세서 분석" }));
@@ -95,6 +104,164 @@ describe("UploadPanel", () => {
       await screen.findByText("분석 요청을 처리하지 못했습니다."),
     ).toBeInTheDocument();
     expect(screen.getByText("분석 결과가 아직 없습니다.")).toBeInTheDocument();
+  });
+
+  it("auto-re-analyzes the latest statement and unlocks Pro after returning from checkout", async () => {
+    window.history.replaceState(null, "", "/dashboard?checkout=success");
+    const proResponse: AnalyzeResponse = {
+      tier: "pro",
+      free: analyzeResponse.free,
+      pro: {
+        status: "active",
+        insights: { summary: "Opus 심층 분석", insights: ["절약 인사이트"] },
+      },
+    };
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(proResponse), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      }),
+    );
+
+    render(<UploadPanel serverTier="free" />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/analyze/latest");
+    expect(init?.method).toBe("POST");
+
+    // 잠금 화면이 Opus 심층 분석으로 교체되고 업그레이드 버튼은 사라진다.
+    expect(await screen.findByText("Opus 심층 분석")).toBeInTheDocument();
+    expect(screen.queryByText("Pro 분석 잠금")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Pro로 업그레이드/ }),
+    ).not.toBeInTheDocument();
+    // 새로고침 재트리거 방지를 위해 쿼리를 제거한다.
+    expect(window.location.search).toBe("");
+  });
+
+  it("shows a Pro generating state in the insights panel while re-analysis is in flight", async () => {
+    window.history.replaceState(null, "", "/dashboard?checkout=success");
+    // 결제 직후 복원된 잠금 결과 위에서 재분석이 진행되는 상태.
+    sessionStorage.setItem(
+      "finsight:last-analysis",
+      JSON.stringify(analyzeResponse),
+    );
+    // fetch를 보류시켜 Opus 생성 중(폴링 in-flight) 상태를 캡처한다.
+    fetchMock.mockReturnValue(new Promise<Response>(() => {}));
+
+    render(<UploadPanel serverTier="free" />);
+
+    expect(
+      await screen.findByText(
+        /Pro 심층 분석\(Opus\)을 생성하는 중입니다/,
+      ),
+    ).toBeInTheDocument();
+    // 생성 중에는 업그레이드 잠금 CTA가 보이지 않는다.
+    expect(screen.queryByText("Pro 분석 잠금")).not.toBeInTheDocument();
+  });
+
+  it("does not auto-refresh without the checkout=success flag", () => {
+    window.history.replaceState(null, "", "/dashboard");
+
+    render(<UploadPanel serverTier="free" />);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("auto-re-analyzes on plain reload when server is Pro but stored analysis is still locked", async () => {
+    // 결제 직후 폴링 윈도우를 놓쳐 Free(잠금) 분석만 저장된 상태를 재현.
+    // checkout 쿼리 없이 새로고침만으로도 복구되어야 한다.
+    window.history.replaceState(null, "", "/dashboard");
+    sessionStorage.setItem(
+      "finsight:last-analysis",
+      JSON.stringify(analyzeResponse),
+    );
+    const proResponse: AnalyzeResponse = {
+      tier: "pro",
+      free: analyzeResponse.free,
+      pro: {
+        status: "active",
+        insights: { summary: "Opus 심층 분석", insights: ["절약 인사이트"] },
+      },
+    };
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(proResponse), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      }),
+    );
+
+    render(<UploadPanel serverTier="pro" />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/analyze/latest");
+    expect(await screen.findByText("Opus 심층 분석")).toBeInTheDocument();
+    expect(screen.queryByText("Pro 분석 잠금")).not.toBeInTheDocument();
+  });
+
+  it("does not re-analyze on reload when stored analysis already matches Pro", async () => {
+    window.history.replaceState(null, "", "/dashboard");
+    sessionStorage.setItem(
+      "finsight:last-analysis",
+      JSON.stringify({
+        tier: "pro",
+        free: analyzeResponse.free,
+        pro: { status: "active", insights: { summary: "s", insights: [] } },
+      }),
+    );
+
+    render(<UploadPanel serverTier="pro" />);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("downgrades stored Pro insights to locked when server tier is Free on reload", async () => {
+    // 다운그레이드 후에도 sessionStorage에 옛 Pro 인사이트가 남은 상태를 재현.
+    window.history.replaceState(null, "", "/dashboard");
+    sessionStorage.setItem(
+      "finsight:last-analysis",
+      JSON.stringify({
+        tier: "pro",
+        free: analyzeResponse.free,
+        pro: {
+          status: "active",
+          insights: { summary: "옛 Pro 인사이트", insights: ["심층"] },
+        },
+      }),
+    );
+    // 서버는 이제 Free → latest가 잠금(인사이트 없음)을 반환.
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          tier: "free",
+          free: analyzeResponse.free,
+          pro: { status: "locked" },
+        }),
+        { headers: { "content-type": "application/json" }, status: 200 },
+      ),
+    );
+
+    render(<UploadPanel serverTier="free" />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/analyze/latest");
+    // Pro 심층 분석이 사라지고 업그레이드 잠금 화면으로 강등된다.
+    expect(await screen.findByText("Pro 분석 잠금")).toBeInTheDocument();
+    expect(screen.queryByText("옛 Pro 인사이트")).not.toBeInTheDocument();
+  });
+
+  it("keeps the empty state when there is no stored statement to re-analyze", async () => {
+    window.history.replaceState(null, "", "/dashboard?checkout=success");
+    fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
+
+    render(<UploadPanel serverTier="free" />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(
+      await screen.findByText("분석 결과가 아직 없습니다."),
+    ).toBeInTheDocument();
+    expect(window.location.search).toBe("");
   });
 });
 

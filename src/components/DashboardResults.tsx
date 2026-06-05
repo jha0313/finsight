@@ -6,9 +6,15 @@ import type { AnalyzeResponse } from "@/types/analysis";
 
 export interface DashboardResultsProps {
   response: AnalyzeResponse;
+  // 서버는 Pro 확정인데 Opus 심층 분석을 아직 생성 중일 때 인사이트 패널을
+  // 진행 표시로 보여준다.
+  proPending?: boolean;
 }
 
-export function DashboardResults({ response }: DashboardResultsProps) {
+export function DashboardResults({
+  response,
+  proPending = false,
+}: DashboardResultsProps) {
   return (
     <section aria-label="분석 결과" className="space-y-lg">
       <div className="grid gap-lg xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
@@ -18,6 +24,7 @@ export function DashboardResults({ response }: DashboardResultsProps) {
         />
         <InsightsPanel
           insights={response.pro.insights}
+          pending={proPending}
           status={response.pro.status}
         />
       </div>

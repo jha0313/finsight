@@ -20,13 +20,13 @@ describe("signOutAction", () => {
     vi.clearAllMocks();
   });
 
-  it("signs out and redirects to the login page", async () => {
+  it("signs out and redirects to the landing page", async () => {
     actionMocks.signOutCurrentUser.mockResolvedValue(undefined);
 
     await signOutAction();
 
     expect(actionMocks.signOutCurrentUser).toHaveBeenCalledTimes(1);
-    expect(actionMocks.redirect).toHaveBeenCalledWith("/login");
+    expect(actionMocks.redirect).toHaveBeenCalledWith("/");
   });
 
   it("redirects only after sign-out resolves", async () => {

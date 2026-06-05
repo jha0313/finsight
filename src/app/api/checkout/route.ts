@@ -22,9 +22,10 @@ export async function POST(): Promise<NextResponse> {
 }
 
 // 결제 완료 후 Polar가 사용자를 돌려보낼 앱 내부 URL. 미설정 시 Polar 기본
-// thank-you 페이지에 머문다.
+// thank-you 페이지에 머문다. checkout=success는 대시보드가 결제 복귀를 감지해
+// 저장된 명세서를 Pro로 자동 재분석하는 신호다.
 function checkoutSuccessUrl(): string | undefined {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-  return baseUrl ? `${baseUrl}/dashboard` : undefined;
+  return baseUrl ? `${baseUrl}/dashboard?checkout=success` : undefined;
 }

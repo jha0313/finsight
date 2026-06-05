@@ -52,6 +52,8 @@ type SupabaseError = {
 type SubscriptionRow = {
   status: string | null;
   current_period_end: string | null;
+  cancel_at_period_end: boolean | null;
+  polar_subscription_id: string | null;
 };
 
 type SaveStatementAnalysisRpcRow = {
@@ -274,7 +276,19 @@ export async function getCurrentUser(): Promise<{
 export interface SubscriptionSummary {
   tier: Tier;
   currentPeriodEnd: string | null;
+  // 기간 말 취소 예약 여부(Pro일 때만 의미가 있다). true면 현재 기간 종료 후
+  // Free로 전환될 예정이라는 안내·취소 철회 UI를 보여준다.
+  cancelAtPeriodEnd: boolean;
+  // 본인 구독을 취소/철회하기 위한 Polar 구독 ID. Pro가 아니면 null.
+  polarSubscriptionId: string | null;
 }
+
+export const FREE_SUMMARY: SubscriptionSummary = {
+  tier: "free",
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  polarSubscriptionId: null,
+};
 
 export async function getSubscriptionSummary(
   userId: string,
@@ -283,7 +297,7 @@ export async function getSubscriptionSummary(
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("subscriptions")
-    .select("status,current_period_end")
+    .select("status,current_period_end,cancel_at_period_end,polar_subscription_id")
     .eq("user_id", userId)
     .eq("status", "active")
     .gt("current_period_end", now)
@@ -296,10 +310,15 @@ export async function getSubscriptionSummary(
     data.current_period_end === null ||
     data.current_period_end <= now
   ) {
-    return { tier: "free", currentPeriodEnd: null };
+    return FREE_SUMMARY;
   }
 
-  return { tier: "pro", currentPeriodEnd: data.current_period_end };
+  return {
+    tier: "pro",
+    currentPeriodEnd: data.current_period_end,
+    cancelAtPeriodEnd: data.cancel_at_period_end === true,
+    polarSubscriptionId: data.polar_subscription_id,
+  };
 }
 
 export async function signOutCurrentUser(): Promise<void> {

@@ -55,6 +55,22 @@ describe("InsightsPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a generating progress state (no upgrade CTA) while Pro analysis is pending", () => {
+    // 서버 Pro 확정 + Opus 생성 중: locked로 저장돼 있어도 pending이 우선한다.
+    render(<InsightsPanel status="locked" pending />);
+
+    expect(
+      screen.getByText(
+        "Pro 심층 분석(Opus)을 생성하는 중입니다. 잠시만 기다려 주세요.",
+      ),
+    ).toBeInTheDocument();
+    // 이미 Pro이므로 업그레이드 CTA도, 잠금 문구도 보이지 않는다.
+    expect(
+      screen.queryByRole("button", { name: "Pro로 업그레이드" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Pro 분석 잠금")).not.toBeInTheDocument();
+  });
+
   it("renders unavailable copy without the upgrade CTA", () => {
     render(<InsightsPanel status="unavailable" />);
 

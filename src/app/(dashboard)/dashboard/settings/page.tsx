@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 
 import { SettingsView } from "@/components/SettingsView";
 import { formatDate } from "@/lib/format";
-import { getCurrentUser, getSubscriptionSummary } from "@/services/supabase";
+import {
+  FREE_SUMMARY,
+  getCurrentUser,
+  getSubscriptionSummary,
+} from "@/services/supabase";
 
 import { signOutAction } from "../../actions";
 
@@ -14,7 +18,7 @@ export default async function SettingsPage() {
   const user = await getCurrentUser();
   const summary = user
     ? await getSubscriptionSummary(user.id)
-    : { tier: "free" as const, currentPeriodEnd: null };
+    : FREE_SUMMARY;
   const renewalLabel =
     summary.currentPeriodEnd !== null
       ? formatDate(summary.currentPeriodEnd)
@@ -22,6 +26,7 @@ export default async function SettingsPage() {
 
   return (
     <SettingsView
+      cancelAtPeriodEnd={summary.cancelAtPeriodEnd}
       email={user?.email ?? null}
       renewalLabel={renewalLabel}
       signOutAction={signOutAction}

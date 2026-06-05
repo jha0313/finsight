@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  cancelSubscriptionAtPeriodEnd,
   createPolarCheckout,
   toSubscriptionUpsert,
   verifyPolarWebhook,
@@ -8,11 +9,15 @@ import {
 
 const polarMocks = vi.hoisted(() => {
   const checkoutsCreate = vi.fn();
+  const subscriptionsUpdate = vi.fn();
   const validateEvent = vi.fn();
   const Polar = vi.fn(function Polar() {
     return {
       checkouts: {
         create: checkoutsCreate,
+      },
+      subscriptions: {
+        update: subscriptionsUpdate,
       },
     };
   });
@@ -20,6 +25,7 @@ const polarMocks = vi.hoisted(() => {
   return {
     Polar,
     checkoutsCreate,
+    subscriptionsUpdate,
     validateEvent,
   };
 });
@@ -168,6 +174,70 @@ describe("verifyPolarWebhook", () => {
   });
 });
 
+describe("cancelSubscriptionAtPeriodEnd", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPolarEnv();
+    setPolarEnv();
+  });
+
+  it("does not create the Polar client until called", () => {
+    clearPolarEnv();
+
+    expect(polarMocks.Polar).not.toHaveBeenCalled();
+  });
+
+  it("schedules cancellation at period end and normalizes the result", async () => {
+    polarMocks.subscriptionsUpdate.mockResolvedValue({
+      id: "sub_123",
+      status: "active",
+      currentPeriodEnd: new Date("2026-07-01T00:00:00.000Z"),
+      cancelAtPeriodEnd: true,
+    });
+
+    const result = await cancelSubscriptionAtPeriodEnd("sub_123", true);
+
+    expect(polarMocks.Polar).toHaveBeenCalledWith({
+      accessToken: "polar-token",
+      server: "sandbox",
+    });
+    expect(polarMocks.subscriptionsUpdate).toHaveBeenCalledWith({
+      id: "sub_123",
+      subscriptionUpdate: { cancelAtPeriodEnd: true },
+    });
+    expect(result).toEqual({
+      status: "active",
+      currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      cancelAtPeriodEnd: true,
+    });
+  });
+
+  it("resumes a scheduled cancellation when cancel is false", async () => {
+    polarMocks.subscriptionsUpdate.mockResolvedValue({
+      id: "sub_123",
+      status: "active",
+      currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      cancelAtPeriodEnd: false,
+    });
+
+    const result = await cancelSubscriptionAtPeriodEnd("sub_123", false);
+
+    expect(polarMocks.subscriptionsUpdate).toHaveBeenCalledWith({
+      id: "sub_123",
+      subscriptionUpdate: { cancelAtPeriodEnd: false },
+    });
+    expect(result.cancelAtPeriodEnd).toBe(false);
+  });
+
+  it("throws at call time when Polar env is missing", async () => {
+    clearPolarEnv();
+
+    await expect(
+      cancelSubscriptionAtPeriodEnd("sub_1", true),
+    ).rejects.toThrow("POLAR_ACCESS_TOKEN");
+  });
+});
+
 describe("toSubscriptionUpsert", () => {
   it("normalizes active subscription events for subscriptions upsert", () => {
     const upsert = toSubscriptionUpsert({
@@ -180,8 +250,25 @@ describe("toSubscriptionUpsert", () => {
       polarSubscriptionId: "sub_123",
       status: "active",
       currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+      cancelAtPeriodEnd: false,
       eventTimestamp: "2026-06-15T00:00:00.000Z",
     });
+  });
+
+  it("captures the cancel-at-period-end flag from either key casing", () => {
+    expect(
+      toSubscriptionUpsert({
+        type: "subscription.updated",
+        data: subscriptionData({ cancelAtPeriodEnd: true }),
+      }),
+    ).toMatchObject({ cancelAtPeriodEnd: true });
+
+    expect(
+      toSubscriptionUpsert({
+        type: "subscription.updated",
+        data: subscriptionData({ cancel_at_period_end: true }),
+      }),
+    ).toMatchObject({ cancelAtPeriodEnd: true });
   });
 
   it("falls back to a null event timestamp when none is present", () => {

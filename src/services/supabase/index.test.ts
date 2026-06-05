@@ -363,7 +363,9 @@ describe("supabase adapter", () => {
 
     expect(tier).toBe("pro");
     expect(supabaseMocks.from).toHaveBeenCalledWith("subscriptions");
-    expect(supabaseMocks.select).toHaveBeenCalledWith("status,current_period_end");
+    expect(supabaseMocks.select).toHaveBeenCalledWith(
+      "status,current_period_end,cancel_at_period_end,polar_subscription_id",
+    );
     expect(supabaseMocks.eq).toHaveBeenCalledWith("user_id", "user-1");
     expect(supabaseMocks.gt).toHaveBeenCalledWith(
       "current_period_end",
@@ -396,11 +398,13 @@ describe("supabase adapter", () => {
     await expect(gateway.resolveTier("user-1")).resolves.toBe("free");
   });
 
-  it("summarizes an active subscription as pro with its renewal date", async () => {
+  it("summarizes an active subscription as pro with its renewal and cancel state", async () => {
     selectChain({
       data: {
         status: "active",
         current_period_end: "2999-01-01T00:00:00.000Z",
+        cancel_at_period_end: true,
+        polar_subscription_id: "sub_123",
       },
       error: null,
     });
@@ -408,6 +412,8 @@ describe("supabase adapter", () => {
     await expect(getSubscriptionSummary("user-1")).resolves.toEqual({
       tier: "pro",
       currentPeriodEnd: "2999-01-01T00:00:00.000Z",
+      cancelAtPeriodEnd: true,
+      polarSubscriptionId: "sub_123",
     });
   });
 
@@ -417,6 +423,8 @@ describe("supabase adapter", () => {
     await expect(getSubscriptionSummary("user-1")).resolves.toEqual({
       tier: "free",
       currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      polarSubscriptionId: null,
     });
   });
 
