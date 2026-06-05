@@ -164,7 +164,7 @@ export async function runAnalyzeRequest(input: {
 
   const tier = await input.deps.subscriptionGateway.resolveTier(user.id);
   const inputHash = analysisInputHash({
-    statement: input.statement,
+    transactions: input.statement.transactions,
     tier,
   });
   const cachedInsights = toCachedInsights(
@@ -204,6 +204,87 @@ export async function runAnalyzeRequest(input: {
     status: 200,
     body: analysisResult.response,
   };
+}
+
+// 결제 복귀 후 자동 재분석. 원본 파일은 클라이언트에 남지 않으므로, DB에 저장된
+// 마지막 명세서의 정규화 거래로 Free 분석을 재계산하고 Pro면 Opus 인사이트를
+// (캐시 우선) 만든다. 구독이 아직 반영되지 않았으면(웹훅 레이스) locked로 두고
+// 클라이언트가 잠깐 후 재시도한다.
+export async function runLatestAnalysisRequest(input: {
+  deps: AnalyzeRequestDeps;
+}): Promise<
+  | { status: 200; body: AnalyzeResponse }
+  | { status: 401; body: { error: "unauthorized" } }
+  | { status: 404; body: { error: "no_statement" } }
+> {
+  const user = await input.deps.getCurrentUser();
+
+  if (user === null) {
+    return { status: 401, body: { error: "unauthorized" } };
+  }
+
+  const latest = await input.deps.statementRepository.loadLatestStatement(
+    user.id,
+  );
+
+  if (latest === null) {
+    return { status: 404, body: { error: "no_statement" } };
+  }
+
+  const tier = await input.deps.subscriptionGateway.resolveTier(user.id);
+  const transactions = latest.transactions;
+  const response = buildLatestBaseResponse(transactions, tier);
+  const inputHash = analysisInputHash({
+    transactions: transactions.map(toHashTransaction),
+    tier,
+  });
+
+  const cachedInsights = toCachedInsights(
+    await input.deps.aiUsage.getCachedInsights(user.id, inputHash),
+  );
+
+  if (cachedInsights !== null) {
+    response.pro = {
+      status: proStatusForTier(tier),
+      insights: cachedInsights,
+    };
+
+    return { status: 200, body: response };
+  }
+
+  // 미구독은 Opus를 돌리지 않고 locked(업그레이드 CTA)로 남긴다.
+  if (tier !== "pro") {
+    return { status: 200, body: response };
+  }
+
+  const insights = await generatePaidInsights({
+    deps: input.deps,
+    userId: user.id,
+    transactions,
+    tier,
+  });
+
+  if (insights === null) {
+    // quota 소진·타임아웃·에러는 unavailable로 격리(Free 결과는 보존).
+    return { status: 200, body: response };
+  }
+
+  response.pro = { status: "active", insights };
+
+  // 멱등 save RPC로 캐시만 추가한다(statement·거래는 이미 저장돼 중복 무시).
+  // 같은 명세서를 Pro로 재업로드할 때 Opus 재호출을 피한다.
+  await input.deps.statementRepository.saveStatementAnalysis({
+    userId: user.id,
+    statement: { sourceHash: latest.sourceHash, status: "ready" },
+    transactions,
+    analysis: {
+      inputHash,
+      model: MODEL_BY_TIER[tier],
+      result: insights,
+    },
+  });
+
+  return { status: 200, body: response };
 }
 
 export async function runCheckoutRequest(input: {
@@ -381,13 +462,13 @@ function toCachedInsights(value: unknown): ProInsights | null {
 // CSV·PDF 입력 형식과도 무관하다. CLAUDE.md의 unique(user_id, input_hash)
 // 캐시 규칙과 일치한다.
 function analysisInputHash(input: {
-  statement: ParsedStatement;
+  transactions: ParsedTransaction[];
   tier: Tier;
 }): string {
   const payload = JSON.stringify([
     AI_PROMPT_VERSION,
     MODEL_BY_TIER[input.tier],
-    sourceHash(input.statement.transactions),
+    sourceHash(input.transactions),
   ]);
 
   return createHash("sha256").update(payload, "utf8").digest("hex");
@@ -403,6 +484,71 @@ function proStatusWithoutInsights(
   tier: Tier,
 ): AnalyzeResponse["pro"]["status"] {
   return tier === "pro" ? "unavailable" : "locked";
+}
+
+// 저장된 거래로부터 인사이트 없는 기본 응답을 만든다. Free 분석은 결정론적이라
+// 재계산해도 동일하고, pro.status는 tier에 따라 locked/unavailable로 둔다.
+function buildLatestBaseResponse(
+  transactions: Transaction[],
+  tier: Tier,
+): AnalyzeResponse {
+  const currency = resolveStatementCurrency(transactions);
+
+  return {
+    tier,
+    free: analyze(transactions),
+    pro: { status: proStatusWithoutInsights(tier) },
+    ...(currency !== undefined ? { currency } : {}),
+  };
+}
+
+// 저장된 거래는 마스킹된 계좌만 보관한다(원본 account 미보관). 캐시 키는 account를
+// 제외한 거래 필드로 계산하므로, account가 없던 명세서는 업로드 경로와 동일 키가
+// 되어 cross-hit한다. account가 있던 명세서는 키가 달라 Opus를 한 번 더 부른다
+// (quota 내 허용).
+function toHashTransaction(transaction: Transaction): ParsedTransaction {
+  return {
+    date: transaction.date,
+    merchant: transaction.merchant,
+    signedAmount: transaction.signedAmount,
+    direction: transaction.direction,
+    currency: transaction.currency,
+  };
+}
+
+// quota를 소비하고 Opus를 호출한다. quota 소진이면 호출 없이 null,
+// 타임아웃·에러로 인사이트를 못 만들면 소비한 quota를 환불하고 null.
+async function generatePaidInsights(input: {
+  deps: AnalyzeRequestDeps;
+  userId: string;
+  transactions: Transaction[];
+  tier: Tier;
+}): Promise<ProInsights | null> {
+  const quotaOk = await input.deps.aiUsage.tryConsumeDailyQuota(
+    input.userId,
+    input.tier,
+  );
+
+  if (!quotaOk) {
+    return null;
+  }
+
+  const insights = await generateInsights({
+    insightProvider: createLazyInsightProvider(
+      input.deps.insightProviderFactory,
+    ),
+    transactions: input.transactions,
+    tier: input.tier,
+    timeoutMs: DEFAULT_AI_TIMEOUT_MS,
+  });
+
+  if (insights === null || insights === undefined) {
+    await input.deps.aiUsage.releaseDailyQuota(input.userId, input.tier);
+
+    return null;
+  }
+
+  return insights;
 }
 
 // 명세서는 단일 청구 통화를 가정하되, 혼합 시 최빈 통화를 대표값으로 쓴다.

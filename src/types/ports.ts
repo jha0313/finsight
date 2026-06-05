@@ -26,6 +26,16 @@ export interface StatementRepository {
   saveStatementAnalysis(
     input: SaveStatementAnalysisInput,
   ): Promise<{ statementId: string }>;
+  // 결제 복귀 후 자동 재분석을 위해, 저장된 가장 최근 명세서의 거래를 그대로
+  // 불러온다. 원본 파일은 클라이언트에 남지 않으므로 DB의 정규화된 거래가
+  // 유일한 재분석 입력이다. 저장된 명세서가 없으면 null.
+  loadLatestStatement(userId: string): Promise<LatestStatement | null>;
+}
+
+export interface LatestStatement {
+  // analyses 캐시 멱등 저장에 재사용할 statement의 source_hash.
+  sourceHash: string;
+  transactions: Transaction[];
 }
 
 export interface AiUsageGateway {

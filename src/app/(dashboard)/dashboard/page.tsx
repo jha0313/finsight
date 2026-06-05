@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 
 import { UploadPanel } from "@/components/UploadPanel";
+import { getCurrentUser, getSubscriptionSummary } from "@/services/supabase";
 
 export const metadata: Metadata = {
   title: "대시보드 | finsight",
 };
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
+  const tier = user ? (await getSubscriptionSummary(user.id)).tier : "free";
+
   return (
     <main className="min-h-screen bg-canvas">
       <section className="border-b border-hairline bg-canvas">
@@ -24,7 +28,7 @@ export default function DashboardPage() {
 
       <section className="bg-surface-soft">
         <div className="mx-auto w-full max-w-finsight px-lg py-xxl">
-          <UploadPanel />
+          <UploadPanel serverTier={tier} />
         </div>
       </section>
     </main>

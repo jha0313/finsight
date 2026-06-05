@@ -1,10 +1,18 @@
 "use client";
 
 import { FileUp, LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 
 import { DashboardResults } from "@/components/DashboardResults";
 import type { AnalyzeResponse } from "@/types/analysis";
+import type { Tier } from "@/types/tier";
+
+export interface UploadPanelProps {
+  // 서버 세션에서 판정한 구독 tier(SSR). 결제 직후 저장된 분석이 아직 Free일 때
+  // 자동 재분석을 트리거하는 기준이다.
+  serverTier: Tier;
+}
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
 
@@ -12,11 +20,18 @@ type UploadStatus = "idle" | "loading" | "success" | "error";
 // 복원하기 위한 세션 저장 키. 탭을 닫으면 비워진다.
 const ANALYSIS_STORAGE_KEY = "finsight:last-analysis";
 
-export function UploadPanel() {
+// 결제 직후 구독 웹훅 반영에 약간의 지연이 있을 수 있어, Pro로 보일 때까지
+// 짧게 재시도한다(웹훅 레이스 방어).
+const CHECKOUT_REFRESH_ATTEMPTS = 5;
+const CHECKOUT_REFRESH_INTERVAL_MS = 1500;
+
+export function UploadPanel({ serverTier }: UploadPanelProps) {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AnalyzeResponse | null>(null);
+  const [checkoutRefreshing, setCheckoutRefreshing] = useState(false);
 
   const isLoading = status === "loading";
 
@@ -35,6 +50,80 @@ export function UploadPanel() {
       sessionStorage.removeItem(ANALYSIS_STORAGE_KEY);
     }
   }, []);
+
+  // 결제 후 저장된 마지막 명세서를 서버에서 Pro(Opus)로 자동 재분석해 잠금
+  // 화면을 심층 분석으로 교체한다. 원본 파일은 redirect 후 클라이언트에 남지
+  // 않으므로 재업로드 없이 갱신한다. 트리거는 두 가지:
+  //  (1) ?checkout=success — 결제 직후 복귀(웹훅 반영 레이스 대비 재시도).
+  //  (2) 서버 구독은 Pro인데 저장된 분석이 아직 Pro가 아님 — 새로고침만으로도
+  //      복구되도록 보장(결제 직후 폴링 윈도우를 놓쳤을 때의 안전망).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutReturn = params.get("checkout") === "success";
+    const storedStale = serverTier === "pro" && isStoredAnalysisStale();
+
+    if (!checkoutReturn && !storedStale) {
+      return;
+    }
+
+    if (checkoutReturn) {
+      // 새로고침 시 중복 트리거되지 않도록 쿼리를 즉시 제거한다.
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+
+    let cancelled = false;
+
+    async function refreshAfterCheckout() {
+      setCheckoutRefreshing(true);
+
+      try {
+        for (let attempt = 0; attempt < CHECKOUT_REFRESH_ATTEMPTS; attempt++) {
+          const latestResponse = await fetch("/api/analyze/latest", {
+            method: "POST",
+          });
+
+          // 분석한 명세서가 없거나(404) 인증 만료 등(4xx/5xx)이면 기존 화면을
+          // 유지한다.
+          if (!latestResponse.ok) {
+            return;
+          }
+
+          const result = (await latestResponse.json()) as AnalyzeResponse;
+
+          if (cancelled) {
+            return;
+          }
+
+          // tier가 pro로 보이면 구독이 반영된 것 — 결과를 채택하고 멈춘다.
+          // 아직 free면 웹훅 반영을 기다리며 잠깐 후 재시도한다.
+          if (result.tier === "pro") {
+            setResponse(result);
+            setStatus("success");
+            sessionStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(result));
+            // 사이드바 Plan 배지(서버 컴포넌트)까지 최신 구독으로 다시 렌더한다.
+            router.refresh();
+            return;
+          }
+
+          if (attempt < CHECKOUT_REFRESH_ATTEMPTS - 1) {
+            await delay(CHECKOUT_REFRESH_INTERVAL_MS);
+          }
+        }
+      } catch {
+        // 네트워크 오류 시 기존 화면을 유지한다.
+      } finally {
+        if (!cancelled) {
+          setCheckoutRefreshing(false);
+        }
+      }
+    }
+
+    void refreshAfterCheckout();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [serverTier, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -129,6 +218,12 @@ export function UploadPanel() {
           </p>
         ) : null}
 
+        {checkoutRefreshing ? (
+          <p className="body-sm mt-base" role="status">
+            Pro 구독을 확인하고 심층 분석을 적용하는 중입니다.
+          </p>
+        ) : null}
+
         {error === null ? null : (
           <p className="body-sm mt-base text-semantic-down" role="alert">
             {error}
@@ -159,4 +254,26 @@ function errorMessageForStatus(status: number): string {
   }
 
   return "분석 요청을 처리하지 못했습니다.";
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+// 저장된 분석이 Pro로 적용되기 전(잠금/사용불가) 상태인지. 서버 구독이 Pro인데
+// 이 값이 true면 결제 직후 Free 결과만 저장된 것이므로 재분석이 필요하다.
+function isStoredAnalysisStale(): boolean {
+  const stored = sessionStorage.getItem(ANALYSIS_STORAGE_KEY);
+
+  if (stored === null) {
+    return false;
+  }
+
+  try {
+    return (JSON.parse(stored) as AnalyzeResponse).pro.status !== "active";
+  } catch {
+    return false;
+  }
 }

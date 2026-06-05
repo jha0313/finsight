@@ -6,6 +6,7 @@ import type {
   AiUsageGateway,
   CheckoutGateway,
   InsightProvider,
+  LatestStatement,
   SubscriptionUpsertPayload,
   StatementRepository,
   SubscriptionGateway,
@@ -19,6 +20,7 @@ import {
   runAnalysis,
   runAnalyzeRequest,
   runCheckoutRequest,
+  runLatestAnalysisRequest,
   runPolarWebhookRequest,
 } from "./index";
 
@@ -26,6 +28,35 @@ const STANDARD_CSV = `date,merchant,amount,currency,account
 2026-06-01,스타벅스,5500,KRW,1234-5678-9012-3456
 2026-06-02,지하철,1500,KRW,1234-5678-9012-3456
 2026-06-03,월급,-3000000,KRW,1234-5678-9012-3456`;
+
+// 결제 복귀 자동 재분석은 원본 CSV가 아니라 DB에 저장된 정규화 거래
+// (Transaction[])를 입력으로 쓴다. STANDARD_CSV의 지출 2건과 동치.
+const SAMPLE_TRANSACTIONS: Transaction[] = [
+  {
+    date: "2026-06-01",
+    merchant: "스타벅스",
+    signedAmount: "5500.00",
+    direction: "debit",
+    category: "food",
+    currency: "KRW",
+    maskedAccount: "**** **** **** 3456",
+    rowHash: "a".repeat(64),
+  },
+  {
+    date: "2026-06-02",
+    merchant: "지하철",
+    signedAmount: "1500.00",
+    direction: "debit",
+    category: "transport",
+    currency: "KRW",
+    rowHash: "b".repeat(64),
+  },
+];
+
+const LATEST_STATEMENT: LatestStatement = {
+  sourceHash: "c".repeat(64),
+  transactions: SAMPLE_TRANSACTIONS,
+};
 
 class FakeInsightProvider implements InsightProvider {
   calls: Array<{ transactions: Transaction[]; tier: Tier }> = [];
@@ -52,15 +83,23 @@ function createAnalyzeRequestDeps(input: {
   quotaOk?: boolean;
   cachedInsights?: unknown | null;
   insightProvider?: InsightProvider;
+  latestStatement?: LatestStatement | null;
 }) {
   const statementRepository: StatementRepository & {
     calls: Parameters<StatementRepository["saveStatementAnalysis"]>[0][];
+    loadCalls: string[];
   } = {
     calls: [],
+    loadCalls: [],
     async saveStatementAnalysis(saveInput) {
       this.calls.push(saveInput);
 
       return { statementId: "statement-1" };
+    },
+    async loadLatestStatement(userId) {
+      this.loadCalls.push(userId);
+
+      return input.latestStatement ?? null;
     },
   };
   const subscriptionGateway: SubscriptionGateway & { calls: string[] } = {
@@ -615,6 +654,189 @@ describe("runAnalyzeRequest", () => {
       summary: "캐시된 심층 분석",
       insights: ["이미 계산된 인사이트"],
     });
+  });
+});
+
+describe("runLatestAnalysisRequest", () => {
+  it("returns 401 for unauthenticated users without loading any statement", async () => {
+    const { deps, statementRepository, subscriptionGateway } =
+      createAnalyzeRequestDeps({ userId: null });
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result).toEqual({ status: 401, body: { error: "unauthorized" } });
+    expect(statementRepository.loadCalls).toEqual([]);
+    expect(subscriptionGateway.calls).toEqual([]);
+  });
+
+  it("returns 404 when the user has no stored statement", async () => {
+    const { deps, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: null,
+    });
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result).toEqual({ status: 404, body: { error: "no_statement" } });
+    expect(statementRepository.loadCalls).toEqual(["user-1"]);
+  });
+
+  it("re-runs Opus for pro users and caches the insight via the idempotent RPC", async () => {
+    const provider = new FakeInsightProvider(({ tier, transactions }) => ({
+      summary: `${tier}:${transactions.length} 심층 분석`,
+      insights: ["결제 후 Opus 인사이트"],
+    }));
+    const { deps, aiUsage, statementRepository, subscriptionGateway } =
+      createAnalyzeRequestDeps({
+        tier: "pro",
+        latestStatement: LATEST_STATEMENT,
+        insightProvider: provider,
+      });
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result.status).toBe(200);
+    expect(result.body.tier).toBe("pro");
+    expect(result.body.pro).toEqual({
+      status: "active",
+      insights: {
+        summary: "pro:2 심층 분석",
+        insights: ["결제 후 Opus 인사이트"],
+      },
+    });
+    // 저장된 거래로부터 Free 분석을 결정론적으로 재계산한다.
+    expect(result.body.free.byCategory).toEqual([
+      { category: "food", total: "5500.00", count: 1 },
+      { category: "transport", total: "1500.00", count: 1 },
+    ]);
+    expect(result.body.currency).toBe("KRW");
+    expect(subscriptionGateway.calls).toEqual(["user-1"]);
+    expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(aiUsage.releaseCalls).toEqual([]);
+    expect(provider.calls).toHaveLength(1);
+    expect(provider.calls[0].tier).toBe("pro");
+    // 멱등 RPC로 캐시만 저장: 기존 statement source_hash 재사용 + Opus 결과.
+    expect(statementRepository.calls).toHaveLength(1);
+    expect(statementRepository.calls[0]).toMatchObject({
+      userId: "user-1",
+      statement: { sourceHash: "c".repeat(64), status: "ready" },
+      analysis: {
+        model: "claude-opus-4-8",
+        result: {
+          summary: "pro:2 심층 분석",
+          insights: ["결제 후 Opus 인사이트"],
+        },
+      },
+    });
+    expect(statementRepository.calls[0].analysis?.inputHash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
+    expect(statementRepository.calls[0].transactions).toEqual(
+      SAMPLE_TRANSACTIONS,
+    );
+  });
+
+  it("leaves the upgrade CTA without running Opus when the subscription has not propagated yet (webhook race)", async () => {
+    const provider = new FakeInsightProvider(() => ({
+      summary: "should not run",
+      insights: [],
+    }));
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "free",
+      latestStatement: LATEST_STATEMENT,
+      insightProvider: provider,
+    });
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result.status).toBe(200);
+    expect(result.body.tier).toBe("free");
+    // 아직 Pro로 안 보이면 locked(업그레이드 CTA) — 클라이언트가 잠깐 후 재시도한다.
+    expect(result.body.pro).toEqual({ status: "locked" });
+    expect(aiUsage.quotaCalls).toEqual([]);
+    expect(provider.calls).toHaveLength(0);
+    expect(statementRepository.calls).toEqual([]);
+  });
+
+  it("returns unavailable for pro users whose daily quota is exhausted", async () => {
+    let insightProviderCreated = false;
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      quotaOk: false,
+      latestStatement: LATEST_STATEMENT,
+    });
+    deps.insightProviderFactory = () => {
+      insightProviderCreated = true;
+
+      return new FakeInsightProvider(() => ({
+        summary: "should not run",
+        insights: [],
+      }));
+    };
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result.status).toBe(200);
+    expect(result.body.pro).toEqual({ status: "unavailable" });
+    expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(aiUsage.releaseCalls).toEqual([]);
+    expect(insightProviderCreated).toBe(false);
+    expect(statementRepository.calls).toEqual([]);
+  });
+
+  it("reuses cached insights without consuming quota or saving again", async () => {
+    let insightProviderCreated = false;
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: LATEST_STATEMENT,
+      cachedInsights: {
+        summary: "캐시된 심층 분석",
+        insights: ["이미 계산된 인사이트"],
+      },
+    });
+    deps.insightProviderFactory = () => {
+      insightProviderCreated = true;
+
+      return new FakeInsightProvider(() => ({
+        summary: "should not run",
+        insights: [],
+      }));
+    };
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result.status).toBe(200);
+    expect(result.body.pro).toEqual({
+      status: "active",
+      insights: {
+        summary: "캐시된 심층 분석",
+        insights: ["이미 계산된 인사이트"],
+      },
+    });
+    expect(aiUsage.quotaCalls).toEqual([]);
+    expect(insightProviderCreated).toBe(false);
+    // 캐시 hit이면 이미 저장돼 있으므로 재저장하지 않는다.
+    expect(statementRepository.calls).toEqual([]);
+  });
+
+  it("refunds the quota and isolates as unavailable when the Opus call fails", async () => {
+    const provider = new FakeInsightProvider(async () => {
+      throw new Error("Claude unavailable");
+    });
+    const { deps, aiUsage, statementRepository } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: LATEST_STATEMENT,
+      insightProvider: provider,
+    });
+
+    const result = await runLatestAnalysisRequest({ deps });
+
+    expect(result.status).toBe(200);
+    expect(result.body.pro).toEqual({ status: "unavailable" });
+    expect(result.body.free.byCategory).toHaveLength(2);
+    expect(aiUsage.quotaCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(aiUsage.releaseCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
+    expect(statementRepository.calls).toEqual([]);
   });
 });
 
