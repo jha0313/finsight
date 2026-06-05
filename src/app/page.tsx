@@ -144,6 +144,8 @@ export default async function Home() {
         description="CSV 명세서를 올리면 지출 구조와 이상 거래를 먼저 정리하고, AI가 절약 인사이트를 덧붙입니다."
         eyebrow="AI 절약 인사이트"
         headline="명세서에서 지출의 구조를 읽습니다"
+        loginHref="/login"
+        loginLabel="로그인"
         trend={[34, 41, 38, 52, 46, 63, 71, 100]}
       />
 

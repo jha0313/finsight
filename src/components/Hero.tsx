@@ -15,6 +15,8 @@ export interface HeroProps {
   description: string;
   eyebrow?: string;
   headline: string;
+  loginHref: string;
+  loginLabel: string;
   trend?: number[];
 }
 
@@ -27,6 +29,8 @@ export function Hero({
   description,
   eyebrow,
   headline,
+  loginHref,
+  loginLabel,
   trend,
 }: HeroProps) {
   return (
@@ -43,15 +47,22 @@ export function Hero({
         }}
       />
       <div className="relative mx-auto grid max-w-finsight gap-xxl px-lg lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1fr)] lg:items-center">
-        <div>
-          <div className="mb-xl inline-flex items-center gap-sm">
+        <nav className="flex items-center justify-between gap-base lg:col-span-2">
+          <div className="inline-flex items-center gap-sm">
             <span
               aria-hidden="true"
               className="size-8 rounded-circle bg-primary"
             />
             <span className="nav-link !text-on-dark">{brandName}</span>
           </div>
-
+          <a
+            className="nav-link rounded-action px-base py-xs !text-on-dark-soft transition-colors hover:!text-on-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            href={loginHref}
+          >
+            {loginLabel}
+          </a>
+        </nav>
+        <div>
           {eyebrow ? (
             <p className="caption-strong mb-base inline-flex items-center gap-xs rounded-action bg-surface-dark-elevated px-base py-xs !text-on-dark-soft">
               <span className="ai-text-gradient">{eyebrow}</span>

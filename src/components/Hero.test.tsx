@@ -54,6 +54,8 @@ function renderHero() {
       description="CSV 명세서를 올리면 지출 구조와 이상 거래를 먼저 정리하고, AI가 절약 인사이트를 덧붙입니다."
       eyebrow="AI 지출 분석"
       headline="명세서에서 지출의 구조를 읽습니다"
+      loginHref="/login"
+      loginLabel="로그인"
       trend={[20, 60, 100]}
       demoSlot={{
         description: "다음 step에서 샘플 명세서 흐름을 연결합니다.",
@@ -88,6 +90,15 @@ describe("Hero", () => {
       "/login",
     );
     expect(screen.getByText("샘플 명세서 데모 영역")).toBeInTheDocument();
+  });
+
+  it("exposes a login link in the nav for returning users", () => {
+    renderHero();
+
+    expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   });
 
   it("highlights the AI insight result card with label and mono headline number", () => {
