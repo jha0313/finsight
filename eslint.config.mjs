@@ -63,6 +63,7 @@ const eslintConfig = [
       ".claude/**",
       ".codex/**",
       ".next/**",
+      ".next-*/**",
       "node_modules/**",
       "out/**",
       "next-env.d.ts",
