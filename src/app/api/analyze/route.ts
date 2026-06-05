@@ -15,10 +15,10 @@ import {
 } from "@/services/supabase";
 import type { ParsedStatement } from "@/types/csv";
 
-// PDF는 텍스트 추출 후 Claude 추출(Sonnet, 최대 60s) + Pro 인사이트(Opus,
-// 최대 30s)로 Claude를 두 번 순차로 거치므로, 저장 RPC 여유까지 더해 동기
-// 처리 한도를 CSV보다 넉넉히 둔다.
-export const maxDuration = 120;
+// PDF는 텍스트 추출 후 Claude 추출(Sonnet, 최대 60s) + 인사이트(Sonnet/Opus,
+// 최대 60s)로 Claude를 두 번 순차로 거치므로, 저장 RPC 여유까지 더해 동기
+// 처리 한도를 두 호출 합(120s) 위로 넉넉히 둔다.
+export const maxDuration = 180;
 
 type Upload =
   | { kind: "csv"; data: string | Buffer }

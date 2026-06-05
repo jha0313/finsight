@@ -83,7 +83,7 @@ describe("analyze route", () => {
   });
 
   it("raises route maxDuration for synchronous extraction + Opus latency", () => {
-    expect(maxDuration).toBe(120);
+    expect(maxDuration).toBe(180);
   });
 
   it("passes raw CSV body to the testable analyze handler with lazy adapters", async () => {

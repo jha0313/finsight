@@ -83,20 +83,37 @@ supabase db push                                 # 0001_init.sql 적용
 
 ### 4-1. `[수동]` 제품 + 토큰
 
-1. Polar 대시보드(샌드박스 먼저 권장: `POLAR_SERVER=sandbox`) → **Products**에서 Pro 제품 생성 → 제품 ID → `POLAR_PRODUCT_ID`.
-2. **Settings → API/Access Tokens**에서 액세스 토큰 발급 → `POLAR_ACCESS_TOKEN`.
+> 샌드박스는 프로덕션과 **계정·조직이 분리**돼 있다. 결제 흐름은 **샌드박스**에서 검증하라 — `.env`에 `POLAR_SERVER=sandbox`가 이미 기본값으로 들어가 있고, 코드(`src/services/polar/index.ts`의 `readPolarServer`)가 sandbox/production을 분기한다.
+
+1. **https://sandbox.polar.sh** 로그인 → 조직 생성 → **Products**에서 Pro 제품(구독/recurring) 생성 → 제품 ID → `POLAR_PRODUCT_ID`.
+2. **Settings → API Tokens**에서 액세스 토큰 발급(`checkouts:write`·`subscriptions:read` 이상) → `POLAR_ACCESS_TOKEN`.
 
 ### 4-2. `[수동]` 웹훅 등록
 
+웹훅은 공개 URL이 필요하므로 로컬은 터널을 띄운다(계정 없이 바로 되는 cloudflared 권장):
+
+```bash
+brew install cloudflared
+cloudflared tunnel --url http://localhost:3000   # https://xxxx.trycloudflare.com 발급
+```
+
 1. Polar **Settings → Webhooks → Add endpoint**:
    ```
-   https://<your-domain>/api/webhook/polar
+   https://<공개-도메인>/api/webhook/polar
    ```
-   (로컬 테스트는 `ngrok` 등으로 터널링한 공개 URL 사용)
-2. 구독 관련 이벤트 구독(`subscription.created/updated/...`).
-3. 서명 **secret** → `POLAR_WEBHOOK_SECRET`.
+   (로컬은 위 `trycloudflare.com` URL, 배포는 Vercel 도메인)
+   - **끝 슬래시 금지**: `/api/webhook/`처럼 끝나거나 `/polar`가 빠지면 Next가 308 리다이렉트를 반환하고 Polar가 모든 이벤트를 실패 처리한다(DB 무반영). 정확히 `…/api/webhook/polar`로 끝나야 한다.
+2. 포맷은 **Raw** 선택(현 Polar UI 명칭, 과거 'Standard Webhooks'; Discord/Slack 아님) — 라우트가 `webhook-id/timestamp/signature`(Standard Webhooks 서명) 헤더를 검증한다.
+3. 구독 이벤트 구독: `subscription.created/updated/active/canceled/uncanceled/revoked/past_due`.
+4. 서명 **secret** → `POLAR_WEBHOOK_SECRET`.
 
 > 웹훅 라우트 `src/app/api/webhook/polar/route.ts`는 raw body 서명검증 + `event_id` 선삽입 멱등 + `subscriptions` upsert(service_role)를 한다. 체크아웃의 `customerExternalId`는 서버 세션 uid로 강제되므로, 웹훅이 그 uid로 구독을 매핑한다.
+
+### 4-3. 샌드박스 결제 테스트
+
+체크아웃 결제는 Stripe 테스트 모드다 — 카드 `4242 4242 4242 4242` / 미래 만료일 아무거나 / CVC 아무거나.
+
+> **CLI/MCP**: 현재 레포엔 Polar CLI·MCP가 없다(`@polar-sh/sdk`는 순수 API SDK로 `bin` 미포함). Polar 공식 MCP 서버로 제품·구독·체크아웃을 에이전트에서 직접 다룰 수 있으니, 필요하면 샌드박스 토큰으로 MCP 설정에 연결하라.
 
 ## 5. 로컬 실행 + 검증
 

@@ -43,6 +43,18 @@ describe("InsightsPanel", () => {
     expect(checkoutForm).toHaveAttribute("method", "post");
   });
 
+  it("renders Sonnet insights alongside the upgrade CTA in the locked state", () => {
+    render(<InsightsPanel status="locked" insights={insights} />);
+
+    expect(
+      screen.getByText("식비와 교통비가 지출의 대부분을 차지합니다."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("반복 결제를 먼저 점검하세요.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Pro로 업그레이드" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders unavailable copy without the upgrade CTA", () => {
     render(<InsightsPanel status="unavailable" />);
 

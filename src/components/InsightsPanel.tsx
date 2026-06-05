@@ -26,40 +26,54 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
     );
   }
 
-  if (insights !== undefined) {
+  if (status === "active") {
     return (
       <InsightShell
         accent
         icon={<Sparkles aria-hidden="true" size={20} strokeWidth={2} />}
         title="AI 인사이트"
       >
-        <p className="body-strong">{insights.summary}</p>
-        <ul className="mt-base space-y-sm">
-          {insights.insights.map((insight) => (
-            <li className="body-sm flex gap-sm" key={insight}>
-              <span
-                aria-hidden="true"
-                className="mt-[0.55em] size-1.5 rounded-circle bg-ai-violet"
-              />
-              <span>{insight}</span>
-            </li>
-          ))}
-        </ul>
+        {insights !== undefined ? <InsightBody insights={insights} /> : null}
       </InsightShell>
     );
   }
 
+  // status === "locked"(미구독): 인사이트(Free=Sonnet)가 있으면 함께 보여주되,
+  // 인사이트 유무와 관계없이 항상 업그레이드 CTA를 노출한다.
   return (
     <InsightShell
       icon={<Lock aria-hidden="true" size={20} strokeWidth={2} />}
       title="Pro 분석 잠금"
     >
-      <p className="body-sm">
-        Free 분석 결과를 먼저 표시합니다. Pro 구독이 활성화되면 Opus 심층
-        분석을 이어서 표시합니다.
-      </p>
+      {insights !== undefined ? (
+        <InsightBody insights={insights} />
+      ) : (
+        <p className="body-sm">
+          Free 분석 결과를 먼저 표시합니다. Pro 구독이 활성화되면 Opus 심층
+          분석을 이어서 표시합니다.
+        </p>
+      )}
       <UpgradeCta action={checkoutAction} />
     </InsightShell>
+  );
+}
+
+function InsightBody({ insights }: { insights: ProInsights }) {
+  return (
+    <>
+      <p className="body-strong">{insights.summary}</p>
+      <ul className="mt-base space-y-sm">
+        {insights.insights.map((insight) => (
+          <li className="body-sm flex gap-sm" key={insight}>
+            <span
+              aria-hidden="true"
+              className="mt-[0.55em] size-1.5 rounded-circle bg-ai-violet"
+            />
+            <span>{insight}</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
