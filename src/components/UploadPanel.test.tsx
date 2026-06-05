@@ -18,7 +18,8 @@ const analyzeResponse: AnalyzeResponse = {
     trend: [{ period: "2026-06", total: "120000.00" }],
     anomalies: [
       {
-        kind: "outlier",
+        kind: "category_outlier",
+        severity: "high",
         merchant: "전자상거래",
         detail: "평균보다 큰 지출입니다.",
       },

@@ -24,7 +24,10 @@ export function DashboardResults({ response }: DashboardResultsProps) {
 
       <div className="grid gap-lg xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <TrendLine currency={response.currency} data={response.free.trend} />
-        <AnomalyList anomalies={response.free.anomalies} />
+        <AnomalyList
+          anomalies={response.free.anomalies}
+          currency={response.currency}
+        />
       </div>
 
       {response.warnings === undefined || response.warnings.length === 0 ? null : (

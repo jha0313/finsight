@@ -12,7 +12,7 @@ export function SampleDemoSection({
   const { response, transactions } = analysis;
   const totalSpend = sumMoney(response.free.trend.map((point) => point.total));
   const subscriptionLeakCount = response.free.anomalies.filter(
-    (anomaly) => anomaly.kind === "subscription_leak",
+    (anomaly) => anomaly.kind === "duplicate_subscription",
   ).length;
 
   return (

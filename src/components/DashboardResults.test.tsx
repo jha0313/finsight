@@ -18,7 +18,8 @@ const baseResponse: AnalyzeResponse = {
     ],
     anomalies: [
       {
-        kind: "subscription_leak",
+        kind: "duplicate_subscription",
+        severity: "warn",
         merchant: "스트리밍 서비스",
         detail: "최근 3개월 동안 반복 결제가 확인되었습니다.",
       },

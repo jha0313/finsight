@@ -12,10 +12,25 @@ export interface TrendPoint {
   total: string;
 }
 
+export type AnomalyKind =
+  | "annual_cost"
+  | "price_hike"
+  | "duplicate_subscription"
+  | "dormant_subscription"
+  | "double_charge"
+  | "category_outlier"
+  | "new_high_merchant"
+  | "category_surge";
+
+export type AnomalySeverity = "high" | "warn" | "info";
+
 export interface Anomaly {
-  kind: "subscription_leak" | "outlier" | string;
+  kind: AnomalyKind;
+  severity: AnomalySeverity;
   merchant: string;
   detail: string;
+  amount?: string;
+  amountLabel?: string;
 }
 
 export interface FreeAnalysis {

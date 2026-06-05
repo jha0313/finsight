@@ -18,8 +18,8 @@ const TRAILING_AMOUNT = /(\d+(?:\.\d+)?)\s*\.?\s*$/;
 
 /**
  * 데모 분석 결과에서 랜딩에 강조할 인사이트 탭 3~4개를 구성한다.
- * - 구독 누수: subscription_leak 이상거래
- * - 이상 거래: 가장 금액이 큰 outlier 이상거래
+ * - 구독 누수: duplicate_subscription 이상거래
+ * - 이상 거래: 가장 금액이 큰 category_outlier 이상거래
  * - 카테고리 톱: 지출 1위 카테고리
  * 숫자는 formatMoney로 포맷한 문자열이고, insight는 가능한 한 pro 인사이트를
  * 쓰되 없으면 규칙·통계 결과(detail/통계)에서 채워 비어있지 않게 한다.
@@ -32,7 +32,7 @@ export function selectInsightTabs(analysis: SampleDemoAnalysis): InsightTab[] {
   const tabs: InsightTab[] = [];
 
   const subscription = free.anomalies.find(
-    (anomaly) => anomaly.kind === "subscription_leak",
+    (anomaly) => anomaly.kind === "duplicate_subscription",
   );
 
   if (subscription !== undefined) {
@@ -122,7 +122,7 @@ function largestOutlier(anomalies: Anomaly[]): Anomaly | undefined {
   let largestAmount = -1;
 
   for (const anomaly of anomalies) {
-    if (anomaly.kind !== "outlier") {
+    if (anomaly.kind !== "category_outlier") {
       continue;
     }
 

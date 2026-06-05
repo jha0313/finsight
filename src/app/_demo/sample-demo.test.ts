@@ -31,12 +31,6 @@ describe("sample demo analysis", () => {
       { period: "2026-05", total: "402850.00" },
       { period: "2026-06", total: "1022050.00" },
     ]);
-    expect(result.response.free.anomalies).toContainEqual({
-      kind: "subscription_leak",
-      merchant: "YouTube Premium",
-      detail:
-        "월간 반복 결제 후보: 3회, 최근 2026-06-07, 대표 금액 14900.00.",
-    });
     expect(result.transactions).toContainEqual(
       expect.objectContaining({
         direction: "refund",

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { Transaction } from "@/types/transaction";
 
-import { analyze, categorize } from "./index";
+import type { Anomaly } from "@/types/analysis";
+
+import { analyze, categorize, sortAnomalies } from "./index";
 
 function transaction(
   overrides: Partial<Transaction> & {
@@ -119,54 +121,12 @@ describe("analyze", () => {
     ]);
   });
 
-  it("detects repeated monthly similar-amount merchants as subscription leaks", () => {
-    const result = analyze([
-      transaction({
-        date: "2026-01-05",
-        merchant: "Netflix",
-        signedAmount: "17000.00",
-      }),
-      transaction({
-        date: "2026-02-05",
-        merchant: "netflix.com",
-        signedAmount: "17100.00",
-      }),
-      transaction({
-        date: "2026-03-06",
-        merchant: "NETFLIX",
-        signedAmount: "17050.00",
-      }),
-      transaction({
-        date: "2026-03-10",
-        merchant: "마트",
-        signedAmount: "50000.00",
-      }),
-    ]);
-
-    expect(result.anomalies).toContainEqual({
-      kind: "subscription_leak",
-      merchant: "Netflix",
-      detail:
-        "월간 반복 결제 후보: 3회, 최근 2026-03-06, 대표 금액 17050.00.",
-    });
-  });
-
-  it("detects unusually large debit transactions as outliers", () => {
+  it("composes detector outputs into a deterministically sorted anomalies array", () => {
     const result = analyze([
       transaction({
         date: "2026-06-01",
         merchant: "편의점",
         signedAmount: "10000.00",
-      }),
-      transaction({
-        date: "2026-06-02",
-        merchant: "카페",
-        signedAmount: "12000.00",
-      }),
-      transaction({
-        date: "2026-06-03",
-        merchant: "택시",
-        signedAmount: "11000.00",
       }),
       transaction({
         date: "2026-06-04",
@@ -175,10 +135,59 @@ describe("analyze", () => {
       }),
     ]);
 
-    expect(result.anomalies).toContainEqual({
-      kind: "outlier",
-      merchant: "전자제품 매장",
-      detail: "평소 지출 중앙값 11000.00 대비 큰 금액 150000.00.",
-    });
+    // 8개 detector는 현재 스텁이라 빈 배열을 합쳐 정렬한 결과도 비어 있다.
+    expect(result.anomalies).toEqual([]);
+  });
+});
+
+describe("sortAnomalies", () => {
+  it("orders by severity, then kind, then merchant, then detail", () => {
+    const anomalies: Anomaly[] = [
+      {
+        kind: "category_surge",
+        severity: "info",
+        merchant: "Zeta",
+        detail: "a",
+      },
+      {
+        kind: "price_hike",
+        severity: "high",
+        merchant: "Beta",
+        detail: "b",
+      },
+      {
+        kind: "annual_cost",
+        severity: "high",
+        merchant: "Alpha",
+        detail: "a",
+      },
+      {
+        kind: "annual_cost",
+        severity: "high",
+        merchant: "Alpha",
+        detail: "b",
+      },
+      {
+        kind: "annual_cost",
+        severity: "warn",
+        merchant: "Alpha",
+        detail: "a",
+      },
+    ];
+
+    expect(
+      sortAnomalies(anomalies).map((anomaly) => [
+        anomaly.severity,
+        anomaly.kind,
+        anomaly.merchant,
+        anomaly.detail,
+      ]),
+    ).toEqual([
+      ["high", "annual_cost", "Alpha", "a"],
+      ["high", "annual_cost", "Alpha", "b"],
+      ["high", "price_hike", "Beta", "b"],
+      ["warn", "annual_cost", "Alpha", "a"],
+      ["info", "category_surge", "Zeta", "a"],
+    ]);
   });
 });

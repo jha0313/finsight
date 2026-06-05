@@ -21,17 +21,20 @@ function buildAnalysis(
       trend: [],
       anomalies: [
         {
-          kind: "subscription_leak",
+          kind: "duplicate_subscription",
+          severity: "warn",
           merchant: "YouTube Premium",
           detail: "월간 반복 결제 후보: 3회, 최근 2026-06-07, 대표 금액 14900.00.",
         },
         {
-          kind: "outlier",
+          kind: "category_outlier",
+          severity: "high",
           merchant: "전자제품 매장",
           detail: "평소 지출 중앙값 14900.00 대비 큰 금액 780000.00.",
         },
         {
-          kind: "outlier",
+          kind: "category_outlier",
+          severity: "warn",
           merchant: "쿠팡 로켓배송",
           detail: "평소 지출 중앙값 14900.00 대비 큰 금액 124000.00.",
         },
