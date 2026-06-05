@@ -11,9 +11,8 @@ import type { Category, Transaction } from "@/types/transaction";
 const CLAUDE_TIMEOUT_MS = 60000;
 const MAX_TRANSACTIONS_FOR_CLAUDE = 200;
 // Opus 심층 인사이트가 잘리면 structured output JSON이 미완성되어 parse가
-// 던지고(=인사이트 unavailable) 규칙 분석만 남는다. validateInsightBounds가
-// 허용하는 출력(summary≤1200자 + 인사이트 8×700자)을 모두 덮도록 넉넉히 둔다.
-// 실제 출력은 ~800토큰이라 상한일 뿐 비용·latency엔 영향 없다.
+// 던지고(=인사이트 unavailable) 규칙 분석만 남는다. 출력 한도(아래 MAX_*)를
+// 모두 덮도록 넉넉히 둔다. 실제 출력은 ~800토큰이라 상한일 뿐 비용·latency엔 영향 없다.
 const MAX_OUTPUT_TOKENS = 8192;
 const MAX_SUMMARY_CHARS = 1200;
 const MAX_INSIGHTS = 8;
@@ -81,6 +80,7 @@ const SYSTEM_PROMPT = [
   "당신은 finsight의 금융 명세서 분석 어댑터입니다.",
   "제공된 거래 단위 데이터만 근거로 한국어 인사이트를 작성하세요.",
   "직접 식별자나 계좌 정보를 요구하거나 추론하지 마세요.",
+  `요약(summary)은 ${MAX_SUMMARY_CHARS}자 이내, 인사이트(insights)는 중요한 순서로 최대 ${MAX_INSIGHTS}개이며 각 항목은 ${MAX_INSIGHT_CHARS}자 이내로 작성하세요.`,
   "응답은 지정된 structured output schema를 엄격히 따르세요.",
 ].join(" ");
 
@@ -115,7 +115,7 @@ export function createClaudeInsightProvider(): InsightProvider {
         throw new Error("Claude returned no parsed output.");
       }
 
-      return validateInsightBounds(message.parsed_output);
+      return clampInsightBounds(message.parsed_output);
     },
   };
 }
@@ -190,20 +190,14 @@ function toClaudeTransaction(transaction: Transaction): ClaudeTransaction {
   };
 }
 
-function validateInsightBounds(insights: ProInsights): ProInsights {
-  if (insights.summary.length > MAX_SUMMARY_CHARS) {
-    throw new Error("Claude parsed output summary exceeds supported length.");
-  }
-
-  if (insights.insights.length > MAX_INSIGHTS) {
-    throw new Error("Claude parsed output contains too many insights.");
-  }
-
-  for (const insight of insights.insights) {
-    if (insight.length > MAX_INSIGHT_CHARS) {
-      throw new Error("Claude parsed output insight exceeds supported length.");
-    }
-  }
-
-  return insights;
+// 모델 출력이 한도를 살짝 넘었다고 throw하면 인사이트 전체가 null→unavailable로
+// 떨어져, 사소한 초과가 기능 전체를 죽인다. 한도 내로 잘라내(clamp) 그래도 표시한다.
+// 프롬프트(SYSTEM_PROMPT)로 모델에 한도를 알려주므로 clamp는 안전망 역할이다.
+function clampInsightBounds(insights: ProInsights): ProInsights {
+  return {
+    summary: insights.summary.slice(0, MAX_SUMMARY_CHARS),
+    insights: insights.insights
+      .slice(0, MAX_INSIGHTS)
+      .map((insight) => insight.slice(0, MAX_INSIGHT_CHARS)),
+  };
 }

@@ -184,6 +184,26 @@ describe("createClaudeInsightProvider", () => {
 
     await expect(generate("free")).rejects.toThrow("parsed output");
   });
+
+  it("clamps over-budget output to bounds instead of dropping all insights", async () => {
+    anthropicMocks.parse.mockResolvedValueOnce({
+      parsed_output: {
+        summary: "가".repeat(1500),
+        insights: [
+          "나".repeat(900),
+          ...Array.from({ length: 11 }, (_, index) => `인사이트 ${index}`),
+        ],
+      },
+    });
+
+    const result = await generate("pro");
+
+    expect(result.summary.length).toBe(1200);
+    expect(result.insights.length).toBe(8);
+    for (const insight of result.insights) {
+      expect(insight.length).toBeLessThanOrEqual(700);
+    }
+  });
 });
 
 const PDF_EXTRACTION_OUTPUT = {
