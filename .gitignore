@@ -10,6 +10,9 @@ tsconfig.tsbuildinfo
 .env.local
 .env.*.local
 
+# vercel
+.vercel
+
 # phase execution outputs
 phases/**/phase*-output.json
 phases/**/step*-output.json
