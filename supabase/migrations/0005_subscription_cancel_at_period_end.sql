@@ -54,5 +54,12 @@ begin
 end;
 $$;
 
+-- drop+recreate한 새 함수는 Supabase default privilege로 anon·authenticated에
+-- EXECUTE가 '직접' grant된다. PUBLIC 제거만으로는 그 직접 grant가 남아 RPC가
+-- PostgREST로 외부 노출되고, 본문에 auth.uid() 강제가 없어 결제 없이 Pro를
+-- 우회할 수 있다(0003과 동일 이유). anon·authenticated EXECUTE를 명시 제거하고
+-- 웹훅 경로(service_role)에만 허용한다.
 revoke all on function public.upsert_subscription(uuid, text, text, timestamptz, timestamptz, boolean) from public;
+revoke execute on function public.upsert_subscription(uuid, text, text, timestamptz, timestamptz, boolean)
+  from anon, authenticated;
 grant execute on function public.upsert_subscription(uuid, text, text, timestamptz, timestamptz, boolean) to service_role;
