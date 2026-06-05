@@ -10,7 +10,11 @@ import type { Category, Transaction } from "@/types/transaction";
 
 const CLAUDE_TIMEOUT_MS = 60000;
 const MAX_TRANSACTIONS_FOR_CLAUDE = 200;
-const MAX_OUTPUT_TOKENS = 1200;
+// Opus 심층 인사이트가 잘리면 structured output JSON이 미완성되어 parse가
+// 던지고(=인사이트 unavailable) 규칙 분석만 남는다. validateInsightBounds가
+// 허용하는 출력(summary≤1200자 + 인사이트 8×700자)을 모두 덮도록 넉넉히 둔다.
+// 실제 출력은 ~800토큰이라 상한일 뿐 비용·latency엔 영향 없다.
+const MAX_OUTPUT_TOKENS = 8192;
 const MAX_SUMMARY_CHARS = 1200;
 const MAX_INSIGHTS = 8;
 const MAX_INSIGHT_CHARS = 700;
