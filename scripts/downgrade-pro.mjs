@@ -56,6 +56,34 @@ function requireEnv(name) {
   return v;
 }
 
+// Polar의 active 구독을 customer 기준(externalId=Supabase user.id, email 폴백)으로 색인.
+// DB는 user당 polar_subscription_id 1건만 추적하므로, 반복 체크아웃으로 쌓여
+// '추적 밖'에 남은 활성 구독까지 한 번에 모으기 위함.
+async function listActivePolarSubs(polar) {
+  const byExternalId = new Map();
+  const byEmail = new Map();
+  const res = await polar.subscriptions.list({ limit: 100 });
+  for await (const page of res) {
+    const items = page.result?.items ?? page.items ?? [];
+    for (const s of items) {
+      if (s.status !== "active") continue;
+      const cust = s.customer ?? {};
+      if (cust.externalId) {
+        const arr = byExternalId.get(cust.externalId) ?? [];
+        arr.push(s.id);
+        byExternalId.set(cust.externalId, arr);
+      }
+      const email = (cust.email ?? "").toLowerCase();
+      if (email) {
+        const arr = byEmail.get(email) ?? [];
+        arr.push(s.id);
+        byEmail.set(email, arr);
+      }
+    }
+  }
+  return { byExternalId, byEmail };
+}
+
 async function main() {
   const here = dirname(fileURLToPath(import.meta.url));
   loadEnv(findEnvFile(here));
@@ -131,28 +159,48 @@ async function main() {
     server: process.env.POLAR_SERVER === "production" ? "production" : "sandbox",
   });
 
+  // DB가 추적하지 못한 활성 구독(반복 체크아웃으로 누적)까지 revoke해야
+  // 재결제가 Polar에서 "already active"로 막히지 않는다. 목록을 한 번만 색인.
+  let activeIdx = { byExternalId: new Map(), byEmail: new Map() };
+  try {
+    activeIdx = await listActivePolarSubs(polar);
+  } catch (e) {
+    console.warn(
+      `⚠ Polar 구독 목록 조회 실패: ${e?.message || e} — DB가 추적하는 구독만 revoke`,
+    );
+  }
+
   for (const r of rows) {
     const who = emailById.get(r.user_id) || r.user_id;
+    const email = (emailById.get(r.user_id) || "").toLowerCase();
 
-    // 1) Polar 즉시 취소(revoke)
-    if (r.polar_subscription_id) {
+    // 1) Polar 즉시 취소(revoke): DB 추적분 + 추적 밖 활성 구독을 모두
+    const toRevoke = new Set();
+    if (r.polar_subscription_id) toRevoke.add(r.polar_subscription_id);
+    for (const id of activeIdx.byExternalId.get(r.user_id) ?? []) {
+      toRevoke.add(id);
+    }
+    if (email) {
+      for (const id of activeIdx.byEmail.get(email) ?? []) toRevoke.add(id);
+    }
+
+    if (toRevoke.size === 0) {
+      console.log(`• Polar: ${who} 취소할 구독 없음 (DB만 갱신)`);
+    }
+    for (const id of toRevoke) {
       try {
-        const sub = await polar.subscriptions.revoke({
-          id: r.polar_subscription_id,
-        });
-        console.log(`✓ Polar revoke: ${who} → status=${sub.status}`);
+        const sub = await polar.subscriptions.revoke({ id });
+        console.log(`✓ Polar revoke: ${who} ${id} → status=${sub.status}`);
       } catch (e) {
         const tag = `${e?.name} ${e?.statusCode} ${e?.message || e}`;
         if (/already.?cancel|already.?revok|\b403\b|\b410\b/i.test(tag)) {
-          console.log(`• Polar: ${who} 이미 취소됨 (skip)`);
+          console.log(`• Polar: ${who} ${id} 이미 취소됨 (skip)`);
         } else {
           console.warn(
-            `⚠ Polar revoke 실패(${who}): ${e?.message || e} — DB는 계속 갱신`,
+            `⚠ Polar revoke 실패(${who} ${id}): ${e?.message || e} — DB는 계속 갱신`,
           );
         }
       }
-    } else {
-      console.log(`• Polar: ${who} polar_subscription_id 없음 (DB만 갱신)`);
     }
 
     // 2) DB를 Free로 — 게이팅 두 조건을 모두 떨어뜨리고
@@ -174,7 +222,7 @@ async function main() {
     console.log(`✓ DB: ${who} → Free (status=canceled, period_end=${nowIso})`);
   }
 
-  // 3) 검증
+  // 3) 검증 — DB(게이팅) + Polar(재결제 차단 방지) 양쪽
   const { data: after, error: afterErr } = await supabase
     .from("subscriptions")
     .select("user_id,status,current_period_end")
@@ -185,11 +233,32 @@ async function main() {
   if (afterErr) throw afterErr;
 
   const stillPro = (after || []).filter(isPro);
+
+  let polarLeft = 0;
+  try {
+    const idx = await listActivePolarSubs(polar);
+    for (const r of rows) {
+      const email = (emailById.get(r.user_id) || "").toLowerCase();
+      const ids = new Set([
+        ...(idx.byExternalId.get(r.user_id) ?? []),
+        ...(email ? (idx.byEmail.get(email) ?? []) : []),
+      ]);
+      polarLeft += ids.size;
+    }
+  } catch (e) {
+    console.warn(`⚠ Polar 재검증 조회 실패: ${e?.message || e}`);
+  }
+
   console.log("");
-  if (stillPro.length === 0) {
-    console.log("✅ 완료: 모든 대상이 Free 입니다.");
+  if (stillPro.length === 0 && polarLeft === 0) {
+    console.log("✅ 완료: DB·Polar 모두 Free 입니다.");
   } else {
-    console.error(`✗ 아직 Pro로 남은 행: ${stillPro.length}건`);
+    if (stillPro.length > 0) {
+      console.error(`✗ 아직 Pro로 남은 DB 행: ${stillPro.length}건`);
+    }
+    if (polarLeft > 0) {
+      console.error(`✗ 아직 Polar에 남은 active 구독: ${polarLeft}건`);
+    }
     process.exitCode = 1;
   }
 }
