@@ -12,7 +12,10 @@ export function DashboardResults({ response }: DashboardResultsProps) {
   return (
     <section aria-label="분석 결과" className="space-y-lg">
       <div className="grid gap-lg xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <CategoryDonut data={response.free.byCategory} />
+        <CategoryDonut
+          currency={response.currency}
+          data={response.free.byCategory}
+        />
         <InsightsPanel
           insights={response.pro.insights}
           status={response.pro.status}
@@ -20,7 +23,7 @@ export function DashboardResults({ response }: DashboardResultsProps) {
       </div>
 
       <div className="grid gap-lg xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <TrendLine data={response.free.trend} />
+        <TrendLine currency={response.currency} data={response.free.trend} />
         <AnomalyList anomalies={response.free.anomalies} />
       </div>
 

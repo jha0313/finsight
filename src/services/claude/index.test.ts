@@ -4,7 +4,7 @@ import type { ProInsights } from "@/types/analysis";
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
 
-import { createClaudeInsightProvider } from "./index";
+import { createClaudeInsightProvider, createClaudePdfExtractor } from "./index";
 
 const anthropicMocks = vi.hoisted(() => {
   const parse = vi.fn();
@@ -183,5 +183,88 @@ describe("createClaudeInsightProvider", () => {
     });
 
     await expect(generate("free")).rejects.toThrow("parsed output");
+  });
+});
+
+const PDF_EXTRACTION_OUTPUT = {
+  transactions: [
+    {
+      date: "2026-05-13",
+      merchant: "NETFLIX.COM",
+      amount: "19.83",
+      direction: "debit",
+      currency: "USD",
+    },
+  ],
+};
+
+describe("createClaudePdfExtractor", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    anthropicMocks.parse.mockResolvedValue({
+      parsed_output: PDF_EXTRACTION_OUTPUT,
+    });
+    delete process.env.ANTHROPIC_API_KEY;
+  });
+
+  it("creates the Anthropic client lazily when extract is called", async () => {
+    const extractor = createClaudePdfExtractor();
+
+    expect(anthropicMocks.Anthropic).not.toHaveBeenCalled();
+
+    await extractor.extract({ text: "statement" });
+
+    expect(anthropicMocks.Anthropic).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes extraction to Sonnet structured outputs", async () => {
+    await createClaudePdfExtractor().extract({ text: "statement" });
+
+    const request = parseRequest();
+
+    expect(request?.model).toBe("claude-sonnet-4-6");
+    expect(request?.output_config?.format).toMatchObject({
+      type: "json_schema",
+    });
+    expect(typeof request?.output_config?.format?.parse).toBe("function");
+  });
+
+  it("passes the masked statement text as the user message", async () => {
+    await createClaudePdfExtractor().extract({
+      text: "04/13 STARBUCKS 25.00",
+    });
+
+    const request = parseRequest();
+
+    expect(request?.messages[0].content).toBe("04/13 STARBUCKS 25.00");
+    expect(request?.system).toContain("거래 단위");
+  });
+
+  it("caps very large statement text before sending it to Claude", async () => {
+    await createClaudePdfExtractor().extract({ text: "x".repeat(90000) });
+
+    const content = parseRequest()?.messages[0].content as string;
+
+    expect(content).toHaveLength(80000);
+  });
+
+  it("returns the extracted transactions and sets a 60 second timeout", async () => {
+    const result = await createClaudePdfExtractor().extract({ text: "s" });
+
+    expect(result).toEqual(PDF_EXTRACTION_OUTPUT.transactions);
+    expect(parseOptions()).toMatchObject({
+      timeout: 60000,
+      maxRetries: 0,
+    });
+  });
+
+  it("throws when Claude returns no parsed PDF extraction", async () => {
+    anthropicMocks.parse.mockResolvedValueOnce({
+      parsed_output: null,
+    });
+
+    await expect(
+      createClaudePdfExtractor().extract({ text: "s" }),
+    ).rejects.toThrow("PDF extraction");
   });
 });

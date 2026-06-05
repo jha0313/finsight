@@ -20,7 +20,7 @@ export function UploadPanel() {
     event.preventDefault();
 
     if (file === null) {
-      setError("분석할 CSV 파일을 선택하세요.");
+      setError("분석할 CSV 또는 PDF 파일을 선택하세요.");
       setStatus("error");
       return;
     }
@@ -64,18 +64,18 @@ export function UploadPanel() {
       <article className="rounded-card border border-hairline bg-canvas p-xl">
         <div className="grid gap-xl lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <h2 className="title-md">CSV 명세서 업로드</h2>
+            <h2 className="title-md">명세서 업로드</h2>
             <p className="body-sm mt-xs">
-              카드 또는 은행 CSV를 올리면 지출 구조와 이상 거래를 한 화면에
-              정리합니다.
+              카드 또는 은행 명세서(CSV·PDF)를 올리면 지출 구조와 이상 거래를 한
+              화면에 정리합니다.
             </p>
           </div>
 
           <form className="grid gap-base sm:grid-cols-[1fr_auto]" onSubmit={handleSubmit}>
             <label className="block">
-              <span className="caption">CSV 파일</span>
+              <span className="caption">CSV 또는 PDF 파일</span>
               <input
-                accept=".csv,text/csv"
+                accept=".csv,.pdf,text/csv,application/pdf"
                 className="body-sm mt-xs block w-full rounded-field border border-hairline bg-canvas px-base py-sm text-ink file:mr-base file:rounded-action file:border-0 file:bg-surface-strong file:px-base file:py-xs file:text-ink"
                 disabled={isLoading}
                 onChange={handleFileChange}

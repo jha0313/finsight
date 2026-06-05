@@ -1,10 +1,9 @@
 import { createHash } from "node:crypto";
 
 import { analyze, categorize } from "@/lib/analysis";
-import { parseCsv } from "@/lib/csv";
 import { maskAccount, rowHash, sourceHash } from "@/lib/mask";
 import type { AnalyzeResponse, ProInsights } from "@/types/analysis";
-import type { ParsedTransaction } from "@/types/csv";
+import type { ParsedStatement, ParsedTransaction } from "@/types/csv";
 import type {
   AiUsageGateway,
   CheckoutGateway,
@@ -58,7 +57,7 @@ export interface PolarWebhookRequestDeps {
 }
 
 export async function runAnalysis(input: {
-  csv: string | Buffer;
+  statement: ParsedStatement;
   tier: Tier;
   deps: AnalyzeDeps;
 }): Promise<{
@@ -67,11 +66,13 @@ export async function runAnalysis(input: {
   sourceHash: string;
   needsFallback: boolean;
 }> {
-  const parsed = parseCsv(input.csv);
-  const transactions = parsed.transactions.map(toTransaction);
+  const statement = input.statement;
+  const transactions = statement.transactions.map(toTransaction);
   const free = analyze(transactions);
-  const source = sourceHash(csvSourceText(input.csv));
-  const warnings = parsed.warnings.length > 0 ? parsed.warnings : undefined;
+  const source = sourceHash(statement.sourceText);
+  const warnings =
+    statement.warnings.length > 0 ? statement.warnings : undefined;
+  const currency = resolveStatementCurrency(transactions);
   const response: AnalyzeResponse = {
     tier: input.tier,
     free,
@@ -79,14 +80,15 @@ export async function runAnalysis(input: {
       status: "unavailable",
     },
     warnings,
+    ...(currency !== undefined ? { currency } : {}),
   };
 
-  if (parsed.needsFallback) {
+  if (statement.needsFallback) {
     return {
       response,
       transactions,
       sourceHash: source,
-      needsFallback: parsed.needsFallback,
+      needsFallback: statement.needsFallback,
     };
   }
 
@@ -100,7 +102,7 @@ export async function runAnalysis(input: {
       response,
       transactions,
       sourceHash: source,
-      needsFallback: parsed.needsFallback,
+      needsFallback: statement.needsFallback,
     };
   }
 
@@ -112,7 +114,7 @@ export async function runAnalysis(input: {
       response,
       transactions,
       sourceHash: source,
-      needsFallback: parsed.needsFallback,
+      needsFallback: statement.needsFallback,
     };
   }
 
@@ -134,12 +136,12 @@ export async function runAnalysis(input: {
     response,
     transactions,
     sourceHash: source,
-    needsFallback: parsed.needsFallback,
+    needsFallback: statement.needsFallback,
   };
 }
 
 export async function runAnalyzeRequest(input: {
-  csv: string | Buffer;
+  statement: ParsedStatement;
   deps: AnalyzeRequestDeps;
 }): Promise<
   | { status: 200; body: AnalyzeResponse }
@@ -156,7 +158,7 @@ export async function runAnalyzeRequest(input: {
 
   const tier = await input.deps.subscriptionGateway.resolveTier(user.id);
   const inputHash = analysisInputHash({
-    csv: input.csv,
+    statement: input.statement,
     tier,
   });
   const cachedInsights = toCachedInsights(
@@ -165,13 +167,13 @@ export async function runAnalyzeRequest(input: {
   const analysisResult =
     cachedInsights === null
       ? await runAnalysisWithoutCache({
-          csv: input.csv,
+          statement: input.statement,
           deps: input.deps,
           tier,
           userId: user.id,
         })
       : await runAnalysis({
-          csv: input.csv,
+          statement: input.statement,
           tier,
           deps: {
             cachedInsights,
@@ -270,7 +272,7 @@ export async function runPolarWebhookRequest(input: {
 }
 
 async function runAnalysisWithoutCache(input: {
-  csv: string | Buffer;
+  statement: ParsedStatement;
   tier: Tier;
   userId: string;
   deps: AnalyzeRequestDeps;
@@ -282,14 +284,14 @@ async function runAnalysisWithoutCache(input: {
 
   if (!quotaOk) {
     return runAnalysis({
-      csv: input.csv,
+      statement: input.statement,
       tier: input.tier,
       deps: { skipInsights: true },
     });
   }
 
   const result = await runAnalysis({
-    csv: input.csv,
+    statement: input.statement,
     tier: input.tier,
     deps: {
       insightProvider: createLazyInsightProvider(
@@ -366,18 +368,18 @@ function toCachedInsights(value: unknown): ProInsights | null {
   };
 }
 
-// 캐시 키는 원본 CSV 텍스트가 아니라 파싱·정규화된 '거래 단위' 입력으로
-// 만든다(컬럼 순서·공백·요약행 차이는 동일 거래면 같은 키 → 불필요한 재호출
-// 방지). CLAUDE.md의 unique(user_id, input_hash) 캐시 규칙과 일치한다.
+// 캐시 키는 원본 텍스트가 아니라 파싱·정규화된 '거래 단위' 입력으로 만든다
+// (컬럼 순서·공백·요약행 차이는 동일 거래면 같은 키 → 불필요한 재호출 방지).
+// CSV·PDF 입력 형식과도 무관하다. CLAUDE.md의 unique(user_id, input_hash)
+// 캐시 규칙과 일치한다.
 function analysisInputHash(input: {
-  csv: string | Buffer;
+  statement: ParsedStatement;
   tier: Tier;
 }): string {
-  const parsed = parseCsv(input.csv);
   const payload = JSON.stringify([
     AI_PROMPT_VERSION,
     MODEL_BY_TIER[input.tier],
-    sourceHash(parsed.transactions),
+    sourceHash(input.statement.transactions),
   ]);
 
   return createHash("sha256").update(payload, "utf8").digest("hex");
@@ -385,6 +387,34 @@ function analysisInputHash(input: {
 
 function proStatusForTier(tier: Tier): AnalyzeResponse["pro"]["status"] {
   return tier === "pro" ? "active" : "locked";
+}
+
+// 명세서는 단일 청구 통화를 가정하되, 혼합 시 최빈 통화를 대표값으로 쓴다.
+// 거래가 없거나 통화를 알 수 없으면 undefined(표시부가 기본값으로 강등).
+function resolveStatementCurrency(
+  transactions: Transaction[],
+): string | undefined {
+  const counts = new Map<string, number>();
+
+  for (const transaction of transactions) {
+    const code = transaction.currency.trim().toUpperCase();
+
+    if (code !== "") {
+      counts.set(code, (counts.get(code) ?? 0) + 1);
+    }
+  }
+
+  let best: string | undefined;
+  let bestCount = 0;
+
+  for (const [code, count] of counts) {
+    if (count > bestCount) {
+      best = code;
+      bestCount = count;
+    }
+  }
+
+  return best;
 }
 
 function toTransaction(parsed: ParsedTransaction): Transaction {
@@ -438,12 +468,4 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
         clearTimeout(timeout);
       });
   });
-}
-
-function csvSourceText(input: string | Buffer): string {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  return input.toString("utf8");
 }

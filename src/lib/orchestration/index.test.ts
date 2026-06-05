@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { parseCsvStatement } from "@/lib/csv";
 import type { ProInsights } from "@/types/analysis";
 import type {
   AiUsageGateway,
@@ -220,13 +221,14 @@ describe("runAnalysis", () => {
     }));
 
     const result = await runAnalysis({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       tier: "free",
       deps: { insightProvider: provider },
     });
 
     expect(result.needsFallback).toBe(false);
     expect(result.response.tier).toBe("free");
+    expect(result.response.currency).toBe("KRW");
     expect(result.response.pro).toEqual({
       status: "locked",
       insights: {
@@ -261,7 +263,7 @@ describe("runAnalysis", () => {
     }));
 
     const result = await runAnalysis({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       tier: "pro",
       deps: { insightProvider: provider },
     });
@@ -282,7 +284,7 @@ describe("runAnalysis", () => {
     });
 
     const result = await runAnalysis({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       tier: "free",
       deps: { insightProvider: provider },
     });
@@ -306,7 +308,7 @@ describe("runAnalysis", () => {
     );
 
     const result = await runAnalysis({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       tier: "pro",
       deps: { insightProvider: provider, aiTimeoutMs: 1 },
     });
@@ -324,8 +326,8 @@ describe("runAnalysis", () => {
     }));
 
     const result = await runAnalysis({
-      csv: `foo,bar
-one,two`,
+      statement: parseCsvStatement(`foo,bar
+one,two`),
       tier: "free",
       deps: { insightProvider: provider },
     });
@@ -351,14 +353,15 @@ one,two`,
     }));
 
     const result = await runAnalysis({
-      csv: `date,merchant,amount
-2026-06-01,소계,1000`,
+      statement: parseCsvStatement(`date,merchant,amount
+2026-06-01,소계,1000`),
       tier: "free",
       deps: { insightProvider: provider },
     });
 
     expect(result.needsFallback).toBe(false);
     expect(result.transactions).toEqual([]);
+    expect(result.response.currency).toBeUndefined();
     expect(result.response.free).toEqual({
       byCategory: [],
       trend: [],
@@ -373,6 +376,41 @@ one,two`,
     });
     expect(provider.calls).toHaveLength(1);
   });
+
+  it("derives the statement currency from transactions (PDF-style USD)", async () => {
+    const provider = new FakeInsightProvider(() => ({
+      summary: "요약",
+      insights: [],
+    }));
+
+    const result = await runAnalysis({
+      statement: {
+        transactions: [
+          {
+            date: "2025-05-13",
+            merchant: "NETFLIX.COM",
+            signedAmount: "19.83",
+            direction: "debit",
+            currency: "USD",
+          },
+          {
+            date: "2025-05-14",
+            merchant: "STARBUCKS",
+            signedAmount: "25.00",
+            direction: "debit",
+            currency: "USD",
+          },
+        ],
+        warnings: [],
+        needsFallback: false,
+        sourceText: "pdf-source",
+      },
+      tier: "free",
+      deps: { insightProvider: provider },
+    });
+
+    expect(result.response.currency).toBe("USD");
+  });
 });
 
 describe("runAnalyzeRequest", () => {
@@ -383,7 +421,7 @@ describe("runAnalyzeRequest", () => {
       });
 
     const result = await runAnalyzeRequest({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       deps,
     });
 
@@ -407,7 +445,7 @@ describe("runAnalyzeRequest", () => {
       });
 
     const result = await runAnalyzeRequest({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       deps,
     });
 
@@ -460,7 +498,7 @@ describe("runAnalyzeRequest", () => {
     });
 
     const result = await runAnalyzeRequest({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       deps,
     });
 
@@ -494,7 +532,7 @@ describe("runAnalyzeRequest", () => {
     };
 
     const result = await runAnalyzeRequest({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       deps,
     });
 
@@ -519,7 +557,7 @@ describe("runAnalyzeRequest", () => {
       insightProvider: provider,
     });
 
-    const result = await runAnalyzeRequest({ csv: STANDARD_CSV, deps });
+    const result = await runAnalyzeRequest({ statement: parseCsvStatement(STANDARD_CSV), deps });
 
     expect(result.status).toBe(200);
     expect(result.body.pro).toEqual({ status: "unavailable" });
@@ -531,7 +569,7 @@ describe("runAnalyzeRequest", () => {
   it("does not refund the quota when the Claude call succeeds", async () => {
     const { deps, aiUsage } = createAnalyzeRequestDeps({ tier: "pro" });
 
-    await runAnalyzeRequest({ csv: STANDARD_CSV, deps });
+    await runAnalyzeRequest({ statement: parseCsvStatement(STANDARD_CSV), deps });
 
     expect(aiUsage.releaseCalls).toEqual([]);
   });
@@ -555,7 +593,7 @@ describe("runAnalyzeRequest", () => {
     };
 
     const result = await runAnalyzeRequest({
-      csv: STANDARD_CSV,
+      statement: parseCsvStatement(STANDARD_CSV),
       deps,
     });
 

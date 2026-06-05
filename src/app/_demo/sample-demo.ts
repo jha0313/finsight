@@ -1,3 +1,4 @@
+import { parseCsvStatement } from "@/lib/csv";
 import { runAnalysis } from "@/lib/orchestration";
 import type { InsightProvider } from "@/types/ports";
 
@@ -49,7 +50,7 @@ export const demoInsightProvider: InsightProvider = {
 
 export async function getSampleDemoAnalysis() {
   return runAnalysis({
-    csv: sampleStatementCsv,
+    statement: parseCsvStatement(sampleStatementCsv),
     tier: "free",
     deps: {
       insightProvider: demoInsightProvider,

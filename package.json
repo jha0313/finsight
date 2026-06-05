@@ -21,6 +21,7 @@
     "next": "15",
     "react": "19",
     "react-dom": "19",
+    "unpdf": "^1.6.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

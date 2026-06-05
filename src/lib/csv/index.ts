@@ -7,6 +7,7 @@ import type {
   CanonicalField,
   CsvMapping,
   ParseResult,
+  ParsedStatement,
   ParsedTransaction,
 } from "@/types/csv";
 
@@ -135,6 +136,22 @@ export function mapColumns(headers: string[]): CsvMapping {
   return {
     columns,
     source: "standard",
+  };
+}
+
+// parseCsv를 형식 무관 ParsedStatement로 감싼다. sourceText는 statement
+// 중복 판정용 sourceHash의 원본으로, 기존 동작과 동일하게 utf8 텍스트를 쓴다.
+export function parseCsvStatement(
+  input: string | Buffer,
+  opts: { encoding?: string } = {},
+): ParsedStatement {
+  const result = parseCsv(input, opts);
+
+  return {
+    transactions: result.transactions,
+    warnings: result.warnings,
+    needsFallback: result.needsFallback,
+    sourceText: typeof input === "string" ? input : input.toString("utf8"),
   };
 }
 

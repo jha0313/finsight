@@ -1,7 +1,7 @@
 import iconv from "iconv-lite";
 import { describe, expect, it } from "vitest";
 
-import { mapColumns, parseCsv } from "./index";
+import { mapColumns, parseCsv, parseCsvStatement } from "./index";
 
 describe("mapColumns", () => {
   it("maps Korean and English header aliases to canonical fields", () => {
@@ -201,5 +201,33 @@ one,two`);
     expect(result.warnings).toContain(
       "Standard CSV mapping failed; Claude fallback mapping is required.",
     );
+  });
+});
+
+describe("parseCsvStatement", () => {
+  it("wraps parseCsv output as a ParsedStatement carrying the source text", () => {
+    const csv = `date,merchant,amount
+2026-06-01,스타벅스,5500`;
+
+    const statement = parseCsvStatement(csv);
+
+    expect(statement.needsFallback).toBe(false);
+    expect(statement.warnings).toEqual([]);
+    expect(statement.sourceText).toBe(csv);
+    expect(statement.transactions).toHaveLength(1);
+    expect(statement.transactions[0]).toMatchObject({
+      merchant: "스타벅스",
+      signedAmount: "5500.00",
+      direction: "debit",
+    });
+  });
+
+  it("decodes a buffer source to utf8 text for hashing", () => {
+    const csv = `date,merchant,amount
+2026-06-01,서점,12000`;
+
+    const statement = parseCsvStatement(Buffer.from(csv, "utf8"));
+
+    expect(statement.sourceText).toBe(csv);
   });
 });

@@ -1,4 +1,5 @@
 import type { ProInsights } from "./analysis";
+import type { ExtractedTransaction } from "./pdf";
 import type { StatementStatus } from "./statement";
 import type { Tier } from "./tier";
 import type { Transaction } from "./transaction";
@@ -8,6 +9,13 @@ export interface InsightProvider {
     transactions: Transaction[];
     tier: Tier;
   }): Promise<ProInsights>;
+}
+
+// PDF는 은행마다 레이아웃이 제각각이라 결정론적 표준 파서로 일반화하기
+// 어렵다. 마스킹된 명세서 텍스트에서 거래 단위를 추출하는 책임을 port로
+// 분리하고, 실제 Claude 어댑터는 composition root(route)에서 주입한다.
+export interface PdfTransactionExtractor {
+  extract(input: { text: string }): Promise<ExtractedTransaction[]>;
 }
 
 export interface SubscriptionGateway {

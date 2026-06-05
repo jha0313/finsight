@@ -45,7 +45,7 @@ describe("UploadPanel", () => {
   it("renders the initial upload state", () => {
     render(<UploadPanel />);
 
-    expect(screen.getByLabelText("CSV 파일")).toBeInTheDocument();
+    expect(screen.getByLabelText("CSV 또는 PDF 파일")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "명세서 분석" }),
     ).toBeDisabled();
@@ -98,7 +98,7 @@ describe("UploadPanel", () => {
 });
 
 function selectCsvFile(): void {
-  const input = screen.getByLabelText("CSV 파일");
+  const input = screen.getByLabelText("CSV 또는 PDF 파일");
   const file = new File(
     ["date,merchant,amount\n2026-06-01,카페,5500"],
     "statement.csv",
