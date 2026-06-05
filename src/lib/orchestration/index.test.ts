@@ -278,7 +278,7 @@ describe("runAnalysis", () => {
     expect(provider.calls[0].tier).toBe("pro");
   });
 
-  it("isolates provider errors as unavailable while preserving free analysis", async () => {
+  it("locks free tier (showing the upgrade CTA) when the provider fails, preserving free analysis", async () => {
     const provider = new FakeInsightProvider(async () => {
       throw new Error("Claude unavailable");
     });
@@ -289,7 +289,9 @@ describe("runAnalysis", () => {
       deps: { insightProvider: provider },
     });
 
-    expect(result.response.pro).toEqual({ status: "unavailable" });
+    // 미구독(free)은 AI 인사이트가 실패해도 "locked"여서 업그레이드 CTA가 뜬다.
+    // (구독 pro의 실패는 별도 테스트에서 "unavailable"로 격리된다.)
+    expect(result.response.pro).toEqual({ status: "locked" });
     expect(result.response.free.byCategory).toEqual([
       { category: "food", total: "5500.00", count: 1 },
       { category: "transport", total: "1500.00", count: 1 },
@@ -648,6 +650,24 @@ describe("runCheckoutRequest", () => {
       {
         customerExternalId: "user-42",
         productId: "product-1",
+      },
+    ]);
+  });
+
+  it("forwards successUrl to the checkout gateway", async () => {
+    const { deps, checkout } = createCheckoutRequestDeps({ userId: "user-42" });
+
+    await runCheckoutRequest({
+      deps,
+      productId: "product-1",
+      successUrl: "https://app.example/dashboard",
+    });
+
+    expect(checkout.calls).toEqual([
+      {
+        customerExternalId: "user-42",
+        productId: "product-1",
+        successUrl: "https://app.example/dashboard",
       },
     ]);
   });

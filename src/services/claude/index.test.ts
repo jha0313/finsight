@@ -161,11 +161,11 @@ describe("createClaudeInsightProvider", () => {
     });
   });
 
-  it("sets a 30 second SDK timeout and returns parsed output", async () => {
+  it("sets a 60 second SDK timeout and returns parsed output", async () => {
     const result = await generate("free");
 
     expect(parseOptions()).toMatchObject({
-      timeout: 30000,
+      timeout: 60000,
       maxRetries: 0,
     });
     expect(result).toEqual(PARSED_OUTPUT);

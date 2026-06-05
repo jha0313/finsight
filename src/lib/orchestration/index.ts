@@ -17,7 +17,7 @@ import type {
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
 
-const DEFAULT_AI_TIMEOUT_MS = 30000;
+const DEFAULT_AI_TIMEOUT_MS = 60000;
 const AI_PROMPT_VERSION = "claude-insights:v1";
 const MODEL_BY_TIER: Record<Tier, string> = {
   free: "claude-sonnet-4-6",
@@ -77,13 +77,19 @@ export async function runAnalysis(input: {
     tier: input.tier,
     free,
     pro: {
-      status: "unavailable",
+      // 인사이트가 없을 때의 기본값: 미구독(free)은 "locked"(업그레이드 CTA),
+      // 구독(pro)은 AI 실패/quota를 뜻하는 "unavailable".
+      status: proStatusWithoutInsights(input.tier),
     },
     warnings,
     ...(currency !== undefined ? { currency } : {}),
   };
 
   if (statement.needsFallback) {
+    // 파싱 폴백(컬럼 매핑 확인 필요)은 완료된 분석이 아니므로, 미구독이라도
+    // 업그레이드 CTA가 아니라 unavailable로 둔다.
+    response.pro = { status: "unavailable" };
+
     return {
       response,
       transactions,
@@ -202,6 +208,7 @@ export async function runAnalyzeRequest(input: {
 
 export async function runCheckoutRequest(input: {
   productId?: string;
+  successUrl?: string;
   deps: CheckoutRequestDeps;
 }): Promise<
   | { status: 303; redirectUrl: string }
@@ -219,6 +226,7 @@ export async function runCheckoutRequest(input: {
   const checkout = await input.deps.checkout.create({
     customerExternalId: user.id,
     productId: input.productId,
+    successUrl: input.successUrl,
   });
 
   return {
@@ -389,6 +397,14 @@ function proStatusForTier(tier: Tier): AnalyzeResponse["pro"]["status"] {
   return tier === "pro" ? "active" : "locked";
 }
 
+// 인사이트가 없는 경우의 pro.status. 미구독(free)은 "잠금"(업그레이드 CTA 노출),
+// 구독(pro)은 AI 실패/quota 소진을 뜻하는 "unavailable".
+function proStatusWithoutInsights(
+  tier: Tier,
+): AnalyzeResponse["pro"]["status"] {
+  return tier === "pro" ? "unavailable" : "locked";
+}
+
 // 명세서는 단일 청구 통화를 가정하되, 혼합 시 최빈 통화를 대표값으로 쓴다.
 // 거래가 없거나 통화를 알 수 없으면 undefined(표시부가 기본값으로 강등).
 function resolveStatementCurrency(
@@ -451,7 +467,11 @@ async function generateInsights(input: {
       }),
       input.timeoutMs,
     );
-  } catch {
+  } catch (error) {
+    // 실패 원인(30s 타임아웃 vs Claude API 에러)이 묻히지 않도록 서버 로그에
+    // 남긴다. 호출부는 여전히 null→pro.status=unavailable로 격리한다.
+    console.error("AI insight generation failed", error);
+
     return null;
   }
 }

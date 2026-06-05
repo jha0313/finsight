@@ -1,12 +1,16 @@
 "use client";
 
 import { FileUp, LoaderCircle } from "lucide-react";
-import { type ChangeEvent, type FormEvent, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 
 import { DashboardResults } from "@/components/DashboardResults";
 import type { AnalyzeResponse } from "@/types/analysis";
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
+
+// 결제 체크아웃처럼 외부로 이동했다 돌아와도(redirect) 직전 분석 결과를
+// 복원하기 위한 세션 저장 키. 탭을 닫으면 비워진다.
+const ANALYSIS_STORAGE_KEY = "finsight:last-analysis";
 
 export function UploadPanel() {
   const [file, setFile] = useState<File | null>(null);
@@ -15,6 +19,22 @@ export function UploadPanel() {
   const [response, setResponse] = useState<AnalyzeResponse | null>(null);
 
   const isLoading = status === "loading";
+
+  // 마운트 시 직전 분석 결과를 복원해, 체크아웃 redirect 후 화면이 빈 상태로
+  // 초기화되지 않게 한다.
+  useEffect(() => {
+    const stored = sessionStorage.getItem(ANALYSIS_STORAGE_KEY);
+
+    if (stored === null) {
+      return;
+    }
+
+    try {
+      setResponse(JSON.parse(stored) as AnalyzeResponse);
+    } catch {
+      sessionStorage.removeItem(ANALYSIS_STORAGE_KEY);
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,6 +67,7 @@ export function UploadPanel() {
       const result = (await analyzeResponse.json()) as AnalyzeResponse;
       setResponse(result);
       setStatus("success");
+      sessionStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(result));
     } catch {
       setResponse(null);
       setError("분석 요청을 처리하지 못했습니다.");

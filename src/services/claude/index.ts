@@ -8,7 +8,7 @@ import type { InsightProvider, PdfTransactionExtractor } from "@/types/ports";
 import type { Tier } from "@/types/tier";
 import type { Category, Transaction } from "@/types/transaction";
 
-const CLAUDE_TIMEOUT_MS = 30000;
+const CLAUDE_TIMEOUT_MS = 60000;
 const MAX_TRANSACTIONS_FOR_CLAUDE = 200;
 const MAX_OUTPUT_TOKENS = 1200;
 const MAX_SUMMARY_CHARS = 1200;

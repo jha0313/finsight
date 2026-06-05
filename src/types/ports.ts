@@ -39,6 +39,7 @@ export interface CheckoutGateway {
   create(input: {
     customerExternalId: string;
     productId?: string;
+    successUrl?: string;
   }): Promise<{ url: string }>;
 }
 
