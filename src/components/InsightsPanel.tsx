@@ -29,6 +29,7 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
   if (insights !== undefined) {
     return (
       <InsightShell
+        accent
         icon={<Sparkles aria-hidden="true" size={20} strokeWidth={2} />}
         title="AI 인사이트"
       >
@@ -38,7 +39,7 @@ export function InsightsPanel({ status, insights }: InsightsPanelProps) {
             <li className="body-sm flex gap-sm" key={insight}>
               <span
                 aria-hidden="true"
-                className="mt-[0.55em] size-1.5 rounded-circle bg-ink"
+                className="mt-[0.55em] size-1.5 rounded-circle bg-ai-violet"
               />
               <span>{insight}</span>
             </li>
@@ -80,22 +81,32 @@ function UpgradeCta({ action }: { action: string }) {
 }
 
 function InsightShell({
+  accent = false,
   children,
   icon,
   title,
 }: {
+  accent?: boolean;
   children: ReactNode;
   icon: ReactNode;
   title: string;
 }) {
+  const articleClassName = accent
+    ? "ai-border-gradient ai-glow bg-canvas p-xl"
+    : "rounded-card border border-hairline bg-canvas p-xl";
+
+  const iconClassName = accent
+    ? "ai-shimmer flex size-11 shrink-0 items-center justify-center rounded-circle text-on-primary"
+    : "flex size-11 shrink-0 items-center justify-center rounded-circle bg-surface-strong text-ink";
+
+  const titleClassName = accent ? "title-md ai-text-gradient" : "title-md";
+
   return (
-    <article className="rounded-card border border-hairline bg-canvas p-xl">
-      <div className="flex items-start gap-base">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-circle bg-surface-strong text-ink">
-          {icon}
-        </div>
+    <article className={articleClassName}>
+      <div className="relative z-[1] flex items-start gap-base">
+        <div className={iconClassName}>{icon}</div>
         <div>
-          <h2 className="title-md">{title}</h2>
+          <h2 className={titleClassName}>{title}</h2>
           <div className="mt-sm">{children}</div>
         </div>
       </div>

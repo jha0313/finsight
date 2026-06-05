@@ -1,18 +1,4 @@
-export interface HeroPreviewRow {
-  label: string;
-  value: string;
-  tone?: "neutral" | "up" | "down";
-}
-
-export interface HeroPreview {
-  amount: string;
-  amountLabel: string;
-  delta: string;
-  period: string;
-  rows: HeroPreviewRow[];
-  title: string;
-  trend?: number[];
-}
+import { HeroInsightCard, type HeroAiInsight } from "./HeroInsightCard";
 
 export interface HeroDemoSlot {
   description: string;
@@ -21,6 +7,7 @@ export interface HeroDemoSlot {
 }
 
 export interface HeroProps {
+  aiInsight: HeroAiInsight;
   brandName: string;
   ctaHref: string;
   ctaLabel: string;
@@ -28,10 +15,11 @@ export interface HeroProps {
   description: string;
   eyebrow?: string;
   headline: string;
-  preview: HeroPreview;
+  trend?: number[];
 }
 
 export function Hero({
+  aiInsight,
   brandName,
   ctaHref,
   ctaLabel,
@@ -39,11 +27,22 @@ export function Hero({
   description,
   eyebrow,
   headline,
-  preview,
+  trend,
 }: HeroProps) {
   return (
-    <header className="bg-surface-dark py-section" role="banner">
-      <div className="mx-auto grid max-w-finsight gap-xxl px-lg lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1fr)] lg:items-center">
+    <header
+      className="ai-surface-dark overflow-hidden py-section"
+      role="banner"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-24 right-[-10%] size-[480px] rounded-circle blur-[120px]"
+        style={{
+          background:
+            "radial-gradient(circle, color-mix(in srgb, var(--ai-violet) 32%, transparent), transparent 70%)",
+        }}
+      />
+      <div className="relative mx-auto grid max-w-finsight gap-xxl px-lg lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1fr)] lg:items-center">
         <div>
           <div className="mb-xl inline-flex items-center gap-sm">
             <span
@@ -54,8 +53,8 @@ export function Hero({
           </div>
 
           {eyebrow ? (
-            <p className="caption-strong mb-base inline-flex items-center rounded-action bg-surface-dark-elevated px-base py-xs !text-on-dark-soft">
-              {eyebrow}
+            <p className="caption-strong mb-base inline-flex items-center gap-xs rounded-action bg-surface-dark-elevated px-base py-xs !text-on-dark-soft">
+              <span className="ai-text-gradient">{eyebrow}</span>
             </p>
           ) : null}
 
@@ -76,59 +75,9 @@ export function Hero({
         </div>
 
         <div className="relative min-h-[460px]">
-          <article className="absolute right-0 top-0 w-[min(100%,420px)] rounded-card border border-hairline-faint bg-surface-dark-elevated p-xl shadow-float">
-            <div className="flex items-start justify-between gap-base">
-              <div>
-                <p className="caption !text-on-dark-soft">{preview.period}</p>
-                <h2 className="title-md mt-xs !text-on-dark">
-                  {preview.title}
-                </h2>
-              </div>
-              <span className="caption !text-on-dark-soft">
-                {preview.amountLabel}
-              </span>
-            </div>
-
-            <div className="mt-xl">
-              <p className="num !text-on-dark !text-[28px]">{preview.amount}</p>
-              <p className="num down mt-xs">{preview.delta}</p>
-            </div>
-
-            {preview.trend && preview.trend.length > 0 ? (
-              <div
-                aria-hidden="true"
-                className="mt-lg flex h-14 items-end gap-1"
-              >
-                {preview.trend.map((height, index) => (
-                  <span
-                    className="block flex-1 rounded-t-[3px]"
-                    key={index}
-                    style={{
-                      background:
-                        "linear-gradient(var(--primary), color-mix(in srgb, var(--primary) 20%, transparent))",
-                      height: `${height}%`,
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            <div className="mt-xl space-y-sm">
-              {preview.rows.map((row) => (
-                <div
-                  className="flex items-center justify-between gap-base rounded-field border border-hairline-faint bg-surface-dark px-base py-sm"
-                  key={row.label}
-                >
-                  <span className="body-sm !text-on-dark-soft">
-                    {row.label}
-                  </span>
-                  <span className={rowValueClassName(row.tone)}>
-                    {row.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </article>
+          <div className="absolute right-0 top-0">
+            <HeroInsightCard insight={aiInsight} trend={trend} />
+          </div>
 
           <aside className="absolute bottom-0 left-0 w-[min(82%,320px)] -rotate-2 rounded-card border border-hairline-faint bg-surface-dark-elevated p-lg shadow-float">
             <p className="caption !text-on-dark-soft">{demoSlot.label}</p>
@@ -141,16 +90,4 @@ export function Hero({
       </div>
     </header>
   );
-}
-
-function rowValueClassName(tone: HeroPreviewRow["tone"]): string {
-  if (tone === "up") {
-    return "num up";
-  }
-
-  if (tone === "down") {
-    return "num down";
-  }
-
-  return "num !text-on-dark";
 }

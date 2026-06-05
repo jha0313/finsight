@@ -12,8 +12,15 @@ export function CtaBand({
   title,
 }: CtaBandProps) {
   return (
-    <section aria-label={title} className="bg-surface-dark py-section">
-      <div className="mx-auto max-w-finsight px-lg text-center">
+    <section
+      aria-label={title}
+      className="relative overflow-hidden bg-surface-dark py-section"
+    >
+      <span
+        aria-hidden="true"
+        className="ai-shimmer pointer-events-none absolute left-1/2 top-1/3 size-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-circle opacity-30 blur-[120px]"
+      />
+      <div className="relative mx-auto max-w-finsight px-lg text-center">
         <h2 className="display-md !text-on-dark">{title}</h2>
         <p className="body-md mx-auto mt-base max-w-[34rem] !text-on-dark-soft">
           {description}
