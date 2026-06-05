@@ -32,6 +32,9 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AnalyzeResponse | null>(null);
   const [checkoutRefreshing, setCheckoutRefreshing] = useState(false);
+  // 업그레이드(목표 Pro) 재분석이 진행 중인 동안 인사이트 패널을 잠금 CTA가
+  // 아니라 "생성 중" 진행 표시로 둔다.
+  const [proPending, setProPending] = useState(false);
 
   const isLoading = status === "loading";
 
@@ -51,18 +54,18 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
     }
   }, []);
 
-  // 결제 후 저장된 마지막 명세서를 서버에서 Pro(Opus)로 자동 재분석해 잠금
-  // 화면을 심층 분석으로 교체한다. 원본 파일은 redirect 후 클라이언트에 남지
-  // 않으므로 재업로드 없이 갱신한다. 트리거는 두 가지:
-  //  (1) ?checkout=success — 결제 직후 복귀(웹훅 반영 레이스 대비 재시도).
-  //  (2) 서버 구독은 Pro인데 저장된 분석이 아직 Pro가 아님 — 새로고침만으로도
-  //      복구되도록 보장(결제 직후 폴링 윈도우를 놓쳤을 때의 안전망).
+  // 저장된 분석을 서버 구독 상태와 동기화한다. 원본 파일은 redirect/새로고침 후
+  // 클라이언트에 남지 않으므로, 서버에 저장된 마지막 명세서를 재분석해 교체한다.
+  // 트리거는 두 가지이고 업그레이드·다운그레이드를 모두 다룬다:
+  //  (1) ?checkout=success — 결제 직후 복귀(웹훅 반영 레이스 대비 재시도, 목표 Pro).
+  //  (2) 저장된 분석의 tier ≠ 서버 tier — 새로고침만으로도 양방향 복구되도록 보장
+  //      (Pro 미반영 업그레이드, 또는 Free 다운그레이드 후 남은 Pro 인사이트 제거).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const checkoutReturn = params.get("checkout") === "success";
-    const storedStale = serverTier === "pro" && isStoredAnalysisStale();
+    const tierMismatch = isStoredTierMismatch(serverTier);
 
-    if (!checkoutReturn && !storedStale) {
+    if (!checkoutReturn && !tierMismatch) {
       return;
     }
 
@@ -71,13 +74,19 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
       window.history.replaceState(null, "", window.location.pathname);
     }
 
+    // 결제 직후 복귀는 웹훅 반영을 기다린다(목표 Pro, 재시도). 그 외에는 서버의
+    // 현재 tier를 즉시 반영한다(다운그레이드 포함, 1회면 충분).
+    const targetTier: Tier = checkoutReturn ? "pro" : serverTier;
+    const maxAttempts = checkoutReturn ? CHECKOUT_REFRESH_ATTEMPTS : 1;
+
     let cancelled = false;
 
     async function refreshAfterCheckout() {
       setCheckoutRefreshing(true);
+      setProPending(targetTier === "pro");
 
       try {
-        for (let attempt = 0; attempt < CHECKOUT_REFRESH_ATTEMPTS; attempt++) {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
           const latestResponse = await fetch("/api/analyze/latest", {
             method: "POST",
           });
@@ -94,9 +103,9 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
             return;
           }
 
-          // tier가 pro로 보이면 구독이 반영된 것 — 결과를 채택하고 멈춘다.
-          // 아직 free면 웹훅 반영을 기다리며 잠깐 후 재시도한다.
-          if (result.tier === "pro") {
+          // 서버 tier가 목표와 일치하면 동기화된 것 — 결과를 채택하고 멈춘다.
+          // (업그레이드 결제 복귀는 웹훅 반영을 기다리며 재시도한다.)
+          if (result.tier === targetTier) {
             setResponse(result);
             setStatus("success");
             sessionStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(result));
@@ -105,7 +114,7 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
             return;
           }
 
-          if (attempt < CHECKOUT_REFRESH_ATTEMPTS - 1) {
+          if (attempt < maxAttempts - 1) {
             await delay(CHECKOUT_REFRESH_INTERVAL_MS);
           }
         }
@@ -114,6 +123,7 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
       } finally {
         if (!cancelled) {
           setCheckoutRefreshing(false);
+          setProPending(false);
         }
       }
     }
@@ -220,7 +230,7 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
 
         {checkoutRefreshing ? (
           <p className="body-sm mt-base" role="status">
-            Pro 구독을 확인하고 심층 분석을 적용하는 중입니다.
+            구독 상태를 확인하고 분석을 갱신하는 중입니다.
           </p>
         ) : null}
 
@@ -242,7 +252,7 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
           </p>
         </section>
       ) : (
-        <DashboardResults response={response} />
+        <DashboardResults proPending={proPending} response={response} />
       )}
     </div>
   );
@@ -262,9 +272,10 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-// 저장된 분석이 Pro로 적용되기 전(잠금/사용불가) 상태인지. 서버 구독이 Pro인데
-// 이 값이 true면 결제 직후 Free 결과만 저장된 것이므로 재분석이 필요하다.
-function isStoredAnalysisStale(): boolean {
+// 저장된 분석의 tier가 서버 구독 tier와 어긋났는지. 어긋났으면 재분석으로
+// 동기화한다(서버 Pro인데 저장 Free=업그레이드 미반영, 서버 Free인데 저장
+// Pro=다운그레이드 후 남은 Pro 인사이트).
+function isStoredTierMismatch(serverTier: Tier): boolean {
   const stored = sessionStorage.getItem(ANALYSIS_STORAGE_KEY);
 
   if (stored === null) {
@@ -272,7 +283,7 @@ function isStoredAnalysisStale(): boolean {
   }
 
   try {
-    return (JSON.parse(stored) as AnalyzeResponse).pro.status !== "active";
+    return (JSON.parse(stored) as AnalyzeResponse).tier !== serverTier;
   } catch {
     return false;
   }

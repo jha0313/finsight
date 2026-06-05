@@ -140,6 +140,27 @@ describe("UploadPanel", () => {
     expect(window.location.search).toBe("");
   });
 
+  it("shows a Pro generating state in the insights panel while re-analysis is in flight", async () => {
+    window.history.replaceState(null, "", "/dashboard?checkout=success");
+    // 결제 직후 복원된 잠금 결과 위에서 재분석이 진행되는 상태.
+    sessionStorage.setItem(
+      "finsight:last-analysis",
+      JSON.stringify(analyzeResponse),
+    );
+    // fetch를 보류시켜 Opus 생성 중(폴링 in-flight) 상태를 캡처한다.
+    fetchMock.mockReturnValue(new Promise<Response>(() => {}));
+
+    render(<UploadPanel serverTier="free" />);
+
+    expect(
+      await screen.findByText(
+        /Pro 심층 분석\(Opus\)을 생성하는 중입니다/,
+      ),
+    ).toBeInTheDocument();
+    // 생성 중에는 업그레이드 잠금 CTA가 보이지 않는다.
+    expect(screen.queryByText("Pro 분석 잠금")).not.toBeInTheDocument();
+  });
+
   it("does not auto-refresh without the checkout=success flag", () => {
     window.history.replaceState(null, "", "/dashboard");
 
@@ -193,6 +214,41 @@ describe("UploadPanel", () => {
     render(<UploadPanel serverTier="pro" />);
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("downgrades stored Pro insights to locked when server tier is Free on reload", async () => {
+    // 다운그레이드 후에도 sessionStorage에 옛 Pro 인사이트가 남은 상태를 재현.
+    window.history.replaceState(null, "", "/dashboard");
+    sessionStorage.setItem(
+      "finsight:last-analysis",
+      JSON.stringify({
+        tier: "pro",
+        free: analyzeResponse.free,
+        pro: {
+          status: "active",
+          insights: { summary: "옛 Pro 인사이트", insights: ["심층"] },
+        },
+      }),
+    );
+    // 서버는 이제 Free → latest가 잠금(인사이트 없음)을 반환.
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          tier: "free",
+          free: analyzeResponse.free,
+          pro: { status: "locked" },
+        }),
+        { headers: { "content-type": "application/json" }, status: 200 },
+      ),
+    );
+
+    render(<UploadPanel serverTier="free" />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/analyze/latest");
+    // Pro 심층 분석이 사라지고 업그레이드 잠금 화면으로 강등된다.
+    expect(await screen.findByText("Pro 분석 잠금")).toBeInTheDocument();
+    expect(screen.queryByText("옛 Pro 인사이트")).not.toBeInTheDocument();
   });
 
   it("keeps the empty state when there is no stored statement to re-analyze", async () => {

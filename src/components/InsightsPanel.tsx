@@ -1,5 +1,11 @@
 import type { ReactNode } from "react";
-import { ArrowUpRight, CircleAlert, Lock, Sparkles } from "lucide-react";
+import {
+  ArrowUpRight,
+  CircleAlert,
+  LoaderCircle,
+  Lock,
+  Sparkles,
+} from "lucide-react";
 
 import type { ProInsights } from "@/types/analysis";
 import type { ProStatus } from "@/types/tier";
@@ -7,11 +13,39 @@ import type { ProStatus } from "@/types/tier";
 export interface InsightsPanelProps {
   status: ProStatus;
   insights?: ProInsights;
+  // 서버 구독은 Pro로 확정됐고 Opus 심층 분석을 생성 중인 상태. status보다
+  // 우선해 잠금 CTA 대신 진행 표시를 보여준다(이미 Pro인데 업그레이드 버튼이
+  // 뜨는 혼란 방지).
+  pending?: boolean;
 }
 
 const checkoutAction = "/api/checkout";
 
-export function InsightsPanel({ status, insights }: InsightsPanelProps) {
+export function InsightsPanel({
+  status,
+  insights,
+  pending = false,
+}: InsightsPanelProps) {
+  if (pending) {
+    return (
+      <InsightShell
+        accent
+        icon={<Sparkles aria-hidden="true" size={20} strokeWidth={2} />}
+        title="AI 인사이트"
+      >
+        <p className="body-sm flex items-center gap-sm" role="status">
+          <LoaderCircle
+            aria-hidden="true"
+            className="animate-spin"
+            size={18}
+            strokeWidth={2}
+          />
+          Pro 심층 분석(Opus)을 생성하는 중입니다. 잠시만 기다려 주세요.
+        </p>
+      </InsightShell>
+    );
+  }
+
   if (status === "unavailable") {
     return (
       <InsightShell
