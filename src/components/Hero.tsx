@@ -50,7 +50,7 @@ export function Hero({
             <span className="nav-link !text-on-dark">{brandName}</span>
           </div>
 
-          <h1 className="font-finsight-display text-[44px] leading-none font-normal tracking-[-0.025em] !text-on-dark sm:text-[64px] lg:text-[80px]">
+          <h1 className="font-finsight-display text-[44px] leading-none font-normal tracking-[-0.025em] break-keep !text-on-dark sm:text-[64px] lg:text-[80px]">
             {headline}
           </h1>
           <p className="body-md mt-lg max-w-[36rem] !text-on-dark-soft">
@@ -58,7 +58,7 @@ export function Hero({
           </p>
           <div className="mt-xl">
             <a
-              className="btn-label inline-flex min-h-12 items-center justify-center rounded-action bg-primary px-lg text-on-primary transition-colors hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="btn-label inline-flex min-h-12 items-center justify-center rounded-action bg-primary px-lg !text-on-primary transition-colors hover:bg-primary-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               href={ctaHref}
             >
               {ctaLabel}

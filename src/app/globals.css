@@ -223,6 +223,16 @@ samp {
   color: var(--ink);
 }
 
+/* 한글 큰 제목은 어절 단위로 줄바꿈(단어 중간 분절 방지) */
+.display-mega,
+.display-xl,
+.display-lg,
+.display-md,
+.display-sm,
+.title-lg {
+  word-break: keep-all;
+}
+
 .body-md {
   font-family: var(--font-sans);
   font-weight: 400;
