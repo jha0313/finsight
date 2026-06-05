@@ -17,3 +17,6 @@ phases/**/step*-output.json
 # python (harness scripts)
 __pycache__/
 .pytest_cache/
+
+# git worktrees (격리 작업용 — 커밋 대상 아님)
+.claude/worktrees/
