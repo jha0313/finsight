@@ -74,6 +74,23 @@ type RpcTransaction = {
   rowHash: string;
 };
 
+type LatestStatementRow = {
+  id: string;
+  source_hash: string;
+};
+
+type LatestTransactionRow = {
+  txn_date: string;
+  merchant: string;
+  // numeric은 정밀도 보존을 위해 string으로 직렬화되지만 방어적으로 number도 받는다.
+  signed_amount: string | number;
+  direction: Transaction["direction"];
+  category: Transaction["category"];
+  masked_account: string | null;
+  currency: string;
+  row_hash: string;
+};
+
 export function isSupabaseConfigured(): boolean {
   return (
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
@@ -234,7 +251,10 @@ function createSupabaseClientWithCookies(
   });
 }
 
-export async function getCurrentUser(): Promise<{ id: string } | null> {
+export async function getCurrentUser(): Promise<{
+  id: string;
+  email: string | null;
+} | null> {
   if (!isSupabaseConfigured()) {
     return null;
   }
@@ -246,11 +266,98 @@ export async function getCurrentUser(): Promise<{ id: string } | null> {
     return null;
   }
 
-  return data.user === null ? null : { id: data.user.id };
+  return data.user === null
+    ? null
+    : { id: data.user.id, email: data.user.email ?? null };
+}
+
+export interface SubscriptionSummary {
+  tier: Tier;
+  currentPeriodEnd: string | null;
+}
+
+export async function getSubscriptionSummary(
+  userId: string,
+): Promise<SubscriptionSummary> {
+  const supabase = createServerSupabaseClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("status,current_period_end")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .gt("current_period_end", now)
+    .maybeSingle<SubscriptionRow>();
+
+  if (
+    error !== null ||
+    data === null ||
+    data.status !== "active" ||
+    data.current_period_end === null ||
+    data.current_period_end <= now
+  ) {
+    return { tier: "free", currentPeriodEnd: null };
+  }
+
+  return { tier: "pro", currentPeriodEnd: data.current_period_end };
+}
+
+export async function signOutCurrentUser(): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  const supabase = createServerSupabaseClient();
+  await supabase.auth.signOut();
 }
 
 export function createStatementRepository(): StatementRepository {
   return {
+    async loadLatestStatement(userId) {
+      const supabase = createServerSupabaseClient();
+
+      const { data: statement, error: statementError } = await supabase
+        .from("statements")
+        .select("id,source_hash")
+        .eq("user_id", userId)
+        .eq("status", "ready")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle<LatestStatementRow>();
+
+      throwIfSupabaseError(statementError, "latest statement lookup failed");
+
+      if (statement === null) {
+        return null;
+      }
+
+      const { data: rows, error: transactionsError } = await supabase
+        .from("transactions")
+        .select(
+          "txn_date,merchant,signed_amount,direction,category,masked_account,currency,row_hash",
+        )
+        .eq("user_id", userId)
+        .eq("statement_id", statement.id)
+        // 분석 결과의 결정성을 위해 안정적인 순서로 읽는다(거래의 원래 행 순서는
+        // 보관하지 않으므로 날짜→row_hash로 정렬).
+        .order("txn_date", { ascending: true })
+        .order("row_hash", { ascending: true })
+        .returns<LatestTransactionRow[]>();
+
+      throwIfSupabaseError(
+        transactionsError,
+        "latest transactions lookup failed",
+      );
+
+      const transactions = (rows ?? []).map(toTransactionFromRow);
+
+      if (transactions.length === 0) {
+        return null;
+      }
+
+      return { sourceHash: statement.source_hash, transactions };
+    },
+
     async saveStatementAnalysis(input) {
       const supabase = createServerSupabaseClient();
       const { data, error } = await supabase.rpc("save_statement_analysis", {
@@ -278,25 +385,8 @@ export function createStatementRepository(): StatementRepository {
 export function createSubscriptionGateway(): SubscriptionGateway {
   return {
     async resolveTier(userId) {
-      const supabase = createServerSupabaseClient();
-      const now = new Date().toISOString();
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select("status,current_period_end")
-        .eq("user_id", userId)
-        .eq("status", "active")
-        .gt("current_period_end", now)
-        .maybeSingle<SubscriptionRow>();
-
-      if (error !== null || data === null) {
-        return "free";
-      }
-
-      return data.status === "active" &&
-        data.current_period_end !== null &&
-        data.current_period_end > now
-        ? "pro"
-        : "free";
+      const { tier } = await getSubscriptionSummary(userId);
+      return tier;
     },
   };
 }
@@ -413,6 +503,24 @@ function toRpcTransaction(transaction: Transaction): RpcTransaction {
   }
 
   return payload;
+}
+
+function toTransactionFromRow(row: LatestTransactionRow): Transaction {
+  const transaction: Transaction = {
+    date: row.txn_date,
+    merchant: row.merchant,
+    signedAmount: String(row.signed_amount),
+    direction: row.direction,
+    category: row.category,
+    currency: row.currency,
+    rowHash: row.row_hash,
+  };
+
+  if (row.masked_account !== null && row.masked_account !== "") {
+    transaction.maskedAccount = row.masked_account;
+  }
+
+  return transaction;
 }
 
 function firstRpcRow(data: unknown): SaveStatementAnalysisRpcRow | null {

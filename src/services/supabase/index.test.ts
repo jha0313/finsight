@@ -11,10 +11,12 @@ import {
   createSubscriptionGateway,
   exchangeAuthCodeForSession,
   getCurrentUser,
+  getSubscriptionSummary,
   isSupabaseConfigured,
   resolveAuthCallbackRedirect,
   resolveMiddlewareAuthDecision,
   sanitizeRedirectPath,
+  signOutCurrentUser,
 } from "./index";
 
 const supabaseMocks = vi.hoisted(() => {
@@ -23,6 +25,7 @@ const supabaseMocks = vi.hoisted(() => {
   const authGetSession = vi.fn();
   const authGetUser = vi.fn();
   const authSignInWithOAuth = vi.fn();
+  const authSignOut = vi.fn();
   const eq = vi.fn();
   const gt = vi.fn();
   const insert = vi.fn();
@@ -40,6 +43,7 @@ const supabaseMocks = vi.hoisted(() => {
       getSession: authGetSession,
       getUser: authGetUser,
       signInWithOAuth: authSignInWithOAuth,
+      signOut: authSignOut,
     },
     from,
     rpc,
@@ -50,6 +54,7 @@ const supabaseMocks = vi.hoisted(() => {
     authGetSession,
     authGetUser,
     authSignInWithOAuth,
+    authSignOut,
     client,
     createServerClient,
     eq,
@@ -111,9 +116,10 @@ describe("supabase adapter", () => {
       error: null,
     });
     supabaseMocks.authGetUser.mockResolvedValue({
-      data: { user: { id: "user-1" } },
+      data: { user: { id: "user-1", email: "ava@example.com" } },
       error: null,
     });
+    supabaseMocks.authSignOut.mockResolvedValue({ error: null });
     supabaseMocks.authGetSession.mockResolvedValue({
       data: { session: { user: { id: "session-user" } } },
       error: null,
@@ -158,9 +164,21 @@ describe("supabase adapter", () => {
   it("verifies auth with getUser instead of trusting getSession", async () => {
     const user = await getCurrentUser();
 
-    expect(user).toEqual({ id: "user-1" });
+    expect(user).toEqual({ id: "user-1", email: "ava@example.com" });
     expect(supabaseMocks.authGetUser).toHaveBeenCalledTimes(1);
     expect(supabaseMocks.authGetSession).not.toHaveBeenCalled();
+  });
+
+  it("returns a null email when the authenticated user has none", async () => {
+    supabaseMocks.authGetUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+
+    await expect(getCurrentUser()).resolves.toEqual({
+      id: "user-1",
+      email: null,
+    });
   });
 
   it("reports configuration from the publishable env presence", () => {
@@ -378,6 +396,46 @@ describe("supabase adapter", () => {
     await expect(gateway.resolveTier("user-1")).resolves.toBe("free");
   });
 
+  it("summarizes an active subscription as pro with its renewal date", async () => {
+    selectChain({
+      data: {
+        status: "active",
+        current_period_end: "2999-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    await expect(getSubscriptionSummary("user-1")).resolves.toEqual({
+      tier: "pro",
+      currentPeriodEnd: "2999-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("summarizes a missing subscription as free without a renewal date", async () => {
+    selectChain({ data: null, error: null });
+
+    await expect(getSubscriptionSummary("user-1")).resolves.toEqual({
+      tier: "free",
+      currentPeriodEnd: null,
+    });
+  });
+
+  it("signs the current user out through Supabase auth", async () => {
+    await signOutCurrentUser();
+
+    expect(supabaseMocks.authSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips sign-out without throwing when Supabase is not configured", async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    supabaseMocks.createServerClient.mockClear();
+
+    await expect(signOutCurrentUser()).resolves.toBeUndefined();
+    expect(supabaseMocks.createServerClient).not.toHaveBeenCalled();
+    expect(supabaseMocks.authSignOut).not.toHaveBeenCalled();
+  });
+
   it("saves statement analysis through the save_statement_analysis RPC", async () => {
     const input: SaveStatementAnalysisInput = {
       userId: "user-1",
@@ -439,6 +497,105 @@ describe("supabase adapter", () => {
     expect(supabaseMocks.from).not.toHaveBeenCalledWith("statements");
     expect(supabaseMocks.from).not.toHaveBeenCalledWith("transactions");
     expect(supabaseMocks.from).not.toHaveBeenCalledWith("analyses");
+  });
+
+  it("loads the latest ready statement and maps its transactions to the domain shape", async () => {
+    const chain = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: vi.fn(),
+      returns: vi.fn(),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.order.mockReturnValue(chain);
+    chain.limit.mockReturnValue(chain);
+    chain.maybeSingle.mockResolvedValue({
+      data: { id: "stmt-1", source_hash: "src-hash" },
+      error: null,
+    });
+    chain.returns.mockResolvedValue({
+      data: [
+        {
+          txn_date: "2026-06-01",
+          merchant: "스타벅스",
+          signed_amount: "5500.00",
+          direction: "debit",
+          category: "food",
+          masked_account: "**** **** **** 3456",
+          currency: "KRW",
+          row_hash: "row-1",
+        },
+        {
+          txn_date: "2026-06-02",
+          merchant: "지하철",
+          // numeric이 number로 와도 방어적으로 string화하고, null 계좌는 생략한다.
+          signed_amount: 1500,
+          direction: "debit",
+          category: "transport",
+          masked_account: null,
+          currency: "KRW",
+          row_hash: "row-2",
+        },
+      ],
+      error: null,
+    });
+    supabaseMocks.from.mockReturnValue(chain);
+
+    const result =
+      await createStatementRepository().loadLatestStatement("user-1");
+
+    expect(supabaseMocks.from).toHaveBeenCalledWith("statements");
+    expect(supabaseMocks.from).toHaveBeenCalledWith("transactions");
+    expect(result).toEqual({
+      sourceHash: "src-hash",
+      transactions: [
+        {
+          date: "2026-06-01",
+          merchant: "스타벅스",
+          signedAmount: "5500.00",
+          direction: "debit",
+          category: "food",
+          currency: "KRW",
+          maskedAccount: "**** **** **** 3456",
+          rowHash: "row-1",
+        },
+        {
+          date: "2026-06-02",
+          merchant: "지하철",
+          signedAmount: "1500",
+          direction: "debit",
+          category: "transport",
+          currency: "KRW",
+          rowHash: "row-2",
+        },
+      ],
+    });
+  });
+
+  it("returns null without querying transactions when no ready statement exists", async () => {
+    const chain = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: vi.fn(),
+      returns: vi.fn(),
+    };
+    chain.select.mockReturnValue(chain);
+    chain.eq.mockReturnValue(chain);
+    chain.order.mockReturnValue(chain);
+    chain.limit.mockReturnValue(chain);
+    chain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    supabaseMocks.from.mockReturnValue(chain);
+
+    const result =
+      await createStatementRepository().loadLatestStatement("user-1");
+
+    expect(result).toBeNull();
+    expect(chain.returns).not.toHaveBeenCalled();
   });
 
   it("reads cached insights by unique user and input hash", async () => {
