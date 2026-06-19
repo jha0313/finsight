@@ -1,30 +1,26 @@
 name: review-code (PR 자동 리뷰)
 
-# finsight `/review-code` — 차원별 병렬 서브에이전트(correctness·security·conventions)
-# 리뷰 + adversarial 검증을 PR에 자동 실행하고 결과를 인라인 코멘트 + 요약으로 게시한다.
+# finsight 3차원(correctness·security·conventions) 코드 리뷰를 PR에 자동 실행하고
+# 결과를 인라인 코멘트 + 요약으로 게시한다.
 #
-# 사전 준비(1회):
-#   - repo Settings → Secrets and variables → Actions → New secret
-#     ANTHROPIC_API_KEY = <Anthropic API 키>
-#   - pull_request 자동 모드는 기본 GITHUB_TOKEN을 쓰므로 별도 GitHub App 설치는 불필요.
+# 설계 메모: claude-code-action은 슬래시 커맨드를 자기 번들 디렉토리에서만 로드하므로
+# 프로젝트의 .claude/commands/review-code.md(인터랙티브 /review-code, 멀티에이전트 Workflow)는
+# Action에서 실리지 않는다. 그래서 Action용으로는 리뷰 절차를 prompt에 자기완결적으로 풀어
+# 단일 패스로 돌린다(멀티에이전트 verify는 인터랙티브 /review-code 전용).
 #
-# 비용 주의: PR당 멀티에이전트 리뷰라 토큰 비용이 크다(변경량에 비례, 수 달러까지).
-#   - synchronize(매 push)마다 돌므로 비용이 누적된다. 줄이려면:
-#       · types를 [opened, reopened]로 좁히거나
-#       · paths 필터로 src/** 변경에만 한정하거나
-#       · claude_args에 --model claude-sonnet-4-6 으로 모델을 낮춘다.
+# 사전 준비(1회): repo Secret ANTHROPIC_API_KEY 등록(pull_request 자동 모드는 GITHUB_TOKEN 사용 → App 불필요).
+# 비용: synchronize(매 push)마다 도므로 누적. 줄이려면 types 축소·paths 필터·--model 하향.
 
 on:
   pull_request:
     types: [opened, synchronize]
-    # paths: ["src/**", "supabase/**"]   # 필요시 리뷰 대상 경로 한정
+    # paths: ["src/**", "supabase/**"]
 
 permissions:
   contents: read
   pull-requests: write
   id-token: write
 
-# 같은 PR에 새 push가 오면 진행 중인 리뷰를 취소(중복 비용 방지)
 concurrency:
   group: review-code-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -35,24 +31,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # /review-code가 base 브랜치 대비 diff를 쓰므로 전체 히스토리 필요
+          fetch-depth: 0 # base 브랜치 대비 diff를 위해 전체 히스토리
 
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # /review-code 커맨드(.claude/commands/review-code.md)를 그대로 실행한다.
-          # 커맨드가 diff·PR메타 수집 → Workflow 도구로 차원별 병렬 리뷰·검증 → 2층 출력 게시까지 수행.
-          # headless에서 Workflow/Agent 도구 가용을 로컬 검증함. Action 환경 동작은 이 워크플로 첫 실행으로 확정.
+          show_full_output: true # 모델 동작을 로그에 노출(진단용)
           prompt: |
-            PR #${{ github.event.pull_request.number }} (base 브랜치: ${{ github.event.pull_request.base.ref }})를 코드 리뷰한다.
+            PR #${{ github.event.pull_request.number }} (base: ${{ github.event.pull_request.base.ref }})를 코드 리뷰하라. PR 브랜치는 이미 체크아웃돼 있다.
+            변경분은 `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD` 로 얻는다.
 
-            `/review-code` 커맨드의 절차를 실행하라. PR 브랜치는 이미 체크아웃돼 있다.
-            - 변경분: `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`
-            - PR 번호는 ${{ github.event.pull_request.number }} (gh pr view 조회가 안 되면 이 번호를 직접 사용)
-            - 확정된 발견은 인라인 코멘트로, 전체 요약은 `gh pr comment`로 게시하라.
-              인라인은 `mcp__github_inline_comment__create_inline_comment`(confirmed: true) 또는 `gh api`를 쓴다.
-              GitHub 코멘트로만 결과를 남기고, 리뷰 본문을 메시지로 출력하지 마라.
+            아래 3개 차원으로만 검토하라(finsight CRITICAL 규칙). 추측·범위 밖 지적 금지, 확실한 위반/버그만 보고하라.
+            1) correctness: 금액에 float/parseFloat 금지(numeric·BigInt minor-unit이 정본), 부호 규약 direction(debit/credit/refund), 통화기호·콤마·괄호음수 정규화, 합계/소계 요약행 필터, 분석 저장은 Postgres RPC 단일 트랜잭션 rollback, analyses unique(user_id,input_hash) 캐시, 일반 로직 버그.
+            2) security: 모든 DB 테이블 RLS auth.uid()=user_id, 서버는 getUser()/getClaims()로 검증(getSession 불신), service_role은 server-only, NEXT_PUBLIC_ 비밀키 금지, 카드/계좌 마스킹(전체 PAN 평문 저장 금지), Claude엔 마스킹된 거래단위만, Pro 게이팅은 서버 DB 구독상태로만 판정(요청 body/header의 tier 불신), customerExternalId=세션 getUser().id, 웹훅 raw body 서명검증+event_id 멱등.
+            3) conventions/architecture: lib/는 services/·외부 SDK(@anthropic-ai/sdk·@supabase/*·@polar-sh/*) import 금지(단방향, Zod 등 순수 유틸 예외), 외부 클라이언트는 호출 시점 지연 생성, 컴포넌트는 dumb(계산·파싱·마스킹은 lib/), 디렉토리 src/{app,components,lib,services,types}, 미구독/쿼터소진 시 402 아닌 200+pro.status=locked|unavailable, Vantage 색은 토큰만(hex 인라인 금지)·숫자 JetBrains Mono.
+
+            게시 방법:
+            - 각 발견을 해당 코드 라인에 `mcp__github_inline_comment__create_inline_comment`(confirmed: true)로 인라인 게시하라. 본문 4줄 형식:
+              `[심각도: critical|major|minor|nit] 제목` / `TL;DR: 무엇이/왜` / `✓ Good: 잘 지킨 점(있으면)` / `→ Fix: 수정 방안`
+            - 마지막에 전체 요약 1개를 `gh pr comment ${{ github.event.pull_request.number }} --body "..."` 로 게시하라:
+              판정(critical≥1 → Blocked / major≥1 → Changes Requested / 그 외 → Approve), 심각도 집계(🔴critical 🟠major 🟡minor ⚪nit), 변경 개요 2~3줄, critical/major 목록, 다음 액션.
+            - 위반이 없으면 인라인은 생략하고 요약만 Approve로 게시하라.
+            - 결과는 GitHub 코멘트로만 남기고, 리뷰 본문을 응답 메시지로 출력하지 마라.
           claude_args: |
-            --allowedTools "Workflow,Agent,Read,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(gh api:*),mcp__github_inline_comment__create_inline_comment"
-            # 비용 절감: 아래 주석을 해제해 리뷰 모델을 Sonnet으로 낮춘다(Workflow 서브에이전트도 상속).
+            --allowedTools "Read,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr comment:*),mcp__github_inline_comment__create_inline_comment"
+            # 비용 절감: 아래 주석 해제로 모델 하향.
             # --model claude-sonnet-4-6
