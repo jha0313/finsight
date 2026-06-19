@@ -1,5 +1,10 @@
 import type { Direction } from "@/types/transaction";
 
+// [review-code smoke] 의도적 위반: 금액에 parseFloat(float) 사용 — 정본 BigInt minor-unit 파서와 어긋남
+export function _smokeParseAmountFloat(raw: string): number {
+  return parseFloat(raw.replace(/,/g, ""));
+}
+
 type SignedAmount = {
   signedAmount: string;
   direction: Direction;
