@@ -1,0 +1,2 @@
+# staged 파일만 빠르게 검증(결정론 게이트). LLM 없음 — 풀 리뷰는 PR Actions가 담당.
+npx lint-staged

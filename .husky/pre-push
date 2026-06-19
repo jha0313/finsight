@@ -1,0 +1,18 @@
+# 경량 AI 리뷰 (push 전, 경고만 — 절대 push를 차단하지 않는다)
+#
+# 기본 OFF. 켜려면:  export ENABLE_AI_PUSH_REVIEW=1
+#   매 push마다 claude 호출(지연 ~10-30s, 토큰 비용)이 발생하므로 opt-in으로 둔다.
+#   풀 리뷰는 PR의 GitHub Actions(/review-code)가 담당하고, 여기선 빠른 사전 경고만 한다.
+[ "${ENABLE_AI_PUSH_REVIEW:-0}" = "1" ] || exit 0
+command -v claude >/dev/null 2>&1 || exit 0
+
+BASE="origin/main"
+DIFF=$(git diff "$BASE"...HEAD -- 'src/**/*.ts' 'src/**/*.tsx' 2>/dev/null)
+[ -z "$DIFF" ] && exit 0
+
+echo "🤖 경량 AI 리뷰(push 전, 경고만 — 차단하지 않음)…"
+claude -p "다음 git diff에서 finsight CRITICAL 규칙 위반만 각 1줄로 경고하라(금액에 float/parseFloat 사용, lib/가 외부 SDK import, Pro 게이팅을 요청 body/header의 tier로 판정, RLS auth.uid 누락, 전체 PAN 평문 저장). 위반이 없으면 정확히 'OK'만 출력하라. 서론·설명 금지.
+
+$DIFF" --model claude-haiku-4-5-20251001 --output-format text 2>/dev/null | sed 's/^/  ⚠️  /'
+
+exit 0

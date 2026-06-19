@@ -1,0 +1,58 @@
+name: review-code (PR 자동 리뷰)
+
+# finsight `/review-code` — 차원별 병렬 서브에이전트(correctness·security·conventions)
+# 리뷰 + adversarial 검증을 PR에 자동 실행하고 결과를 인라인 코멘트 + 요약으로 게시한다.
+#
+# 사전 준비(1회):
+#   - repo Settings → Secrets and variables → Actions → New secret
+#     ANTHROPIC_API_KEY = <Anthropic API 키>
+#   - pull_request 자동 모드는 기본 GITHUB_TOKEN을 쓰므로 별도 GitHub App 설치는 불필요.
+#
+# 비용 주의: PR당 멀티에이전트 리뷰라 토큰 비용이 크다(변경량에 비례, 수 달러까지).
+#   - synchronize(매 push)마다 돌므로 비용이 누적된다. 줄이려면:
+#       · types를 [opened, reopened]로 좁히거나
+#       · paths 필터로 src/** 변경에만 한정하거나
+#       · claude_args에 --model claude-sonnet-4-6 으로 모델을 낮춘다.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # paths: ["src/**", "supabase/**"]   # 필요시 리뷰 대상 경로 한정
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+# 같은 PR에 새 push가 오면 진행 중인 리뷰를 취소(중복 비용 방지)
+concurrency:
+  group: review-code-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # /review-code가 base 브랜치 대비 diff를 쓰므로 전체 히스토리 필요
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # /review-code 커맨드(.claude/commands/review-code.md)를 그대로 실행한다.
+          # 커맨드가 diff·PR메타 수집 → Workflow 도구로 차원별 병렬 리뷰·검증 → 2층 출력 게시까지 수행.
+          # headless에서 Workflow/Agent 도구 가용을 로컬 검증함. Action 환경 동작은 이 워크플로 첫 실행으로 확정.
+          prompt: |
+            PR #${{ github.event.pull_request.number }} (base 브랜치: ${{ github.event.pull_request.base.ref }})를 코드 리뷰한다.
+
+            `/review-code` 커맨드의 절차를 실행하라. PR 브랜치는 이미 체크아웃돼 있다.
+            - 변경분: `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD`
+            - PR 번호는 ${{ github.event.pull_request.number }} (gh pr view 조회가 안 되면 이 번호를 직접 사용)
+            - 확정된 발견은 인라인 코멘트로, 전체 요약은 `gh pr comment`로 게시하라.
+              인라인은 `mcp__github_inline_comment__create_inline_comment`(confirmed: true) 또는 `gh api`를 쓴다.
+              GitHub 코멘트로만 결과를 남기고, 리뷰 본문을 메시지로 출력하지 마라.
+          claude_args: |
+            --allowedTools "Workflow,Agent,Read,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(gh api:*),mcp__github_inline_comment__create_inline_comment"
+            # 비용 절감: 아래 주석을 해제해 리뷰 모델을 Sonnet으로 낮춘다(Workflow 서브에이전트도 상속).
+            # --model claude-sonnet-4-6
