@@ -1,14 +1,27 @@
 name: review-code (PR 자동 리뷰)
 
 # finsight 3차원(correctness·security·conventions) 코드 리뷰를 PR에 자동 실행하고
-# 결과를 인라인 코멘트 + 요약으로 게시한다.
+# 결과를 인라인 코멘트 + 요약으로 게시한 뒤, 심각도에 따라 자동으로 approve/auto-merge를 건다.
+#
+# 심각도 게이트(요청 사양):
+#   - critical 또는 major ≥ 1  → request-changes (approve·merge 모두 차단)
+#   - critical 0, major 0, minor ≥ 1 → approve만 (머지는 수동)
+#   - nit만 또는 깨끗          → approve + auto-merge(--auto --squash)
+# 판정은 LLM이 아니라, 리뷰가 남긴 review-verdict.json을 별도 step의 bash가 결정론적으로 읽어 분기한다.
+# verdict 파일이 없거나 파싱 실패하면 fail-safe로 아무 액션도 하지 않는다(승인·머지 보류).
 #
 # 설계 메모: claude-code-action은 슬래시 커맨드를 자기 번들 디렉토리에서만 로드하므로
 # 프로젝트의 .claude/commands/review-code.md(인터랙티브 /review-code, 멀티에이전트 Workflow)는
 # Action에서 실리지 않는다. 그래서 Action용으로는 리뷰 절차를 prompt에 자기완결적으로 풀어
 # 단일 패스로 돌린다(멀티에이전트 verify는 인터랙티브 /review-code 전용).
 #
-# 사전 준비(1회): repo Secret ANTHROPIC_API_KEY 등록(pull_request 자동 모드는 GITHUB_TOKEN 사용 → App 불필요).
+# 사전 준비:
+#   1) repo Secret ANTHROPIC_API_KEY 등록(pull_request 자동 모드는 GITHUB_TOKEN 사용 → App 불필요).
+#   2) approve가 동작하려면: Settings > Actions > General >
+#      "Allow GitHub Actions to create and approve pull requests" 체크.
+#   3) auto-merge가 동작하려면: Settings > General > "Allow auto-merge" 체크.
+#      (auto-merge는 필수 상태체크/branch protection 통과 후 GitHub가 자동으로 머지한다.
+#       의미 있으려면 base 브랜치에 required status checks를 설정하는 것을 권장.)
 # 비용: synchronize(매 push)마다 도므로 누적. 줄이려면 types 축소·paths 필터·--model 하향.
 
 on:
@@ -17,7 +30,7 @@ on:
     # paths: ["src/**", "supabase/**"]
 
 permissions:
-  contents: read
+  contents: write # auto-merge(merge 수행)용. approve/코멘트만 필요하면 read로 낮춰도 됨.
   pull-requests: write
   id-token: write
 
@@ -53,7 +66,59 @@ jobs:
               판정(critical≥1 → Blocked / major≥1 → Changes Requested / 그 외 → Approve), 심각도 집계(🔴critical 🟠major 🟡minor ⚪nit), 변경 개요 2~3줄, critical/major 목록, 다음 액션.
             - 위반이 없으면 인라인은 생략하고 요약만 Approve로 게시하라.
             - 결과는 GitHub 코멘트로만 남기고, 리뷰 본문을 응답 메시지로 출력하지 마라.
+            - approve/merge는 절대 직접 하지 마라 — 별도 step이 아래 verdict 파일로 자동 판정한다.
+            - 마지막으로 리포지토리 루트에 `review-verdict.json` 파일을 Write 하라. confirmed(검증 통과)한 발견만 심각도별로 센 정수만 담고, 다른 키·주석·코드펜스 없이 순수 JSON만 쓴다:
+              `{"critical": <n>, "major": <n>, "minor": <n>, "nit": <n>}`
           claude_args: |
-            --allowedTools "Read,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr comment:*),mcp__github_inline_comment__create_inline_comment"
+            --allowedTools "Read,Write,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr comment:*),mcp__github_inline_comment__create_inline_comment"
             # 비용 절감: 아래 주석 해제로 모델 하향.
             # --model claude-sonnet-4-6
+
+      - name: 심각도 게이트 (approve / auto-merge)
+        if: always() # 리뷰 step이 실패해도 verdict가 있으면 게이트는 시도(없으면 보류)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f review-verdict.json ]; then
+            echo "::warning::review-verdict.json 없음 — approve/merge 보류(fail-safe)"
+            exit 0
+          fi
+
+          echo "verdict 원문: $(cat review-verdict.json)"
+          critical=$(jq -r '.critical // 0' review-verdict.json)
+          major=$(jq -r '.major // 0' review-verdict.json)
+          minor=$(jq -r '.minor // 0' review-verdict.json)
+
+          # 정수가 아니면(LLM이 형식을 어기면) 보류
+          for v in "$critical" "$major" "$minor"; do
+            case "$v" in
+              ''|*[!0-9]*)
+                echo "::warning::verdict 숫자 파싱 실패(critical=$critical major=$major minor=$minor) — 보류"
+                exit 0
+                ;;
+            esac
+          done
+
+          echo "집계: critical=$critical · major=$major · minor=$minor"
+
+          if [ "$critical" -gt 0 ] || [ "$major" -gt 0 ]; then
+            echo "→ critical/major 존재: request-changes (approve·merge 차단)"
+            gh pr review "$PR" --request-changes \
+              --body "🔴 critical ${critical} · 🟠 major ${major} 발견 — 머지 차단. 위 인라인/요약 코멘트를 해결하라." \
+              || echo "::warning::request-changes 실패(권한 또는 자기 PR review 제약?)"
+          elif [ "$minor" -gt 0 ]; then
+            echo "→ minor만 존재: approve (머지는 수동)"
+            gh pr review "$PR" --approve \
+              --body "🟡 minor만 발견 — auto-approve. 머지는 수동으로 진행하라." \
+              || echo "::warning::approve 실패(Settings > Actions: 'Allow GitHub Actions to create and approve pull requests' 필요)"
+          else
+            echo "→ nit 이하/깨끗: approve + auto-merge(--squash)"
+            gh pr review "$PR" --approve \
+              --body "⚪ nit 이하 — auto-approve + auto-merge 설정." \
+              || echo "::warning::approve 실패(Settings > Actions: 'Allow GitHub Actions to create and approve pull requests' 필요)"
+            gh pr merge "$PR" --auto --squash \
+              || echo "::warning::auto-merge 실패(Settings > General: 'Allow auto-merge' 필요, 또는 required check 미설정)"
+          fi
