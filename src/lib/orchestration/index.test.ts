@@ -4,6 +4,7 @@ import { parseCsvStatement } from "@/lib/csv";
 import type { ProInsights } from "@/types/analysis";
 import type {
   AiUsageGateway,
+  AnalyticsPort,
   CheckoutGateway,
   InsightProvider,
   LatestStatement,
@@ -16,13 +17,17 @@ import type {
 import type { Tier } from "@/types/tier";
 import type { Transaction } from "@/types/transaction";
 
+import type { OncallAlert } from "@/types/ports";
+
 import {
   runAnalysis,
   runAnalyzeRequest,
   runCheckoutRequest,
   runLatestAnalysisRequest,
   runPolarWebhookRequest,
+  runPostHogWebhookRequest,
   runSubscriptionCancelRequest,
+  type PostHogWebhookRequestDeps,
 } from "./index";
 
 const STANDARD_CSV = `date,merchant,amount,currency,account
@@ -75,6 +80,35 @@ class FakeInsightProvider implements InsightProvider {
     this.calls.push(input);
 
     return this.handler(input);
+  }
+}
+
+class FakeAnalytics implements AnalyticsPort {
+  events: Array<{
+    distinctId: string;
+    event: string;
+    properties?: Record<string, string | number | boolean | undefined>;
+  }> = [];
+  flushCount = 0;
+
+  capture(input: {
+    distinctId: string;
+    event: string;
+    properties?: Record<string, string | number | boolean | undefined>;
+  }): void {
+    this.events.push(input);
+  }
+
+  async flush(): Promise<void> {
+    this.flushCount += 1;
+  }
+
+  eventsNamed(name: string): Array<{
+    distinctId: string;
+    event: string;
+    properties?: Record<string, string | number | boolean | undefined>;
+  }> {
+    return this.events.filter((entry) => entry.event === name);
   }
 }
 
@@ -140,6 +174,7 @@ function createAnalyzeRequestDeps(input: {
       insights: ["지출을 점검하세요."],
     }));
   const insightProviderFactory = () => insightProvider;
+  const analytics = new FakeAnalytics();
 
   return {
     deps: {
@@ -152,11 +187,13 @@ function createAnalyzeRequestDeps(input: {
       aiUsage,
       statementRepository,
       insightProviderFactory,
+      analytics,
     },
     aiUsage,
     insightProvider,
     statementRepository,
     subscriptionGateway,
+    analytics,
   };
 }
 
@@ -220,11 +257,13 @@ function createWebhookRequestDeps(input: {
     headers: Record<string, string>;
   }> = [];
   const upsertCalls: WebhookEvent[] = [];
+  const analytics = new FakeAnalytics();
 
   return {
     repository,
     upsertCalls,
     verifyCalls,
+    analytics,
     deps: {
       verifyWebhook(rawBody: string, headers: Record<string, string>) {
         verifyCalls.push({ rawBody, headers });
@@ -249,6 +288,7 @@ function createWebhookRequestDeps(input: {
           : input.upsert;
       },
       subscriptionRepository: repository,
+      analytics,
     },
   };
 }
@@ -453,6 +493,96 @@ one,two`),
 
     expect(result.response.currency).toBe("USD");
   });
+
+  it("reports diagnostics (aiStatus ok, cacheHit false, transactionCount)", async () => {
+    const result = await runAnalysis({
+      statement: parseCsvStatement(STANDARD_CSV),
+      tier: "pro",
+      deps: {
+        insightProvider: new FakeInsightProvider(() => ({
+          summary: "심층",
+          insights: ["a"],
+        })),
+      },
+    });
+
+    expect(result.aiStatus).toBe("ok");
+    expect(result.cacheHit).toBe(false);
+    // STANDARD_CSV는 지출 2건 + 월급(credit) 1건 = 3건 모두 거래로 센다.
+    expect(result.transactionCount).toBe(3);
+  });
+
+  it("classifies a timeout as aiStatus 'timeout'", async () => {
+    const provider = new FakeInsightProvider(
+      () =>
+        new Promise<ProInsights>((resolve) => {
+          setTimeout(() => resolve({ summary: "late", insights: [] }), 30);
+        }),
+    );
+
+    const result = await runAnalysis({
+      statement: parseCsvStatement(STANDARD_CSV),
+      tier: "pro",
+      deps: { insightProvider: provider, aiTimeoutMs: 1 },
+    });
+
+    expect(result.aiStatus).toBe("timeout");
+    expect(result.response.pro).toEqual({ status: "unavailable" });
+  });
+
+  it("classifies a truncated structured output as aiStatus 'truncated'", async () => {
+    // services/claude가 max_tokens 잘림에서 던지는 메시지를 핑거프린트로 분류한다.
+    const provider = new FakeInsightProvider(() => {
+      throw new Error("Claude returned no parsed output.");
+    });
+
+    const result = await runAnalysis({
+      statement: parseCsvStatement(STANDARD_CSV),
+      tier: "pro",
+      deps: { insightProvider: provider },
+    });
+
+    expect(result.aiStatus).toBe("truncated");
+    expect(result.response.pro).toEqual({ status: "unavailable" });
+  });
+
+  it("classifies other provider errors as aiStatus 'error'", async () => {
+    const provider = new FakeInsightProvider(() => {
+      throw new Error("400 temperature is not supported");
+    });
+
+    const result = await runAnalysis({
+      statement: parseCsvStatement(STANDARD_CSV),
+      tier: "pro",
+      deps: { insightProvider: provider },
+    });
+
+    expect(result.aiStatus).toBe("error");
+  });
+
+  it("reports cached and fallback diagnostics", async () => {
+    const cached = await runAnalysis({
+      statement: parseCsvStatement(STANDARD_CSV),
+      tier: "pro",
+      deps: { cachedInsights: { summary: "c", insights: [] } },
+    });
+    expect(cached.aiStatus).toBe("cached");
+    expect(cached.cacheHit).toBe(true);
+
+    const fallback = await runAnalysis({
+      statement: parseCsvStatement(`foo,bar
+one,two`),
+      tier: "free",
+      deps: {
+        insightProvider: new FakeInsightProvider(() => ({
+          summary: "x",
+          insights: [],
+        })),
+      },
+    });
+    expect(fallback.aiStatus).toBe("skipped");
+    expect(fallback.needsFallback).toBe(true);
+  });
 });
 
 describe("runAnalyzeRequest", () => {
@@ -656,6 +786,89 @@ describe("runAnalyzeRequest", () => {
       insights: ["이미 계산된 인사이트"],
     });
   });
+
+  it("emits analysis_completed (upload) with non-PII diagnostics", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({ tier: "pro" });
+
+    await runAnalyzeRequest({ statement: parseCsvStatement(STANDARD_CSV), deps });
+
+    const completed = analytics.eventsNamed("analysis_completed");
+    expect(completed).toHaveLength(1);
+    expect(completed[0].distinctId).toBe("user-1");
+    expect(completed[0].properties).toEqual({
+      tier: "pro",
+      source: "upload",
+      ai_status: "ok",
+      cache_hit: false,
+      transaction_count: 3,
+      needs_fallback: false,
+    });
+    // 가맹점명·금액 같은 원문이 어떤 property에도 새지 않아야 한다.
+    const serialized = JSON.stringify(analytics.events);
+    expect(serialized).not.toContain("스타벅스");
+    expect(serialized).not.toContain("5500");
+  });
+
+  it("emits quota_exhausted (upload) without an ai_insight_failed event", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      quotaOk: false,
+    });
+
+    await runAnalyzeRequest({ statement: parseCsvStatement(STANDARD_CSV), deps });
+
+    expect(analytics.eventsNamed("quota_exhausted")[0].properties).toEqual({
+      tier: "pro",
+      source: "upload",
+    });
+    expect(
+      analytics.eventsNamed("analysis_completed")[0].properties?.ai_status,
+    ).toBe("quota_exhausted");
+    expect(analytics.eventsNamed("ai_insight_failed")).toEqual([]);
+  });
+
+  it("emits ai_insight_failed with the classified reason when Claude fails", async () => {
+    const provider = new FakeInsightProvider(() => {
+      throw new Error("Claude returned no parsed output.");
+    });
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      insightProvider: provider,
+    });
+
+    await runAnalyzeRequest({ statement: parseCsvStatement(STANDARD_CSV), deps });
+
+    expect(analytics.eventsNamed("ai_insight_failed")[0].properties).toEqual({
+      tier: "pro",
+      reason: "truncated",
+      source: "upload",
+    });
+  });
+
+  it("emits parser_fallback when the standard parser cannot map columns", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({ tier: "free" });
+
+    await runAnalyzeRequest({
+      statement: parseCsvStatement(`foo,bar
+one,two`),
+      deps,
+    });
+
+    expect(analytics.eventsNamed("parser_fallback")[0].properties).toEqual({
+      tier: "free",
+    });
+    expect(
+      analytics.eventsNamed("analysis_completed")[0].properties?.needs_fallback,
+    ).toBe(true);
+  });
+
+  it("does not emit any analysis event for unauthenticated users", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({ userId: null });
+
+    await runAnalyzeRequest({ statement: parseCsvStatement(STANDARD_CSV), deps });
+
+    expect(analytics.events).toEqual([]);
+  });
 });
 
 describe("runLatestAnalysisRequest", () => {
@@ -839,6 +1052,86 @@ describe("runLatestAnalysisRequest", () => {
     expect(aiUsage.releaseCalls).toEqual([{ userId: "user-1", tier: "pro" }]);
     expect(statementRepository.calls).toEqual([]);
   });
+
+  it("emits analysis_completed (latest, ok) after re-running Opus", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: LATEST_STATEMENT,
+    });
+
+    await runLatestAnalysisRequest({ deps });
+
+    const completed = analytics.eventsNamed("analysis_completed");
+    expect(completed).toHaveLength(1);
+    expect(completed[0].properties).toEqual({
+      tier: "pro",
+      source: "latest",
+      ai_status: "ok",
+      cache_hit: false,
+      transaction_count: 2,
+      needs_fallback: false,
+    });
+  });
+
+  it("emits ai_insight_failed (latest) classified as error when Opus throws", async () => {
+    const provider = new FakeInsightProvider(async () => {
+      throw new Error("network down");
+    });
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: LATEST_STATEMENT,
+      insightProvider: provider,
+    });
+
+    await runLatestAnalysisRequest({ deps });
+
+    expect(analytics.eventsNamed("ai_insight_failed")[0].properties).toEqual({
+      tier: "pro",
+      reason: "error",
+      source: "latest",
+    });
+  });
+
+  it("emits quota_exhausted (latest) when the pro quota is spent", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      quotaOk: false,
+      latestStatement: LATEST_STATEMENT,
+    });
+
+    await runLatestAnalysisRequest({ deps });
+
+    expect(analytics.eventsNamed("quota_exhausted")[0].properties).toEqual({
+      tier: "pro",
+      source: "latest",
+    });
+  });
+
+  it("emits cached diagnostics (latest) without an AI failure event", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: LATEST_STATEMENT,
+      cachedInsights: { summary: "캐시", insights: ["x"] },
+    });
+
+    await runLatestAnalysisRequest({ deps });
+
+    expect(
+      analytics.eventsNamed("analysis_completed")[0].properties?.ai_status,
+    ).toBe("cached");
+    expect(analytics.eventsNamed("ai_insight_failed")).toEqual([]);
+  });
+
+  it("does not emit when the user has no stored statement (404)", async () => {
+    const { deps, analytics } = createAnalyzeRequestDeps({
+      tier: "pro",
+      latestStatement: null,
+    });
+
+    await runLatestAnalysisRequest({ deps });
+
+    expect(analytics.events).toEqual([]);
+  });
 });
 
 describe("runCheckoutRequest", () => {
@@ -1014,7 +1307,175 @@ describe("runPolarWebhookRequest", () => {
     expect(repository.markCalls).toEqual(["evt_1"]);
     expect(repository.upsertCalls).toEqual([]);
   });
+
+  it("emits subscription_activated for a newly processed active subscription", async () => {
+    const { deps, analytics } = createWebhookRequestDeps({
+      upsert: {
+        userId: "user-1",
+        polarSubscriptionId: "sub_1",
+        status: "active",
+        currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        eventTimestamp: "2026-06-15T00:00:00.000Z",
+      },
+    });
+
+    await runPolarWebhookRequest({
+      rawBody: "raw-body",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    const activated = analytics.eventsNamed("subscription_activated");
+    expect(activated).toHaveLength(1);
+    expect(activated[0].distinctId).toBe("user-1");
+    expect(activated[0].properties).toEqual({ cancel_at_period_end: false });
+  });
+
+  it("does not emit subscription_activated for replayed (duplicate) events", async () => {
+    const { deps, analytics } = createWebhookRequestDeps({
+      eventState: "already_processed",
+      upsert: {
+        userId: "user-1",
+        polarSubscriptionId: "sub_1",
+        status: "active",
+        currentPeriodEnd: "2026-07-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        eventTimestamp: "2026-06-15T00:00:00.000Z",
+      },
+    });
+
+    await runPolarWebhookRequest({
+      rawBody: "raw-body",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    expect(analytics.eventsNamed("subscription_activated")).toEqual([]);
+  });
+
+  it("does not emit subscription_activated for non-active subscription states", async () => {
+    const { deps, analytics } = createWebhookRequestDeps({
+      upsert: {
+        userId: "user-1",
+        polarSubscriptionId: "sub_1",
+        status: "canceled",
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+        eventTimestamp: null,
+      },
+    });
+
+    await runPolarWebhookRequest({
+      rawBody: "raw-body",
+      headers: { "webhook-id": "evt_1" },
+      deps,
+    });
+
+    expect(analytics.eventsNamed("subscription_activated")).toEqual([]);
+  });
 });
+
+describe("runPostHogWebhookRequest", () => {
+  it("returns 401 before idempotency when secret verification fails", async () => {
+    const { deps, markCalls, dispatchCalls } = createPostHogWebhookRequestDeps({
+      verifyThrows: true,
+    });
+
+    const result = await runPostHogWebhookRequest({
+      rawBody: "{}",
+      headers: { authorization: "Bearer wrong" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 401,
+      body: { error: "invalid_signature" },
+    });
+    expect(markCalls).toEqual([]);
+    expect(dispatchCalls).toEqual([]);
+  });
+
+  it("reports duplicate without dispatching a replayed alert", async () => {
+    const { deps, markCalls, dispatchCalls } = createPostHogWebhookRequestDeps({
+      eventState: "already_processed",
+    });
+
+    const result = await runPostHogWebhookRequest({
+      rawBody: "{}",
+      headers: { authorization: "Bearer s3cret" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true, duplicate: true },
+    });
+    expect(markCalls).toEqual(["posthog:evt_1"]);
+    // 비싼 triage 에이전트를 두 번 깨우지 않도록 중복은 dispatch하지 않는다.
+    expect(dispatchCalls).toEqual([]);
+  });
+
+  it("marks the event before dispatching a new alert", async () => {
+    const { deps, markCalls, dispatchCalls, order } =
+      createPostHogWebhookRequestDeps({});
+
+    const result = await runPostHogWebhookRequest({
+      rawBody: "{}",
+      headers: { authorization: "Bearer s3cret" },
+      deps,
+    });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true },
+    });
+    expect(markCalls).toEqual(["posthog:evt_1"]);
+    expect(dispatchCalls).toEqual([{ message: "boom" }]);
+    // event_id 선삽입(멱등) → dispatch 순서.
+    expect(order).toEqual(["mark", "dispatch"]);
+  });
+});
+
+function createPostHogWebhookRequestDeps(input: {
+  verifyThrows?: boolean;
+  eventState?: "inserted" | "already_processed";
+  alert?: OncallAlert;
+}) {
+  const markCalls: string[] = [];
+  const dispatchCalls: unknown[] = [];
+  const order: string[] = [];
+  const alert: OncallAlert = input.alert ?? {
+    eventId: "posthog:evt_1",
+    payload: { message: "boom" },
+  };
+
+  const deps: PostHogWebhookRequestDeps = {
+    verifyWebhook() {
+      if (input.verifyThrows) {
+        throw new Error("invalid PostHog webhook secret");
+      }
+
+      return alert;
+    },
+    eventRepository: {
+      async markEventProcessed(eventId) {
+        markCalls.push(eventId);
+        order.push("mark");
+
+        return input.eventState ?? "inserted";
+      },
+    },
+    dispatch: {
+      async dispatch(payload) {
+        dispatchCalls.push(payload);
+        order.push("dispatch");
+      },
+    },
+  };
+
+  return { deps, markCalls, dispatchCalls, order };
+}
 
 function createSubscriptionCancelRequestDeps(input: {
   userId?: string | null;

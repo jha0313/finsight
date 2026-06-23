@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { getPostHogClient } from "@/services/posthog/analytics";
 import { runCheckoutRequest } from "@/lib/orchestration";
 import { createPolarCheckout } from "@/services/polar";
 import { getCurrentUser } from "@/services/supabase";
 
 export async function POST(): Promise<NextResponse> {
+  const user = await getCurrentUser();
   const result = await runCheckoutRequest({
     productId: process.env.POLAR_PRODUCT_ID,
     successUrl: checkoutSuccessUrl(),
@@ -16,6 +18,15 @@ export async function POST(): Promise<NextResponse> {
 
   if (result.status === 401) {
     return NextResponse.json(result.body, { status: result.status });
+  }
+
+  if (user) {
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: user.id,
+      event: "checkout_initiated",
+      properties: { product_id: process.env.POLAR_PRODUCT_ID },
+    });
   }
 
   return NextResponse.redirect(result.redirectUrl, result.status);

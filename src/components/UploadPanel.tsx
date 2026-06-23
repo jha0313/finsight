@@ -2,6 +2,7 @@
 
 import { FileUp, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { type ChangeEvent, type FormEvent, useEffect, useState } from "react";
 
 import { DashboardResults } from "@/components/DashboardResults";
@@ -147,6 +148,12 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
     const formData = new FormData();
     formData.set("file", file);
 
+    const fileExtension = file.name.split(".").pop()?.toLowerCase() ?? "unknown";
+    posthog.capture("statement_uploaded", {
+      file_type: fileExtension,
+      file_size_bytes: file.size,
+    });
+
     setError(null);
     setStatus("loading");
 
@@ -157,6 +164,10 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
       });
 
       if (!analyzeResponse.ok) {
+        posthog.capture("analysis_failed", {
+          file_type: fileExtension,
+          http_status: analyzeResponse.status,
+        });
         setResponse(null);
         setError(errorMessageForStatus(analyzeResponse.status));
         setStatus("error");
@@ -164,10 +175,17 @@ export function UploadPanel({ serverTier }: UploadPanelProps) {
       }
 
       const result = (await analyzeResponse.json()) as AnalyzeResponse;
+      posthog.capture("statement_analyzed", {
+        file_type: fileExtension,
+        tier: result.tier,
+        pro_status: result.pro.status,
+        anomaly_count: result.free.anomalies.length,
+      });
       setResponse(result);
       setStatus("success");
       sessionStorage.setItem(ANALYSIS_STORAGE_KEY, JSON.stringify(result));
     } catch {
+      posthog.captureException(new Error("분석 요청을 처리하지 못했습니다."));
       setResponse(null);
       setError("분석 요청을 처리하지 못했습니다.");
       setStatus("error");

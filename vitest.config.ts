@@ -24,7 +24,12 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["src/**/*.test.ts", "evals/**/*.test.ts"],
+          include: [
+            "src/**/*.test.ts",
+            "evals/**/*.test.ts",
+            // 루트 instrumentation(onRequestError 서버 예외 캡처)도 검증한다.
+            "instrumentation.test.ts",
+          ],
         },
       },
       {

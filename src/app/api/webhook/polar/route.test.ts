@@ -9,6 +9,11 @@ const webhookRouteMocks = vi.hoisted(() => {
   const toSubscriptionUpsert = vi.fn();
   const upsertSubscription = vi.fn();
   const verifyPolarWebhook = vi.fn();
+  const analytics = {
+    capture: vi.fn(),
+    flush: vi.fn().mockResolvedValue(undefined),
+  };
+  const createPostHogAnalytics = vi.fn(() => analytics);
 
   return {
     createPolarWebhookRepository,
@@ -16,12 +21,18 @@ const webhookRouteMocks = vi.hoisted(() => {
     toSubscriptionUpsert,
     upsertSubscription,
     verifyPolarWebhook,
+    createPostHogAnalytics,
+    analytics,
   };
 });
 
 vi.mock("@/services/polar", () => ({
   toSubscriptionUpsert: webhookRouteMocks.toSubscriptionUpsert,
   verifyPolarWebhook: webhookRouteMocks.verifyPolarWebhook,
+}));
+
+vi.mock("@/services/posthog/analytics", () => ({
+  createPostHogAnalytics: webhookRouteMocks.createPostHogAnalytics,
 }));
 
 vi.mock("@/services/supabase/service-role", () => ({

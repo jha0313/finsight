@@ -2,15 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const actionMocks = vi.hoisted(() => ({
   signOutCurrentUser: vi.fn(),
+  getCurrentUser: vi.fn().mockResolvedValue(null),
   redirect: vi.fn(),
+  posthogCapture: vi.fn(),
 }));
 
 vi.mock("@/services/supabase", () => ({
   signOutCurrentUser: actionMocks.signOutCurrentUser,
+  getCurrentUser: actionMocks.getCurrentUser,
 }));
 
 vi.mock("next/navigation", () => ({
   redirect: actionMocks.redirect,
+}));
+
+vi.mock("@/services/posthog/analytics", () => ({
+  getPostHogClient: () => ({ capture: actionMocks.posthogCapture }),
 }));
 
 import { signOutAction } from "./actions";

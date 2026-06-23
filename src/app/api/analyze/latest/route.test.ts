@@ -2,14 +2,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "./route";
 
-const latestRouteMocks = vi.hoisted(() => ({
-  runLatestAnalysisRequest: vi.fn(),
-  getCurrentUser: vi.fn(),
-  createSubscriptionGateway: vi.fn(),
-  createAiUsage: vi.fn(),
-  createStatementRepository: vi.fn(),
-  createClaudeInsightProvider: vi.fn(),
-}));
+const latestRouteMocks = vi.hoisted(() => {
+  const analytics = {
+    capture: vi.fn(),
+    flush: vi.fn().mockResolvedValue(undefined),
+  };
+
+  return {
+    runLatestAnalysisRequest: vi.fn(),
+    getCurrentUser: vi.fn(),
+    createSubscriptionGateway: vi.fn(),
+    createAiUsage: vi.fn(),
+    createStatementRepository: vi.fn(),
+    createClaudeInsightProvider: vi.fn(),
+    createPostHogAnalytics: vi.fn(() => analytics),
+    analytics,
+  };
+});
 
 vi.mock("@/lib/orchestration", () => ({
   runLatestAnalysisRequest: latestRouteMocks.runLatestAnalysisRequest,
@@ -17,6 +26,10 @@ vi.mock("@/lib/orchestration", () => ({
 
 vi.mock("@/services/claude", () => ({
   createClaudeInsightProvider: latestRouteMocks.createClaudeInsightProvider,
+}));
+
+vi.mock("@/services/posthog/analytics", () => ({
+  createPostHogAnalytics: latestRouteMocks.createPostHogAnalytics,
 }));
 
 vi.mock("@/services/supabase", () => ({
@@ -61,6 +74,7 @@ describe("analyze latest route", () => {
         aiUsage: { kind: "ai-usage" },
         statementRepository: { kind: "statement-repository" },
         insightProviderFactory: latestRouteMocks.createClaudeInsightProvider,
+        analytics: latestRouteMocks.analytics,
       },
     });
   });

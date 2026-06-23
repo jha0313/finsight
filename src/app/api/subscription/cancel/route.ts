@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getPostHogClient } from "@/services/posthog/analytics";
 import { runSubscriptionCancelRequest } from "@/lib/orchestration";
 import { cancelSubscriptionAtPeriodEnd } from "@/services/polar";
 import { getCurrentUser, getSubscriptionSummary } from "@/services/supabase";
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const form = await request.formData();
   const cancel = form.get("action") !== "resume";
 
+  const user = await getCurrentUser();
   const result = await runSubscriptionCancelRequest({
     cancel,
     redirectUrl: settingsRedirectUrl(request, cancel),
@@ -18,6 +20,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cancelSubscription: cancelSubscriptionAtPeriodEnd,
     },
   });
+
+  if (result.status === 303 && user) {
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: user.id,
+      event: cancel ? "subscription_canceled" : "subscription_resumed",
+    });
+    return NextResponse.redirect(result.redirectUrl, result.status);
+  }
 
   if (result.status === 303) {
     return NextResponse.redirect(result.redirectUrl, result.status);

@@ -7,6 +7,7 @@ import {
   createClaudeInsightProvider,
   createClaudePdfExtractor,
 } from "@/services/claude";
+import { createPostHogAnalytics } from "@/services/posthog/analytics";
 import {
   createAiUsage,
   createStatementRepository,
@@ -29,6 +30,7 @@ const PDF_MAGIC = "%PDF-";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const upload = await readUpload(request);
   const statement = await toStatement(upload);
+  const analytics = createPostHogAnalytics();
   const result = await runAnalyzeRequest({
     statement,
     deps: {
@@ -37,8 +39,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       aiUsage: createAiUsage(),
       statementRepository: createStatementRepository(),
       insightProviderFactory: createClaudeInsightProvider,
+      analytics,
     },
   });
+
+  // serverless(Vercel 람다) freeze 전에 emit된 서버 이벤트 전송을 보장한다.
+  await analytics.flush();
 
   return NextResponse.json(result.body, { status: result.status });
 }

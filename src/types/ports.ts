@@ -45,6 +45,21 @@ export interface AiUsageGateway {
   releaseDailyQuota(userId: string, tier: Tier): Promise<void>;
 }
 
+// 서버측 제품 이벤트·예외를 외부 분석(PostHog)으로 보낸다. lib는 이 포트에만
+// 의존하고, 실제 posthog-node 어댑터는 route handler(composition root)에서 주입한다
+// (CLAUDE.md: lib는 외부 SDK를 직접 import하지 않는다). capture/captureException은
+// 동기(어댑터 내부 큐잉)이고, flush는 serverless(Vercel 람다)에서 응답 반환 직후
+// freeze로 in-flight 이벤트가 유실되지 않도록 호출부에서 await한다. PII(이메일·계좌·
+// 가맹점명·금액·요약텍스트)는 properties에 넣지 않는다.
+export interface AnalyticsPort {
+  capture(input: {
+    distinctId: string;
+    event: string;
+    properties?: Record<string, string | number | boolean | undefined>;
+  }): void;
+  flush(): Promise<void>;
+}
+
 export interface CheckoutGateway {
   create(input: {
     customerExternalId: string;
@@ -77,6 +92,27 @@ export interface WebhookSubscriptionRepository {
     eventId: string,
   ): Promise<"inserted" | "already_processed">;
   upsertSubscription(input: SubscriptionUpsertPayload): Promise<void>;
+}
+
+// oncall(운영) prod alert 트리거. PostHog error webhook을 검증·정규화한 결과로,
+// 멱등 키(eventId)와 triage 워크플로우에 그대로 넘길 payload를 담는다.
+export interface OncallAlert {
+  eventId: string;
+  payload: unknown;
+}
+
+// 새 alert만 triage 에이전트를 깨우도록 event_id 선삽입 멱등을 담당한다
+// (Polar와 같은 processed_webhook_events 테이블을 공유하되 키는 prefix로 분리).
+export interface OncallEventRepository {
+  markEventProcessed(
+    eventId: string,
+  ): Promise<"inserted" | "already_processed">;
+}
+
+// GitHub repository_dispatch(event_type: oncall-alert)로 oncall-triage 워크플로우를
+// 깨운다. 실제 에이전트(노이즈 판정·escalation)는 GitHub Actions에서 헤드리스로 돈다.
+export interface OncallDispatchGateway {
+  dispatch(payload: unknown): Promise<void>;
 }
 
 export interface SaveStatementAnalysisInput {

@@ -6,16 +6,23 @@ import { GET } from "./route";
 const callbackMocks = vi.hoisted(() => {
   const exchangeAuthCodeForSession = vi.fn();
   const resolveAuthCallbackRedirect = vi.fn();
+  const getCurrentUser = vi.fn().mockResolvedValue(null);
 
   return {
     exchangeAuthCodeForSession,
     resolveAuthCallbackRedirect,
+    getCurrentUser,
   };
 });
 
 vi.mock("@/services/supabase", () => ({
   exchangeAuthCodeForSession: callbackMocks.exchangeAuthCodeForSession,
   resolveAuthCallbackRedirect: callbackMocks.resolveAuthCallbackRedirect,
+  getCurrentUser: callbackMocks.getCurrentUser,
+}));
+
+vi.mock("@/services/posthog/analytics", () => ({
+  getPostHogClient: () => ({ capture: vi.fn(), identify: vi.fn() }),
 }));
 
 describe("auth callback route", () => {

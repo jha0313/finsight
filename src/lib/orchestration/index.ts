@@ -6,8 +6,12 @@ import type { AnalyzeResponse, ProInsights } from "@/types/analysis";
 import type { ParsedStatement, ParsedTransaction } from "@/types/csv";
 import type {
   AiUsageGateway,
+  AnalyticsPort,
   CheckoutGateway,
   InsightProvider,
+  OncallAlert,
+  OncallDispatchGateway,
+  OncallEventRepository,
   SubscriptionUpsertPayload,
   StatementRepository,
   SubscriptionGateway,
@@ -25,6 +29,33 @@ const MODEL_BY_TIER: Record<Tier, string> = {
 };
 type RunAnalysisResult = Awaited<ReturnType<typeof runAnalysis>>;
 
+// 분석 1건의 AI 인사이트 처리 결과(진단). 'ok'=성공, 'cached'=캐시 재사용,
+// 'skipped'=AI 미호출(파싱폴백·미구독 등), 'quota_exhausted'=일일 quota 소진,
+// 'timeout'/'truncated'/'error'=Claude 호출 실패(원인별 — 각각 30s 초과, 출력 잘림,
+// 그 외 API 에러). PostHog 이벤트의 ai_status·ai_insight_failed reason으로 그대로 쓴다.
+type AiStatus =
+  | "ok"
+  | "cached"
+  | "skipped"
+  | "quota_exhausted"
+  | "timeout"
+  | "truncated"
+  | "error";
+
+// generateInsights가 분류해 돌려주는 실제 Claude 호출 결과(quota·캐시·skip은 제외).
+type AiOutcome =
+  | { status: "ok"; insights: ProInsights }
+  | { status: "timeout" }
+  | { status: "truncated" }
+  | { status: "error" };
+
+// AI 인사이트가 실패로 끝났는지(원인 구분이 ai_insight_failed로 보고된다).
+function isAiFailure(
+  status: AiStatus,
+): status is "timeout" | "truncated" | "error" {
+  return status === "timeout" || status === "truncated" || status === "error";
+}
+
 export interface AnalyzeDeps {
   insightProvider?: InsightProvider;
   aiTimeoutMs?: number;
@@ -38,6 +69,7 @@ export interface AnalyzeRequestDeps {
   aiUsage: AiUsageGateway;
   statementRepository: StatementRepository;
   insightProviderFactory: () => InsightProvider;
+  analytics: AnalyticsPort;
 }
 
 export interface CheckoutRequestDeps {
@@ -67,6 +99,16 @@ export interface PolarWebhookRequestDeps {
     event: Pick<WebhookEvent, "type" | "data">,
   ) => SubscriptionUpsertPayload | null;
   subscriptionRepository: WebhookSubscriptionRepository;
+  analytics: AnalyticsPort;
+}
+
+export interface PostHogWebhookRequestDeps {
+  verifyWebhook: (
+    rawBody: string,
+    headers: Record<string, string>,
+  ) => OncallAlert;
+  eventRepository: OncallEventRepository;
+  dispatch: OncallDispatchGateway;
 }
 
 export async function runAnalysis(input: {
@@ -78,6 +120,11 @@ export async function runAnalysis(input: {
   transactions: Transaction[];
   sourceHash: string;
   needsFallback: boolean;
+  // 서버측 트래킹용 진단(클라이언트 응답 AnalyzeResponse에는 노출되지 않는다).
+  // request 레벨 함수가 이 메타를 보고 PostHog 이벤트를 emit한다.
+  aiStatus: AiStatus;
+  cacheHit: boolean;
+  transactionCount: number;
 }> {
   const statement = input.statement;
   const transactions = statement.transactions.map(toTransaction);
@@ -86,6 +133,7 @@ export async function runAnalysis(input: {
   const warnings =
     statement.warnings.length > 0 ? statement.warnings : undefined;
   const currency = resolveStatementCurrency(transactions);
+  const transactionCount = transactions.length;
   const response: AnalyzeResponse = {
     tier: input.tier,
     free,
@@ -108,6 +156,9 @@ export async function runAnalysis(input: {
       transactions,
       sourceHash: source,
       needsFallback: statement.needsFallback,
+      aiStatus: "skipped",
+      cacheHit: false,
+      transactionCount,
     };
   }
 
@@ -122,6 +173,9 @@ export async function runAnalysis(input: {
       transactions,
       sourceHash: source,
       needsFallback: statement.needsFallback,
+      aiStatus: "cached",
+      cacheHit: true,
+      transactionCount,
     };
   }
 
@@ -134,20 +188,23 @@ export async function runAnalysis(input: {
       transactions,
       sourceHash: source,
       needsFallback: statement.needsFallback,
+      aiStatus: "skipped",
+      cacheHit: false,
+      transactionCount,
     };
   }
 
-  const insights = await generateInsights({
+  const outcome = await generateInsights({
     insightProvider: input.deps.insightProvider,
     transactions,
     tier: input.tier,
     timeoutMs: input.deps.aiTimeoutMs ?? DEFAULT_AI_TIMEOUT_MS,
   });
 
-  if (insights !== null) {
+  if (outcome.status === "ok") {
     response.pro = {
       status: proStatusForTier(input.tier),
-      insights,
+      insights: outcome.insights,
     };
   }
 
@@ -156,6 +213,9 @@ export async function runAnalysis(input: {
     transactions,
     sourceHash: source,
     needsFallback: statement.needsFallback,
+    aiStatus: outcome.status,
+    cacheHit: false,
+    transactionCount,
   };
 }
 
@@ -213,6 +273,17 @@ export async function runAnalyzeRequest(input: {
     }),
   });
 
+  emitAnalysisEvents({
+    analytics: input.deps.analytics,
+    userId: user.id,
+    tier,
+    source: "upload",
+    aiStatus: analysisResult.aiStatus,
+    cacheHit: analysisResult.cacheHit,
+    transactionCount: analysisResult.transactionCount,
+    needsFallback: analysisResult.needsFallback,
+  });
+
   return {
     status: 200,
     body: analysisResult.response,
@@ -246,11 +317,26 @@ export async function runLatestAnalysisRequest(input: {
 
   const tier = await input.deps.subscriptionGateway.resolveTier(user.id);
   const transactions = latest.transactions;
+  const transactionCount = transactions.length;
   const response = buildLatestBaseResponse(transactions, tier);
   const inputHash = analysisInputHash({
     transactions: transactions.map(toHashTransaction),
     tier,
   });
+
+  // 저장된 거래 재분석이라 파싱 폴백은 발생하지 않는다(needs_fallback=false 고정).
+  const emit = (aiStatus: AiStatus, cacheHit: boolean): void => {
+    emitAnalysisEvents({
+      analytics: input.deps.analytics,
+      userId: user.id,
+      tier,
+      source: "latest",
+      aiStatus,
+      cacheHit,
+      transactionCount,
+      needsFallback: false,
+    });
+  };
 
   const cachedInsights = toCachedInsights(
     await input.deps.aiUsage.getCachedInsights(user.id, inputHash),
@@ -262,27 +348,33 @@ export async function runLatestAnalysisRequest(input: {
       insights: cachedInsights,
     };
 
+    emit("cached", true);
+
     return { status: 200, body: response };
   }
 
   // 미구독은 Opus를 돌리지 않고 locked(업그레이드 CTA)로 남긴다.
   if (tier !== "pro") {
+    emit("skipped", false);
+
     return { status: 200, body: response };
   }
 
-  const insights = await generatePaidInsights({
+  const paid = await generatePaidInsights({
     deps: input.deps,
     userId: user.id,
     transactions,
     tier,
   });
 
-  if (insights === null) {
-    // quota 소진·타임아웃·에러는 unavailable로 격리(Free 결과는 보존).
+  if (paid.insights === null) {
+    // quota 소진·타임아웃·잘림·에러는 unavailable로 격리(Free 결과는 보존).
+    emit(paid.aiStatus, false);
+
     return { status: 200, body: response };
   }
 
-  response.pro = { status: "active", insights };
+  response.pro = { status: "active", insights: paid.insights };
 
   // 멱등 save RPC로 캐시만 추가한다(statement·거래는 이미 저장돼 중복 무시).
   // 같은 명세서를 Pro로 재업로드할 때 Opus 재호출을 피한다.
@@ -293,9 +385,11 @@ export async function runLatestAnalysisRequest(input: {
     analysis: {
       inputHash,
       model: MODEL_BY_TIER[tier],
-      result: insights,
+      result: paid.insights,
     },
   });
+
+  emit("ok", false);
 
   return { status: 200, body: response };
 }
@@ -402,6 +496,60 @@ export async function runPolarWebhookRequest(input: {
     };
   }
 
+  // 신규 처리된 active 전환만 "전환 완료"로 emit한다(결제 funnel의 마지막 단계).
+  // 멱등: 재전송·중복은 위에서 duplicate로 빠지므로 전환을 두 번 세지 않는다.
+  if (upsert !== null && upsert.status === "active") {
+    input.deps.analytics.capture({
+      distinctId: upsert.userId,
+      event: "subscription_activated",
+      properties: { cancel_at_period_end: upsert.cancelAtPeriodEnd },
+    });
+  }
+
+  return {
+    status: 200,
+    body: { received: true },
+  };
+}
+
+// PostHog error webhook → oncall 운영 트리거(②). Vercel serverless에서는 에이전트를
+// 직접 띄울 수 없으므로, 여기서는 서명검증 + 멱등까지만 하고 GitHub repository_dispatch로
+// oncall-triage 워크플로우를 깨운다(노이즈 판정·escalation은 GitHub Actions 헤드리스).
+export async function runPostHogWebhookRequest(input: {
+  rawBody: string;
+  headers: Record<string, string>;
+  deps: PostHogWebhookRequestDeps;
+}): Promise<
+  | { status: 200; body: { received: true; duplicate?: true } }
+  | { status: 401; body: { error: "invalid_signature" } }
+> {
+  let alert: OncallAlert;
+
+  try {
+    alert = input.deps.verifyWebhook(input.rawBody, input.headers);
+  } catch {
+    return {
+      status: 401,
+      body: { error: "invalid_signature" },
+    };
+  }
+
+  // event_id 선삽입으로 멱등 처리한다(CLAUDE.md). triage 에이전트 1회 실행은
+  // 비싸므로, PostHog의 재전송·중복 전송이 같은 alert로 에이전트를 두 번 깨우지
+  // 않도록 dispatch 전에 먼저 마킹한다. 이미 처리된 이벤트면 dispatch를 건너뛴다.
+  const eventState = await input.deps.eventRepository.markEventProcessed(
+    alert.eventId,
+  );
+
+  if (eventState === "already_processed") {
+    return {
+      status: 200,
+      body: { received: true, duplicate: true },
+    };
+  }
+
+  await input.deps.dispatch.dispatch(alert.payload);
+
   return {
     status: 200,
     body: { received: true },
@@ -420,11 +568,14 @@ async function runAnalysisWithoutCache(input: {
   );
 
   if (!quotaOk) {
-    return runAnalysis({
+    const skipped = await runAnalysis({
       statement: input.statement,
       tier: input.tier,
       deps: { skipInsights: true },
     });
+
+    // quota 소진으로 AI를 건너뛴 경로를 'skipped'와 구분해 진단에 남긴다.
+    return { ...skipped, aiStatus: "quota_exhausted" };
   }
 
   const result = await runAnalysis({
@@ -564,24 +715,25 @@ function toHashTransaction(transaction: Transaction): ParsedTransaction {
   };
 }
 
-// quota를 소비하고 Opus를 호출한다. quota 소진이면 호출 없이 null,
-// 타임아웃·에러로 인사이트를 못 만들면 소비한 quota를 환불하고 null.
+// quota를 소비하고 Opus를 호출한다. quota 소진이면 호출 없이 quota_exhausted,
+// 타임아웃·잘림·에러로 인사이트를 못 만들면 소비한 quota를 환불하고 원인별 상태를
+// 진단(aiStatus)으로 호출부에 올린다. insights는 ok일 때만 채워진다.
 async function generatePaidInsights(input: {
   deps: AnalyzeRequestDeps;
   userId: string;
   transactions: Transaction[];
   tier: Tier;
-}): Promise<ProInsights | null> {
+}): Promise<{ insights: ProInsights | null; aiStatus: AiStatus }> {
   const quotaOk = await input.deps.aiUsage.tryConsumeDailyQuota(
     input.userId,
     input.tier,
   );
 
   if (!quotaOk) {
-    return null;
+    return { insights: null, aiStatus: "quota_exhausted" };
   }
 
-  const insights = await generateInsights({
+  const outcome = await generateInsights({
     insightProvider: createLazyInsightProvider(
       input.deps.insightProviderFactory,
     ),
@@ -590,13 +742,65 @@ async function generatePaidInsights(input: {
     timeoutMs: DEFAULT_AI_TIMEOUT_MS,
   });
 
-  if (insights === null || insights === undefined) {
+  if (outcome.status !== "ok") {
     await input.deps.aiUsage.releaseDailyQuota(input.userId, input.tier);
 
-    return null;
+    return { insights: null, aiStatus: outcome.status };
   }
 
-  return insights;
+  return { insights: outcome.insights, aiStatus: "ok" };
+}
+
+// 분석 1건 처리 후 서버측 PostHog 이벤트를 emit한다. analysis_completed(항상)에
+// 더해, 파싱폴백·quota소진·AI실패를 별도 이벤트로 쪼개 "조용한 실패"에 가시성을
+// 만든다. distinctId는 user.id(uuid)이고 properties는 enum/수치/불리언만 — 가맹점명·
+// 금액·통화·해시 등 원문 추적 가능 값은 넣지 않는다(PII/식별자 차단).
+function emitAnalysisEvents(input: {
+  analytics: AnalyticsPort;
+  userId: string;
+  tier: Tier;
+  source: "upload" | "latest";
+  aiStatus: AiStatus;
+  cacheHit: boolean;
+  transactionCount: number;
+  needsFallback: boolean;
+}): void {
+  const { analytics, userId, tier, source } = input;
+
+  analytics.capture({
+    distinctId: userId,
+    event: "analysis_completed",
+    properties: {
+      tier,
+      source,
+      ai_status: input.aiStatus,
+      cache_hit: input.cacheHit,
+      transaction_count: input.transactionCount,
+      needs_fallback: input.needsFallback,
+    },
+  });
+
+  if (input.needsFallback) {
+    analytics.capture({
+      distinctId: userId,
+      event: "parser_fallback",
+      properties: { tier },
+    });
+  }
+
+  if (input.aiStatus === "quota_exhausted") {
+    analytics.capture({
+      distinctId: userId,
+      event: "quota_exhausted",
+      properties: { tier, source },
+    });
+  } else if (isAiFailure(input.aiStatus)) {
+    analytics.capture({
+      distinctId: userId,
+      event: "ai_insight_failed",
+      properties: { tier, reason: input.aiStatus, source },
+    });
+  }
 }
 
 // 명세서는 단일 청구 통화를 가정하되, 혼합 시 최빈 통화를 대표값으로 쓴다.
@@ -652,21 +856,36 @@ async function generateInsights(input: {
   transactions: Transaction[];
   tier: Tier;
   timeoutMs: number;
-}): Promise<AnalyzeResponse["pro"]["insights"] | null> {
+}): Promise<AiOutcome> {
   try {
-    return await withTimeout(
+    const insights = await withTimeout(
       input.insightProvider.generate({
         transactions: input.transactions,
         tier: input.tier,
       }),
       input.timeoutMs,
     );
+
+    return { status: "ok", insights };
   } catch (error) {
-    // 실패 원인(30s 타임아웃 vs Claude API 에러)이 묻히지 않도록 서버 로그에
-    // 남긴다. 호출부는 여전히 null→pro.status=unavailable로 격리한다.
+    // 실패 원인(30s 타임아웃 vs 출력 잘림 vs Claude API 에러)이 묻히지 않도록 서버
+    // 로그에 남기고, 우리가 통제하는 메시지만 신뢰 가능한 핑거프린트로 분류한다
+    // (그 외는 error). 호출부는 ok 외에는 pro.status=unavailable로 격리한다.
     console.error("AI insight generation failed", error);
 
-    return null;
+    const message = error instanceof Error ? error.message : "";
+
+    if (message.includes("timed out")) {
+      // withTimeout의 "AI insight generation timed out."(30s 초과).
+      return { status: "timeout" };
+    }
+
+    if (message.includes("no parsed output")) {
+      // services/claude의 "Claude returned no parsed output."(max_tokens 잘림).
+      return { status: "truncated" };
+    }
+
+    return { status: "error" };
   }
 }
 
