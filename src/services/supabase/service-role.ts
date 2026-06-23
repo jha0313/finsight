@@ -2,7 +2,10 @@ import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { WebhookSubscriptionRepository } from "@/types/ports";
+import type {
+  OncallEventRepository,
+  WebhookSubscriptionRepository,
+} from "@/types/ports";
 
 type SupabaseError = {
   code?: string;
@@ -58,6 +61,34 @@ export function createPolarWebhookRepository(): WebhookSubscriptionRepository {
       });
 
       throwIfSupabaseError(error, "upsert_subscription RPC failed");
+    },
+  };
+}
+
+// oncall prod alert 멱등(event_id 선삽입). Polar 웹훅과 같은
+// processed_webhook_events 테이블을 공유하되, 키는 verifyPostHogWebhook이
+// "posthog:" prefix로 네임스페이스를 분리한다. service_role로 RLS를 우회한다.
+export function createOncallWebhookRepository(): OncallEventRepository {
+  let supabase: SupabaseClient | null = null;
+  const getSupabase = () => {
+    supabase ??= createServiceRoleSupabaseClient();
+
+    return supabase;
+  };
+
+  return {
+    async markEventProcessed(eventId) {
+      const { error } = await getSupabase()
+        .from("processed_webhook_events")
+        .insert({ event_id: eventId });
+
+      if (isUniqueViolation(error)) {
+        return "already_processed";
+      }
+
+      throwIfSupabaseError(error, "processed_webhook_events insert failed");
+
+      return "inserted";
     },
   };
 }
