@@ -3,7 +3,7 @@
 // kind=review: 본문=코드, 리뷰어가 위반을 잡는지 채점(expect/severity/rule).
 // kind=qa: 본문=질문, 응답자가 코드베이스 사실을 맞히는지 채점(must/mustNot).
 
-export type CaseKind = "review" | "qa";
+export type CaseKind = "review" | "qa" | "oncall";
 
 export interface GoldenCase {
   id: string;
@@ -12,8 +12,9 @@ export interface GoldenCase {
   ruleSource: string;
   expect: "violation" | "pass";
   severity: string;
-  must: string[]; // qa: 답변에 반드시 담겨야 할 사실
-  mustNot: string[]; // qa: 답변이 사실처럼 말하면 안 되는 오답
+  triage: "noise" | "signal" | "none"; // oncall: 기대 판정(노이즈/신호)
+  must: string[]; // qa/oncall: 답변/escalation에 반드시 담겨야 할 사실
+  mustNot: string[]; // qa/oncall: 사실처럼 말하면 안 되는 오답
   input: string;
 }
 
@@ -44,14 +45,45 @@ export function parseCase(filename: string, raw: string): GoldenCase {
 
   const kind = meta.kind ?? "review";
 
-  if (kind !== "review" && kind !== "qa") {
+  if (kind !== "review" && kind !== "qa" && kind !== "oncall") {
     throw new Error(
-      `${filename}: kind는 "review" 또는 "qa"여야 합니다 (받음: ${kind}).`,
+      `${filename}: kind는 "review"·"qa"·"oncall" 중 하나여야 합니다 (받음: ${kind}).`,
     );
   }
 
   if (!meta.id) {
     throw new Error(`${filename}: id가 없습니다.`);
+  }
+
+  if (kind === "oncall") {
+    const triage = meta.triage;
+
+    if (triage !== "noise" && triage !== "signal") {
+      throw new Error(
+        `${filename}: oncall 케이스의 triage는 "noise" 또는 "signal"여야 합니다 (받음: ${triage ?? "없음"}).`,
+      );
+    }
+
+    const must = splitList(meta.must);
+
+    if (must.length === 0) {
+      throw new Error(
+        `${filename}: oncall 케이스는 must(판정/escalation 요건)가 필요합니다.`,
+      );
+    }
+
+    return {
+      id: meta.id,
+      kind,
+      rule: meta.rule ?? "",
+      ruleSource: meta.rule_source ?? "",
+      expect: "pass", // oncall은 expect를 쓰지 않는다(run은 kind로 분기). 인터페이스 충족용.
+      severity: "none",
+      triage,
+      must,
+      mustNot: splitList(meta.must_not),
+      input: body.trim(),
+    };
   }
 
   if (kind === "qa") {
@@ -68,6 +100,7 @@ export function parseCase(filename: string, raw: string): GoldenCase {
       ruleSource: meta.rule_source ?? "",
       expect: "pass", // qa는 expect를 쓰지 않는다(run은 kind로 분기). 인터페이스 충족용.
       severity: "none",
+      triage: "none",
       must,
       mustNot: splitList(meta.must_not),
       input: body.trim(),
@@ -93,6 +126,7 @@ export function parseCase(filename: string, raw: string): GoldenCase {
     ruleSource: meta.rule_source ?? "",
     expect,
     severity: meta.severity ?? "none",
+    triage: "none",
     must: [],
     mustNot: [],
     input: body.trim(),

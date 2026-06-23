@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { JudgeVerdictSchema, judgeUserContent, qaJudgeUserContent } from "./judge";
+import {
+  JudgeVerdictSchema,
+  judgeUserContent,
+  oncallJudgeUserContent,
+  qaJudgeUserContent,
+} from "./judge";
 
 describe("JudgeVerdictSchema", () => {
   it("verdict는 pass/fail만 허용한다", () => {
@@ -50,6 +55,34 @@ describe("qaJudgeUserContent", () => {
       must: ["사실"],
       mustNot: [],
       answer: "a",
+    });
+
+    expect(content).toContain("(없음)");
+  });
+});
+
+describe("oncallJudgeUserContent", () => {
+  it("기대 판정·escalation 요건(must)·금지(must_not)·에이전트 출력을 담는다", () => {
+    const content = oncallJudgeUserContent({
+      expectTriage: "signal",
+      must: ["신호로 분류", "권장 다음 액션"],
+      mustNot: ["노이즈로 분류"],
+      triagerOutput: "판정: 신호 — checkout 경로 새 에러",
+    });
+
+    expect(content).toContain("signal");
+    expect(content).toContain("신호로 분류");
+    expect(content).toContain("권장 다음 액션");
+    expect(content).toContain("노이즈로 분류");
+    expect(content).toContain("판정: 신호");
+  });
+
+  it("mustNot이 비면 '(없음)'으로 표기한다", () => {
+    const content = oncallJudgeUserContent({
+      expectTriage: "noise",
+      must: ["노이즈로 분류"],
+      mustNot: [],
+      triagerOutput: "판정: 노이즈",
     });
 
     expect(content).toContain("(없음)");

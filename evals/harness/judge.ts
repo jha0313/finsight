@@ -29,9 +29,17 @@ export interface QaJudgeInput {
   answer: string;
 }
 
+export interface OncallJudgeInput {
+  expectTriage: "noise" | "signal";
+  must: string[];
+  mustNot: string[];
+  triagerOutput: string;
+}
+
 export interface Judge {
   judge(input: JudgeInput): Promise<JudgeVerdict>;
   judgeQa(input: QaJudgeInput): Promise<JudgeVerdict>;
+  judgeOncall(input: OncallJudgeInput): Promise<JudgeVerdict>;
 }
 
 const JUDGE_SYSTEM = [
@@ -47,6 +55,17 @@ const JUDGE_QA_SYSTEM = [
   "응답자의 답변이 기대 사실(must)을 모두 담고, 금지 사실(must_not)을 사실처럼 말하지 않았는지 판정하세요.",
   "- must의 각 항목이 (표현은 달라도) 답변에 사실로 담겨 있으면 충족.",
   "- must_not의 항목을 사실처럼 주장하면(틀린 전제에 동조·환각·오답) fail.",
+  "- must를 모두 충족하고 must_not을 하나도 범하지 않으면 pass, 아니면 fail.",
+  "verdict(pass|fail)와 한국어 reasoning을 structured output으로 반환하세요.",
+].join("\n");
+
+const JUDGE_ONCALL_SYSTEM = [
+  "당신은 finsight oncall 하네스 Eval의 채점관(LLM-as-judge)입니다.",
+  "oncall 에이전트가 prod alert를 기대 판정(expect_triage)으로 분류하고, 요건(must)을 갖추고 금지(must_not)를 범하지 않았는지 판정하세요.",
+  "- 에이전트 출력의 최종 분류가 expect_triage(noise/signal)와 일치해야 한다. 어긋나면 fail.",
+  "- expect_triage=signal: must의 escalation 구성요소(원인 가설·영향 범위·권장 액션 등)가 (표현은 달라도) 담겨 있으면 충족.",
+  "- expect_triage=noise: 에이전트가 사람을 깨우지 않기로 했고 must를 충족하면 충족.",
+  "- must_not의 항목을 행하거나 주장하면 fail(예: 노이즈인데 escalation, 신호인데 침묵).",
   "- must를 모두 충족하고 must_not을 하나도 범하지 않으면 pass, 아니면 fail.",
   "verdict(pass|fail)와 한국어 reasoning을 structured output으로 반환하세요.",
 ].join("\n");
@@ -71,6 +90,20 @@ export function qaJudgeUserContent(input: QaJudgeInput): string {
       : ["  (없음)"]),
     "[응답자 답변]",
     input.answer,
+  ].join("\n");
+}
+
+export function oncallJudgeUserContent(input: OncallJudgeInput): string {
+  return [
+    `[기대 판정] expect_triage=${input.expectTriage}`,
+    "[충족해야 할 요건(must)]",
+    ...input.must.map((fact, index) => `  ${index + 1}. ${fact}`),
+    "[하면 안 되는 것(must_not)]",
+    ...(input.mustNot.length > 0
+      ? input.mustNot.map((fact, index) => `  ${index + 1}. ${fact}`)
+      : ["  (없음)"]),
+    "[에이전트 출력]",
+    input.triagerOutput,
   ].join("\n");
 }
 
@@ -100,5 +133,7 @@ export function createClaudeJudge(): Judge {
   return {
     judge: (input) => score(JUDGE_SYSTEM, judgeUserContent(input)),
     judgeQa: (input) => score(JUDGE_QA_SYSTEM, qaJudgeUserContent(input)),
+    judgeOncall: (input) =>
+      score(JUDGE_ONCALL_SYSTEM, oncallJudgeUserContent(input)),
   };
 }

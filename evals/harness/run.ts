@@ -10,6 +10,7 @@ import { type GoldenCase, parseCase } from "./lib/case";
 import { type CaseResult, formatSummary, summarize } from "./lib/verdict";
 import { createClaudeResponder } from "./responder";
 import { createClaudeReviewer } from "./reviewer";
+import { createClaudeTriager } from "./triager";
 
 export const CASES_DIR = fileURLToPath(new URL("./cases/", import.meta.url));
 
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
   const cases = loadCases(CASES_DIR);
   const reviewer = createClaudeReviewer();
   const responder = createClaudeResponder();
+  const triager = createClaudeTriager();
   const judge = createClaudeJudge();
 
   console.log(
@@ -40,7 +42,12 @@ async function main(): Promise<void> {
   const results: CaseResult[] = [];
 
   for (const goldenCase of cases) {
-    const stage = goldenCase.kind === "qa" ? "응답 → 채점" : "리뷰 → 채점";
+    const stage =
+      goldenCase.kind === "qa"
+        ? "응답 → 채점"
+        : goldenCase.kind === "oncall"
+          ? "분류 → 채점"
+          : "리뷰 → 채점";
     process.stdout.write(`  · [${goldenCase.id}] ${stage} …`);
 
     const verdict =
@@ -51,12 +58,20 @@ async function main(): Promise<void> {
             mustNot: goldenCase.mustNot,
             answer: await responder.answer(goldenCase.input),
           })
-        : await judge.judge({
-            rule: goldenCase.rule,
-            expect: goldenCase.expect,
-            severity: goldenCase.severity,
-            reviewerOutput: await reviewer.review(goldenCase.input),
-          });
+        : goldenCase.kind === "oncall"
+          ? await judge.judgeOncall({
+              // kind==="oncall"이면 parseCase가 triage를 noise|signal로 보장한다.
+              expectTriage: goldenCase.triage as "noise" | "signal",
+              must: goldenCase.must,
+              mustNot: goldenCase.mustNot,
+              triagerOutput: await triager.triage(goldenCase.input),
+            })
+          : await judge.judge({
+              rule: goldenCase.rule,
+              expect: goldenCase.expect,
+              severity: goldenCase.severity,
+              reviewerOutput: await reviewer.review(goldenCase.input),
+            });
 
     results.push({
       id: goldenCase.id,

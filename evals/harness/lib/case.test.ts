@@ -113,4 +113,47 @@ body`;
 
     expect(() => parseCase("q.md", raw)).toThrow(/must/);
   });
+
+  it("oncall 케이스는 triage 라벨과 must/mustNot을 분리한다", () => {
+    const raw = `---
+id: t01
+kind: oncall
+triage: signal
+must: 신호로 분류; 권장 다음 액션
+must_not: 노이즈로 분류
+rule_source: oncall/references/triage-rubric.md
+---
+
+prod alert 본문`;
+    const result = parseCase("t01.md", raw);
+
+    expect(result.kind).toBe("oncall");
+    expect(result.triage).toBe("signal");
+    expect(result.must).toEqual(["신호로 분류", "권장 다음 액션"]);
+    expect(result.mustNot).toEqual(["노이즈로 분류"]);
+    expect(result.input).toBe("prod alert 본문");
+  });
+
+  it("oncall 케이스의 triage가 noise/signal이 아니면 throw한다", () => {
+    const raw = `---
+id: t
+kind: oncall
+triage: maybe
+must: x
+---
+body`;
+
+    expect(() => parseCase("t.md", raw)).toThrow(/triage/);
+  });
+
+  it("oncall 케이스에 must가 없으면 throw한다", () => {
+    const raw = `---
+id: t
+kind: oncall
+triage: noise
+---
+body`;
+
+    expect(() => parseCase("t.md", raw)).toThrow(/must/);
+  });
 });
