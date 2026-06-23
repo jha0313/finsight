@@ -29,7 +29,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 
 // 통화 코드가 심볼을 가진(지원되는) 코드인지 확인.
 export function isSupportedCurrency(code: string): boolean {
-  return CURRENCY_SYMBOLS[code.toUpperCase()];
+  return CURRENCY_SYMBOLS[code.toUpperCase()] !== undefined;
 }
 
 export function formatMoney(
