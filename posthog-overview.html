@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PostHog — 제품을 만드는 엔지니어를 위한 올인원 데이터 스택</title>
+<meta name="description" content="PostHog가 무엇이고, 어떤 제품으로 구성되며, 데이터가 어떻게 흐르고, finsight에 어떻게 연동돼 있는지 한 장으로 설명·시각화한 페이지." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  :root{
+    --paper:#f4f1e9;
+    --paper-2:#eae5d8;
+    --ink:#17140f;
+    --ink-soft:#4a443a;
+    --line:#1714100f;
+    --line-strong:#17140f;
+    --orange:#f54e00;
+    --blue:#2f50ff;
+    --yellow:#f7bb1e;
+    --green:#1f9d57;
+    --violet:#7b5cff;
+    --dark:#141210;
+    --dark-2:#1d1a16;
+    --on-dark:#f3efe6;
+    --on-dark-soft:#a39c8c;
+    --radius:14px;
+    --maxw:1180px;
+    --mono:"Space Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --disp:"Bricolage Grotesque","Pretendard Variable",Pretendard,system-ui,sans-serif;
+    --body:"Pretendard Variable",Pretendard,system-ui,sans-serif;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:17px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    /* blueprint paper grid */
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size:28px 28px;
+    background-position:center top;
+  }
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+  a{color:inherit}
+  h1,h2,h3{font-family:var(--disp);font-weight:800;line-height:1.05;letter-spacing:-0.02em;margin:0}
+  .mono{font-family:var(--mono)}
+  .kick{font-family:var(--mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-soft)}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:saturate(1.2) blur(8px);
+    background:#f4f1e9cc;
+    border-bottom:1px solid var(--line-strong);
+  }
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:56px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:800;letter-spacing:-0.03em;font-size:19px}
+  .brand .dot{width:13px;height:13px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 3px #f54e0026}
+  .navlinks{display:flex;gap:22px;font-family:var(--mono);font-size:12px;letter-spacing:0.04em}
+  .navlinks a{text-decoration:none;color:var(--ink-soft);transition:color .15s}
+  .navlinks a:hover{color:var(--ink)}
+  @media(max-width:760px){.navlinks{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:var(--dark);color:var(--on-dark);
+    border-bottom:3px solid var(--ink);
+    position:relative;overflow:hidden;
+  }
+  .hero::before{ /* dark grid */
+    content:"";position:absolute;inset:0;
+    background-image:
+      linear-gradient(#ffffff0c 1px,transparent 1px),
+      linear-gradient(90deg,#ffffff0c 1px,transparent 1px);
+    background-size:40px 40px;
+    mask-image:radial-gradient(120% 90% at 70% 0%,#000 30%,transparent 78%);
+  }
+  .hero::after{ /* glow */
+    content:"";position:absolute;width:620px;height:620px;right:-120px;top:-220px;
+    background:radial-gradient(circle, #f54e0033 0%, #2f50ff1f 38%, transparent 66%);
+    filter:blur(8px);
+  }
+  .hero .wrap{position:relative;z-index:2;padding:78px 24px 64px}
+  .badge{
+    display:inline-flex;align-items:center;gap:9px;
+    font-family:var(--mono);font-size:12px;letter-spacing:0.08em;
+    color:var(--on-dark-soft);border:1px solid #ffffff26;border-radius:999px;
+    padding:6px 13px;margin-bottom:26px;
+  }
+  .badge b{color:var(--yellow);font-weight:700}
+  .hero h1{font-size:clamp(40px,7.2vw,80px);max-width:15ch}
+  .hero h1 .hl{color:var(--orange)}
+  .hero h1 .hl2{color:var(--blue)}
+  .hero p.lede{
+    max-width:60ch;margin:24px 0 0;color:var(--on-dark-soft);
+    font-size:clamp(17px,2.1vw,21px);line-height:1.6;
+  }
+  .hero .cta{display:flex;flex-wrap:wrap;gap:13px;margin-top:34px}
+  .btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:0.03em;text-decoration:none;
+    padding:12px 20px;border-radius:10px;border:1px solid transparent;transition:transform .12s, background .15s;
+    display:inline-flex;align-items:center;gap:9px;
+  }
+  .btn:hover{transform:translateY(-2px)}
+  .btn-primary{background:var(--orange);color:#fff}
+  .btn-ghost{background:transparent;color:var(--on-dark);border-color:#ffffff33}
+
+  /* terminal */
+  .term{
+    margin-top:48px;border:1px solid #ffffff1f;border-radius:12px;overflow:hidden;
+    background:#0f0d0b;box-shadow:0 30px 60px -30px #000;max-width:760px;
+  }
+  .term .bar{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid #ffffff12;background:#17140f}
+  .term .bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .term .bar .t{margin-left:10px;font-family:var(--mono);font-size:11px;color:var(--on-dark-soft)}
+  .term pre{margin:0;padding:20px 20px 22px;font-family:var(--mono);font-size:13.5px;line-height:1.85;color:#e7e2d6;overflow-x:auto}
+  .term .c-com{color:#6f6857}
+  .term .c-fn{color:var(--yellow)}
+  .term .c-str{color:#7fd6a0}
+  .term .c-key{color:#86a6ff}
+  .term .cur{display:inline-block;width:8px;height:16px;background:var(--orange);vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ticker */
+  .ticker{border-top:1px solid #ffffff1f;border-bottom:1px solid var(--ink);background:#0f0d0b;color:var(--on-dark);overflow:hidden}
+  .ticker .row{display:flex;gap:46px;white-space:nowrap;font-family:var(--mono);font-size:13px;letter-spacing:0.06em;padding:13px 0;width:max-content;animation:scroll 32s linear infinite}
+  .ticker .row span{display:inline-flex;align-items:center;gap:46px;color:var(--on-dark-soft)}
+  .ticker .row b{color:var(--on-dark);font-weight:400}
+  .ticker .sep{color:var(--orange)}
+  @keyframes scroll{to{transform:translateX(-50%)}}
+
+  /* ---------- sections ---------- */
+  section{padding:84px 0;border-bottom:1px solid var(--line-strong)}
+  .sec-head{max-width:70ch;margin-bottom:48px}
+  .sec-head .kick{display:block;margin-bottom:14px}
+  .sec-head h2{font-size:clamp(28px,4.4vw,46px)}
+  .sec-head p{color:var(--ink-soft);font-size:18px;margin:16px 0 0;max-width:62ch}
+
+  /* what it replaces */
+  .replace{display:grid;grid-template-columns:1fr auto 1fr;gap:28px;align-items:center}
+  @media(max-width:860px){.replace{grid-template-columns:1fr;gap:20px}}
+  .stack-old,.stack-new{border:1px solid var(--line-strong);border-radius:var(--radius);padding:22px;background:#fffdf7}
+  .stack-old{background:repeating-linear-gradient(135deg,#fdfbf4,#fdfbf4 9px,#f1ede2 9px,#f1ede2 10px)}
+  .stack-old h3,.stack-new h3{font-size:15px;font-family:var(--mono);font-weight:700;letter-spacing:0.04em;margin-bottom:16px;display:flex;align-items:center;gap:9px}
+  .pill-list{display:flex;flex-wrap:wrap;gap:8px}
+  .pill{font-family:var(--mono);font-size:12px;padding:7px 11px;border-radius:8px;border:1px solid var(--line-strong);background:#fff}
+  .stack-old .pill{opacity:.62;text-decoration:line-through;text-decoration-color:#f54e0099}
+  .stack-new{background:var(--dark);color:var(--on-dark);border-color:var(--ink)}
+  .stack-new .pill{background:#ffffff12;border-color:#ffffff2a;color:var(--on-dark);text-decoration:none;opacity:1}
+  .arrow-mid{font-family:var(--mono);font-size:13px;color:var(--ink-soft);text-align:center;line-height:1.5}
+  .arrow-mid .big{font-size:30px;color:var(--orange);display:block}
+  @media(max-width:860px){.arrow-mid .big{transform:rotate(90deg)}}
+
+  /* product grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line-strong);border-radius:var(--radius);overflow:hidden;background:#fffdf7}
+  @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}}
+  .card{padding:26px 24px;border-right:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);position:relative;background:#fffdf7;transition:background .18s}
+  .card:hover{background:#fff}
+  .card .ic{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;margin-bottom:16px;border:1px solid var(--line-strong)}
+  .card .ic svg{width:22px;height:22px;stroke-width:1.7;fill:none;stroke:var(--ink);stroke-linecap:round;stroke-linejoin:round}
+  .card h3{font-size:18px;letter-spacing:-0.01em}
+  .card .en{font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:0.04em;margin-top:3px;display:block}
+  .card p{font-size:14.5px;color:var(--ink-soft);margin:13px 0 0;line-height:1.55}
+  .card .q{margin-top:14px;font-family:var(--mono);font-size:12px;color:var(--ink);border-top:1px dashed #17140f33;padding-top:11px}
+  .card .q::before{content:"› ";color:var(--orange)}
+  .card .tag{position:absolute;top:18px;right:18px;width:9px;height:9px;border-radius:50%}
+
+  /* pipeline / how it works */
+  .pipe-wrap{background:var(--dark);color:var(--on-dark);border-radius:18px;padding:42px 30px;border:1px solid var(--ink);overflow:hidden;position:relative}
+  .pipe-wrap::before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff09 1px,transparent 1px),linear-gradient(90deg,#ffffff09 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(120% 100% at 50% 0%,#000,transparent 80%)}
+  .pipe{position:relative;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);gap:0;align-items:stretch}
+  @media(max-width:900px){.pipe{grid-template-columns:1fr;gap:0}}
+  .stage{padding:22px 20px;position:relative}
+  .stage:not(:last-child)::after{ /* connector */
+    content:"";position:absolute;top:54px;right:-1px;width:2px;height:calc(100% - 54px);background:#ffffff14;
+  }
+  .stage .n{font-family:var(--mono);font-size:11px;color:var(--on-dark-soft);letter-spacing:0.1em}
+  .stage h3{font-size:19px;margin:10px 0 4px;color:#fff}
+  .stage .sub{font-family:var(--mono);font-size:11.5px;color:var(--yellow)}
+  .stage p{font-size:13.5px;color:var(--on-dark-soft);margin:12px 0 0;line-height:1.55}
+  .flowline{position:relative;z-index:2;height:3px;margin:8px 12px 0;border-radius:2px;background:linear-gradient(90deg,#f54e00,#f7bb1e,#1f9d57,#2f50ff);background-size:200% 100%;overflow:hidden}
+  .flowline::after{content:"";position:absolute;top:-2.5px;left:0;width:60px;height:8px;border-radius:8px;background:#fff;filter:blur(3px);opacity:.85;animation:flow 3.4s linear infinite}
+  @keyframes flow{from{left:-10%}to{left:105%}}
+  @media(max-width:900px){.flowline{display:none}.stage:not(:last-child)::after{top:auto;bottom:-1px;right:auto;left:20px;width:calc(100% - 40px);height:2px}}
+
+  /* pricing */
+  .price-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:start}
+  @media(max-width:860px){.price-grid{grid-template-columns:1fr}}
+  .price-card{border:1px solid var(--line-strong);border-radius:var(--radius);padding:26px;background:#fffdf7}
+  .meter{margin:8px 0 18px}
+  .meter .bar{height:30px;border-radius:8px;overflow:hidden;display:flex;border:1px solid var(--line-strong)}
+  .meter .free{background:var(--green);width:58%;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:0.04em}
+  .meter .paid{background:repeating-linear-gradient(135deg,#f54e00,#f54e00 8px,#e64800 8px,#e64800 16px);flex:1;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-size:11px}
+  .meter .lab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:7px}
+  .price-points{list-style:none;padding:0;margin:0;display:grid;gap:14px}
+  .price-points li{display:flex;gap:13px;align-items:flex-start;font-size:15px}
+  .price-points .big{font-family:var(--mono);font-weight:700;font-size:22px;color:var(--orange);min-width:62px;line-height:1.2}
+  .price-points .big.b{color:var(--blue)}
+  .price-points .big.g{color:var(--green)}
+  .price-points small{display:block;color:var(--ink-soft);font-size:13px;font-family:var(--body)}
+  .freechips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .freechips .c{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line-strong);border-radius:7px;padding:6px 10px;background:#fff}
+  .freechips .c b{color:var(--green)}
+  .note{font-size:12.5px;color:var(--ink-soft);margin-top:14px;font-family:var(--mono);line-height:1.6}
+
+  /* finsight */
+  .fin{background:var(--paper-2)}
+  .ev-table{width:100%;border-collapse:collapse;border:1px solid var(--line-strong);border-radius:var(--radius);overflow:hidden;background:#fffdf7;font-size:14.5px}
+  .ev-table th,.ev-table td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .ev-table thead th{background:var(--dark);color:var(--on-dark);font-family:var(--mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;font-weight:400}
+  .ev-table tbody tr:last-child td{border-bottom:none}
+  .ev-table tbody tr:hover{background:#fff}
+  .ev-table code{font-family:var(--mono);font-size:12.5px;background:#17140f0d;padding:2px 7px;border-radius:6px;color:var(--orange);white-space:nowrap}
+  .ev-table .file{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+  @media(max-width:760px){.ev-table .file{display:none}.ev-table th:nth-child(3){display:none}.ev-table td:nth-child(3){display:none}}
+  .fin-flow{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;align-items:center;font-family:var(--mono);font-size:12px}
+  .fin-flow .node{border:1px solid var(--line-strong);background:#fffdf7;border-radius:9px;padding:9px 13px}
+  .fin-flow .node b{color:var(--blue)}
+  .fin-flow .ar{color:var(--orange);font-size:16px}
+
+  /* personality */
+  .traits{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:860px){.traits{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.traits{grid-template-columns:1fr}}
+  .trait{border:1px solid var(--line-strong);border-radius:var(--radius);padding:22px;background:#fffdf7}
+  .trait .e{font-size:26px}
+  .trait h3{font-size:16px;margin:12px 0 6px}
+  .trait p{font-size:13.5px;color:var(--ink-soft);margin:0;line-height:1.55}
+
+  /* footer */
+  footer{background:var(--dark);color:var(--on-dark);padding:54px 0 40px;border-bottom:none}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:30px;justify-content:space-between;align-items:flex-start}
+  footer h3{font-size:22px;color:#fff}
+  footer p{color:var(--on-dark-soft);font-size:14px;max-width:46ch;margin:12px 0 0}
+  footer .links{display:flex;flex-direction:column;gap:9px;font-family:var(--mono);font-size:13px}
+  footer .links a{color:var(--on-dark-soft);text-decoration:none;transition:color .15s}
+  footer .links a:hover{color:var(--orange)}
+  footer .fine{width:100%;border-top:1px solid #ffffff14;margin-top:34px;padding-top:18px;font-family:var(--mono);font-size:11px;color:#6f6857;line-height:1.7}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.flowline::after,.cur,.ticker .row{animation:none}}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span>PostHog<span style="color:var(--ink-soft);font-weight:400;font-size:13px;font-family:var(--mono)">/ 한 장 설명서</span></div>
+    <nav class="navlinks">
+      <a href="#what">개념</a>
+      <a href="#suite">제품군</a>
+      <a href="#how">동작 원리</a>
+      <a href="#pricing">가격</a>
+      <a href="#finsight">finsight 연동</a>
+    </nav>
+  </div>
+</div>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="wrap">
+    <span class="badge reveal">데이터 스택 · <b>오픈소스</b> · 사용량 과금</span>
+    <h1 class="reveal">제품을 만드는 엔지니어를 위한 <span class="hl">올인원</span> <span class="hl2">데이터 스택</span></h1>
+    <p class="lede reveal">분석 도구, 세션 리플레이, 피처 플래그, A/B 실험, 데이터 웨어하우스를 <b style="color:var(--on-dark)">하나의 플랫폼</b>으로 묶은 제품. 5~6개 SaaS를 따로 붙이고 데이터를 흩뜨릴 필요 없이, 같은 이벤트 데이터를 모든 제품이 함께 본다.</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="#suite">제품군 살펴보기 ↓</a>
+      <a class="btn btn-ghost" href="#finsight">finsight엔 어떻게 들어있나</a>
+    </div>
+
+    <div class="term reveal" aria-label="코드 예시">
+      <div class="bar">
+        <i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i>
+        <span class="t">UploadPanel.tsx — 이벤트 한 줄이면 캡처</span>
+      </div>
+<pre><span class="c-com">// 클라이언트: 사용자가 명세서를 업로드하면</span>
+posthog.<span class="c-fn">capture</span>(<span class="c-str">'statement_uploaded'</span>, {
+  <span class="c-key">file_type</span>: <span class="c-str">'csv'</span>,
+  <span class="c-key">tier</span>: <span class="c-str">'free'</span>,
+})
+
+<span class="c-com">// 이 한 줄로 분석·퍼널·세션리플레이·플래그가 동시에 활성화된다</span><span class="cur"></span></pre>
+    </div>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker" aria-hidden="true">
+  <div class="row">
+    <span><b>Product Analytics</b><i class="sep">◆</i><b>Web Analytics</b><i class="sep">◆</i><b>Session Replay</b><i class="sep">◆</i><b>Feature Flags</b><i class="sep">◆</i><b>Experiments (A/B)</b><i class="sep">◆</i><b>Surveys</b><i class="sep">◆</i><b>Error Tracking</b><i class="sep">◆</i><b>Data Warehouse</b><i class="sep">◆</i><b>LLM Analytics</b><i class="sep">◆</i><b>CDP</b><i class="sep">◆</i></span>
+    <span><b>Product Analytics</b><i class="sep">◆</i><b>Web Analytics</b><i class="sep">◆</i><b>Session Replay</b><i class="sep">◆</i><b>Feature Flags</b><i class="sep">◆</i><b>Experiments (A/B)</b><i class="sep">◆</i><b>Surveys</b><i class="sep">◆</i><b>Error Tracking</b><i class="sep">◆</i><b>Data Warehouse</b><i class="sep">◆</i><b>LLM Analytics</b><i class="sep">◆</i><b>CDP</b><i class="sep">◆</i></span>
+  </div>
+</div>
+
+<!-- WHAT -->
+<section id="what">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kick">01 / 한 문장 정의</span>
+      <h2>여러 개의 분석 SaaS를, 하나의 데이터 위에서.</h2>
+      <p>보통 스타트업은 행동 분석은 Mixpanel, 히트맵/리플레이는 Hotjar, 기능 토글은 LaunchDarkly, 실험은 Optimizely, 데이터 통합은 Segment를 따로 쓴다. 도구마다 데이터가 갈라지고 SDK·비용·정합성이 따로 논다. PostHog는 이걸 <b>한 플랫폼·한 이벤트 스트림</b>으로 합친다.</p>
+    </div>
+
+    <div class="replace">
+      <div class="stack-old reveal">
+        <h3>🧩 흔한 분석 스택</h3>
+        <div class="pill-list">
+          <span class="pill">Mixpanel</span>
+          <span class="pill">Amplitude</span>
+          <span class="pill">Hotjar</span>
+          <span class="pill">FullStory</span>
+          <span class="pill">LaunchDarkly</span>
+          <span class="pill">Optimizely</span>
+          <span class="pill">Segment</span>
+          <span class="pill">Sentry</span>
+          <span class="pill">Typeform</span>
+        </div>
+        <p style="font-size:13px;color:var(--ink-soft);margin:16px 0 0;font-family:var(--mono)">→ SDK 9개, 비용 9개, 갈라진 데이터</p>
+      </div>
+
+      <div class="arrow-mid reveal">
+        <span class="big">→</span>
+        하나로<br>합침
+      </div>
+
+      <div class="stack-new reveal">
+        <h3 style="color:#fff">🦔 PostHog 하나</h3>
+        <div class="pill-list">
+          <span class="pill">Analytics</span>
+          <span class="pill">Replay</span>
+          <span class="pill">Flags</span>
+          <span class="pill">Experiments</span>
+          <span class="pill">Surveys</span>
+          <span class="pill">Error Tracking</span>
+          <span class="pill">Warehouse</span>
+          <span class="pill">LLM Analytics</span>
+          <span class="pill">CDP</span>
+        </div>
+        <p style="font-size:13px;color:var(--on-dark-soft);margin:16px 0 0;font-family:var(--mono)">→ SDK 1개, 같은 이벤트, 같은 사용자</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUITE -->
+<section id="suite">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kick">02 / 제품군</span>
+      <h2>한 SDK가 켜는 10개의 제품</h2>
+      <p>각 카드는 "어떤 질문에 답하는가"로 읽으면 쉽다. 모두 같은 이벤트·사용자 데이터를 공유하므로, 분석에서 발견한 코호트를 그대로 플래그·실험·설문 대상으로 넘길 수 있다.</p>
+    </div>
+
+    <div class="grid">
+      <!-- 1 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--blue)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="7" width="3" height="9"/><rect x="17" y="13" width="3" height="3"/></svg></div>
+        <h3>Product Analytics<span class="en">제품 분석</span></h3>
+        <p>이벤트·퍼널·리텐션·경로 분석으로 사용자가 제품을 어떻게 쓰는지 측정한다.</p>
+        <div class="q">가입 후 핵심 행동까지 몇 %가 도달하나?</div>
+      </div>
+      <!-- 2 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--blue)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg></div>
+        <h3>Web Analytics<span class="en">웹 분석</span></h3>
+        <p>방문자·세션·유입 채널·페이지 성과를 GA 스타일 대시보드로 본다.</p>
+        <div class="q">어떤 캠페인이 트래픽을 데려오나?</div>
+      </div>
+      <!-- 3 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--orange)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="13" rx="2"/><path d="M10 9.5l4 2.5l-4 2.5z" fill="var(--ink)" stroke="none"/></svg></div>
+        <h3>Session Replay<span class="en">세션 리플레이</span></h3>
+        <p>실제 사용자의 화면 조작을 영상처럼 재생해 막히는 지점을 눈으로 본다.</p>
+        <div class="q">사용자는 어디서 멈칫하고 이탈하나?</div>
+      </div>
+      <!-- 4 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--green)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="5" rx="2.5"/><circle cx="16.5" cy="8.5" r="1.4" fill="var(--ink)" stroke="none"/><rect x="3" y="14" width="18" height="5" rx="2.5"/><circle cx="7.5" cy="16.5" r="1.4" fill="var(--ink)" stroke="none"/></svg></div>
+        <h3>Feature Flags<span class="en">피처 플래그</span></h3>
+        <p>코드 배포 없이 기능을 켜고/끄고, 특정 사용자·비율에만 점진 롤아웃한다.</p>
+        <div class="q">신기능을 5%에게만 먼저 열까?</div>
+      </div>
+      <!-- 5 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--violet)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M7 7l-3 5l3 5"/><path d="M17 7l3 5l-3 5"/></svg></div>
+        <h3>Experiments<span class="en">A/B 실험</span></h3>
+        <p>플래그 위에서 변형(variant)을 나눠 지표 변화를 통계적 유의성과 함께 측정한다.</p>
+        <div class="q">새 CTA가 전환을 정말 올렸나?</div>
+      </div>
+      <!-- 6 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--yellow)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M5 4h14v13l-4-3H5z"/><path d="M9 9h6"/><path d="M9 12h3"/></svg></div>
+        <h3>Surveys<span class="en">설문</span></h3>
+        <p>제품 안에서 NPS·만족도·피드백을 특정 조건의 사용자에게 띄워 수집한다.</p>
+        <div class="q">이탈 직전 사용자는 무엇이 불편했나?</div>
+      </div>
+      <!-- 7 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--orange)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="16.5" r=".6" fill="var(--ink)" stroke="none"/></svg></div>
+        <h3>Error Tracking<span class="en">에러 추적</span></h3>
+        <p>예외·스택트레이스를 묶어 추적하고, 영향받은 사용자·세션과 바로 연결한다.</p>
+        <div class="q">이 에러가 누구의 어떤 흐름을 깼나?</div>
+      </div>
+      <!-- 8 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--blue)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></div>
+        <h3>Data Warehouse<span class="en">데이터 웨어하우스</span></h3>
+        <p>Stripe·Postgres 등 외부 데이터를 끌어와 이벤트와 함께 SQL로 조인·질의한다.</p>
+        <div class="q">결제 데이터와 행동을 한 쿼리로?</div>
+      </div>
+      <!-- 9 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--violet)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="2"/><path d="M12 8V5"/><circle cx="12" cy="4" r="1.4"/><circle cx="9" cy="13" r="1" fill="var(--ink)" stroke="none"/><circle cx="15" cy="13" r="1" fill="var(--ink)" stroke="none"/><path d="M9.5 16h5"/></svg></div>
+        <h3>LLM Analytics<span class="en">LLM 관측</span></h3>
+        <p>AI 앱의 프롬프트·토큰·비용·지연·트레이스를 추적한다(생성형 제품용).</p>
+        <div class="q">어떤 프롬프트가 비싸고 느린가?</div>
+      </div>
+      <!-- 10 -->
+      <div class="card reveal">
+        <span class="tag" style="background:var(--green)"></span>
+        <div class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.4"/><circle cx="18" cy="7" r="2.4"/><circle cx="12" cy="17" r="2.4"/><path d="M7.7 8.6L11 15"/><path d="M16.3 8.6L13 15"/></svg></div>
+        <h3>CDP &amp; Pipelines<span class="en">데이터 플랫폼</span></h3>
+        <p>120+ 소스/목적지로 이벤트를 받아서 Slack·웨어하우스 등으로 내보낸다.</p>
+        <div class="q">이 이벤트를 다른 도구로도 흘려보낼까?</div>
+      </div>
+      <!-- bonus cell to fill the 12-grid nicely on 3-col -->
+      <div class="card reveal" style="background:var(--dark);color:var(--on-dark)">
+        <div class="ic" style="border-color:#ffffff2a"><svg viewBox="0 0 24 24" style="stroke:var(--yellow)"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h13"/></svg></div>
+        <h3 style="color:#fff">SQL Editor &amp; BI<span class="en" style="color:var(--on-dark-soft)">조회·시각화</span></h3>
+        <p style="color:var(--on-dark-soft)">HogQL/SQL로 직접 질의하고, 인사이트·대시보드·노트북으로 묶어 공유한다.</p>
+        <div class="q" style="border-top-color:#ffffff2a;color:#fff">자유롭게 파고들 마지막 한 겹.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kick">03 / 동작 원리</span>
+      <h2>이벤트 하나가 흐르는 길</h2>
+      <p>SDK가 캡처한 이벤트는 <code style="font-family:var(--mono);font-size:13px;color:var(--orange)">/ingest</code> 리버스 프록시(애드블록 우회·퍼스트파티)를 거쳐 수집·저장되고, 모든 제품이 <b>같은 이벤트·사용자 테이블</b>을 조회한다. 그래서 분석·리플레이·플래그가 따로 적재할 필요가 없다.</p>
+    </div>
+
+    <div class="pipe-wrap reveal">
+      <div class="flowline"></div>
+      <div class="pipe">
+        <div class="stage">
+          <div class="n">STAGE 01</div>
+          <h3>캡처</h3>
+          <div class="sub">posthog-js · posthog-node</div>
+          <p>클라이언트(브라우저)와 서버(API·서버액션) 양쪽에서 <code style="color:var(--yellow);font-family:var(--mono);font-size:12px">capture()</code> 한 줄로 이벤트를 기록하고, 로그인 시 <code style="color:var(--yellow);font-family:var(--mono);font-size:12px">identify()</code>로 사람을 묶는다.</p>
+        </div>
+        <div class="stage">
+          <div class="n">STAGE 02</div>
+          <h3>리버스 프록시</h3>
+          <div class="sub">/ingest → us.posthog.com</div>
+          <p>Next.js rewrite로 이벤트를 자체 도메인으로 받아 PostHog로 포워딩. 퍼스트파티라 광고차단기에 덜 막히고 데이터 손실이 준다.</p>
+        </div>
+        <div class="stage">
+          <div class="n">STAGE 03</div>
+          <h3>수집·저장</h3>
+          <div class="sub">events · persons</div>
+          <p>이벤트와 속성이 컬럼형 스토어에 적재되고 사람(person)에 연결된다. <b style="color:var(--on-dark)">Person-on-events</b>: 속성은 이벤트 시점 값으로 박제된다.</p>
+        </div>
+        <div class="stage">
+          <div class="n">STAGE 04</div>
+          <h3>제품이 조회</h3>
+          <div class="sub">한 데이터 · 모든 제품</div>
+          <p>분석·퍼널·리플레이·플래그·실험·웨어하우스가 같은 테이블을 읽는다. 한 곳에서 만든 코호트를 다른 제품이 즉시 재사용한다.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kick">04 / 가격 철학</span>
+      <h2>좌석이 아니라 사용량으로 낸다</h2>
+      <p>모든 유료 제품은 <b>제품별 월 무료 한도</b>를 넉넉히 주고, 초과분만 사용량 과금한다. 인원(seat)당 요금이 없어서 팀을 무제한으로 초대해도 비용이 늘지 않는다. 볼륨이 커질수록 단가는 떨어진다.</p>
+    </div>
+
+    <div class="price-grid">
+      <div class="price-card reveal">
+        <div class="kick" style="margin-bottom:10px">제품별 과금 모델</div>
+        <div class="meter">
+          <div class="bar">
+            <div class="free">무료 한도 (대부분 여기서 끝남)</div>
+            <div class="paid">초과분만 과금</div>
+          </div>
+          <div class="lab"><span>$0 — 매월 리셋되는 free tier</span><span>사용량 비례 →</span></div>
+        </div>
+        <p style="font-size:14px;color:var(--ink-soft);margin:0 0 14px">제품마다 매월 새로 채워지는 무료 한도가 있다. 대표적인 무료 한도(변동 가능, 시점에 따라 다름):</p>
+        <div class="freechips">
+          <span class="c"><b>~1M</b> 이벤트/월</span>
+          <span class="c"><b>~5K</b> 리플레이/월</span>
+          <span class="c"><b>~1M</b> 플래그 요청/월</span>
+          <span class="c"><b>~250</b> 설문 응답/월</span>
+        </div>
+        <div class="note">* 위 수치는 이해를 돕는 대표값이며 PostHog 공식 가격 페이지가 정본이다. 좌석 과금은 없다.</div>
+      </div>
+
+      <div class="price-card reveal" style="background:var(--dark);color:var(--on-dark);border-color:var(--ink)">
+        <div class="kick" style="margin-bottom:18px;color:var(--on-dark-soft)">핵심 숫자</div>
+        <ul class="price-points">
+          <li><span class="big g">98%</span><div>고객은 무료 티어 안에서만 쓴다.<small>대부분은 한 푼도 안 낸다는 의미.</small></div></li>
+          <li><span class="big b">$0</span><div>좌석(per-seat) 요금.<small>팀원·뷰어를 무제한 초대해도 동일.</small></div></li>
+          <li><span class="big">↓</span><div>볼륨이 커질수록 이벤트 단가는 하락.<small>슬라이딩 단가 — 성장해도 폭증하지 않게.</small></div></li>
+        </ul>
+        <div class="note" style="color:var(--on-dark-soft);border-top:1px solid #ffffff1f;padding-top:14px;margin-top:20px">제품을 켜고 끄는 건 자유 — 쓰는 제품의 사용량에만 과금된다.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINSIGHT -->
+<section id="finsight" class="fin">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kick">05 / 이 레포 안에서</span>
+      <h2>finsight는 PostHog를 이렇게 쓴다</h2>
+      <p>이 프로젝트엔 PostHog가 이미 연동돼 있다. 클라이언트는 <code style="font-family:var(--mono);font-size:13px;color:var(--orange)">instrumentation-client.ts</code>, 서버는 <code style="font-family:var(--mono);font-size:13px;color:var(--orange)">src/lib/posthog-server.ts</code>로 캡처하고, Google OAuth 콜백에서 사용자를 <code style="font-family:var(--mono);font-size:13px;color:var(--orange)">identify</code>한다. 제품 생애주기를 덮는 <b>8개 이벤트</b>가 박혀 있다.</p>
+    </div>
+
+    <div class="reveal">
+    <table class="ev-table">
+      <thead>
+        <tr><th>이벤트</th><th>의미</th><th>위치</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>statement_uploaded</code></td><td>사용자가 CSV/PDF 명세서를 업로드</td><td class="file">UploadPanel.tsx</td></tr>
+        <tr><td><code>statement_analyzed</code></td><td>분석이 성공적으로 끝나 결과 표시</td><td class="file">UploadPanel.tsx</td></tr>
+        <tr><td><code>analysis_failed</code></td><td>네트워크/서버 오류로 분석 실패</td><td class="file">UploadPanel.tsx</td></tr>
+        <tr><td><code>checkout_initiated</code></td><td>Pro 구독 체크아웃 시작</td><td class="file">api/checkout/route.ts</td></tr>
+        <tr><td><code>subscription_canceled</code></td><td>기간 종료 시점 구독 취소 요청</td><td class="file">api/subscription/cancel/route.ts</td></tr>
+        <tr><td><code>subscription_resumed</code></td><td>예약 취소를 되돌려 구독 재개</td><td class="file">api/subscription/cancel/route.ts</td></tr>
+        <tr><td><code>user_signed_in</code></td><td>Google OAuth 로그인 완료</td><td class="file">auth/callback/route.ts</td></tr>
+        <tr><td><code>user_signed_out</code></td><td>로그아웃</td><td class="file">(dashboard)/actions.ts</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="fin-flow reveal">
+      <span class="node">브라우저 <b>posthog-js</b></span>
+      <span class="ar">→</span>
+      <span class="node">서버 <b>posthog-node</b></span>
+      <span class="ar">→</span>
+      <span class="node">rewrite <b>/ingest</b></span>
+      <span class="ar">→</span>
+      <span class="node">PostHog 수집</span>
+      <span class="ar">→</span>
+      <span class="node">퍼널·인사이트·대시보드</span>
+    </div>
+
+    <p style="font-size:14px;color:var(--ink-soft);margin-top:22px;max-width:64ch">이 이벤트들로 <b>Pro 업그레이드 퍼널</b>, <b>업로드↔분석 추이</b>, <b>분석 실패율</b>, <b>가입·구독 취소/재개</b> 인사이트가 만들어진다. 같은 데이터 위에 세션 리플레이를 켜면 "왜 분석이 실패했는지"를 실제 화면으로 되짚을 수 있다 — 추가 SDK 없이.</p>
+  </div>
+</section>
+
+<!-- PERSONALITY -->
+<section>
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="kick">06 / 성격</span>
+      <h2>왜 개발자들이 좋아하나</h2>
+    </div>
+    <div class="traits">
+      <div class="trait reveal"><div class="e">🔓</div><h3>오픈소스</h3><p>셀프호스팅 가능. 데이터 주권과 투명성을 중시하는 팀에 맞는다.</p></div>
+      <div class="trait reveal"><div class="e">🧮</div><h3>사용량 과금</h3><p>좌석 요금 없음. 안 쓰면 안 낸다. 98%는 무료 티어 안에서 끝난다.</p></div>
+      <div class="trait reveal"><div class="e">🧰</div><h3>올인원</h3><p>분석·리플레이·플래그·실험·웨어하우스를 한 SDK로. 스택을 줄인다.</p></div>
+      <div class="trait reveal"><div class="e">🦔</div><h3>장난기 있는 보이스</h3><p>마스코트 Hogzilla, 자조적인 마케팅, 안티-하이프. 엔지니어가 만든 톤.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div>
+      <h3>PostHog, 한 줄 요약</h3>
+      <p>제품을 만드는 엔지니어가 "무엇을 만들지" 결정하는 데 필요한 데이터·실험·관측을 하나의 오픈소스 스택으로 묶은 도구. finsight에도 이미 8개 이벤트로 들어와 있다.</p>
+    </div>
+    <div class="links">
+      <a href="https://posthog.com/" target="_blank" rel="noopener">→ posthog.com</a>
+      <a href="https://posthog.com/docs" target="_blank" rel="noopener">→ docs</a>
+      <a href="https://posthog.com/pricing" target="_blank" rel="noopener">→ pricing (정본)</a>
+      <a href="https://github.com/PostHog/posthog" target="_blank" rel="noopener">→ github (오픈소스)</a>
+    </div>
+    <div class="fine">
+      이 페이지는 PostHog를 설명·시각화하기 위한 비공식 자료입니다. 제품 구성과 무료 한도·가격은 변경될 수 있으며, 정확한 수치는 PostHog 공식 페이지가 정본입니다. · finsight 연동 내용은 이 레포의 posthog-setup-report.md 및 소스 기준.
+    </div>
+  </div>
+</footer>
+
+<script>
+  // staggered reveal on scroll
+  (function(){
+    var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+    if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return;}
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){
+          var sibs = Array.prototype.slice.call(en.target.parentNode.querySelectorAll(':scope > .reveal'));
+          var idx = sibs.indexOf(en.target);
+          en.target.style.transitionDelay = Math.min(idx,8)*60 + 'ms';
+          en.target.classList.add('in');
+          io.unobserve(en.target);
+        }
+      });
+    },{threshold:0.12, rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){io.observe(e)});
+    // hero reveals immediately, staggered
+    document.querySelectorAll('.hero .reveal').forEach(function(e,i){
+      e.style.transitionDelay = (i*90)+'ms';
+      requestAnimationFrame(function(){e.classList.add('in')});
+    });
+  })();
+</script>
+</body>
+</html>

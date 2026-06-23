@@ -1,0 +1,32 @@
+name: ci
+
+# lint + build + test. PR과 main push에서 돈다. oncall-ci-fix.yml이 이 워크플로우의
+# 실패(conclusion=failure)에 반응해 자동 수정 PR을 연다. 이 잡 자체엔 secret이 필요 없다
+# (FinSight는 외부 클라이언트를 호출 시점 지연 생성 — 키 없이 build/test가 통과해야 한다).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test

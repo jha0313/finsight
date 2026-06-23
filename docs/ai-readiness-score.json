@@ -1,0 +1,277 @@
+{
+  "meta": {
+    "repo": "finsight",
+    "path": "/Users/jaeha/Projects/finsight",
+    "scored_at": "2026-06-08",
+    "git_branch": "main",
+    "rubric_version": "v2-100pt",
+    "modules_total": 3,
+    "context_files_total": 2,
+    "large_files_300plus": 8
+  },
+  "total": 20,
+  "grade": "AI-Hostile",
+  "grade_color": "red",
+  "categories": {
+    "A": {
+      "name": "AI Navigation & Coverage",
+      "score": 0,
+      "max": 15,
+      "evidence": {
+        "core_modules": 3,
+        "covered_modules": 0,
+        "coverage_ratio": 0.0,
+        "root_claude": "CLAUDE.md"
+      },
+      "sub_scores": {},
+      "findings": [
+        "context 미보유 핵심 module 3개: scripts, src, supabase"
+      ]
+    },
+    "B": {
+      "name": "Context Document Quality",
+      "score": 8,
+      "max": 20,
+      "evidence": {
+        "context_files": 2,
+        "max_lines": 73,
+        "min_lines": 45
+      },
+      "sub_scores": {
+        "B1_Conciseness": 4,
+        "B2_QuickCommands": 0,
+        "B3_KeyFiles": 4,
+        "B4_NonObvious": 0,
+        "B5_CrossRefs": 0
+      },
+      "findings": [
+        "bash 코드블록이 부족 — quick command 보강 필요",
+        "Why/Note/Gotcha 같은 hidden rule 마커 부족",
+        "관련 module / context 간 cross-link 부족"
+      ]
+    },
+    "C": {
+      "name": "Tribal Knowledge Externalization",
+      "score": 0,
+      "max": 20,
+      "evidence": {
+        "memory_md": false,
+        "adr": false,
+        "modules_total": 3,
+        "q1_owns": 0,
+        "q2_patterns": 0,
+        "q3_nonobvious": 0,
+        "q4_deps": 0
+      },
+      "sub_scores": {
+        "C_Q1_Owns": 0,
+        "C_Q2_Patterns": 0,
+        "C_Q3_NonObvious": 0,
+        "C_Q4_Dependencies": 0,
+        "C_Q5_TribalStore": 0
+      },
+      "findings": [
+        "MEMORY.md / ADR / docs/decisions 부재 — tribal knowledge 외부화 store 없음",
+        "Cross-module dependencies 섹션이 절반 이상 module에서 누락",
+        "Common modification patterns 섹션 누락"
+      ]
+    },
+    "D": {
+      "name": "Cross-Module Dependency Mapping",
+      "score": 6,
+      "max": 15,
+      "evidence": {
+        "architecture_doc": true,
+        "mermaid_diagrams": false,
+        "context_with_deps_section": 0,
+        "monorepo_workspace": false
+      },
+      "sub_scores": {},
+      "findings": [
+        "mermaid 다이어그램 없음 — 시각적 의존도 표현 부재",
+        "어떤 context file에도 cross-module dependency 섹션 없음"
+      ]
+    },
+    "E": {
+      "name": "Verification & Quality Gates",
+      "score": 6,
+      "max": 15,
+      "evidence": {
+        "ref_total": 17,
+        "ref_broken": 4,
+        "codeowners": false,
+        "pr_template": false,
+        "ci_workflows": false,
+        "husky": false,
+        "evals_dir": false
+      },
+      "sub_scores": {
+        "E1_RefAccuracy": 4,
+        "E2_CriticReview": 0,
+        "E3_TaskValidation": 2,
+        "E4_PromptTests": 0
+      },
+      "findings": [
+        "hallucinated path 4건 (총 17 참조 중) — 예: AGENTS.md: claude/settings.js, AGENTS.md: codex/hooks.js, AGENTS.md: claude/skills/vantage-design/colors_and_type.css, CLAUDE.md: claude/skills/vantage-design/colors_and_type.css",
+        "CODEOWNERS / PR template 없음 — independent critic infra 부재",
+        "agent eval / prompt test 디렉터리 없음 — AI 회귀 catch 없음"
+      ]
+    },
+    "F": {
+      "name": "Freshness & Self-Maintenance",
+      "score": 0,
+      "max": 10,
+      "evidence": {
+        "drifted_modules": 0,
+        "measurable_modules": 0,
+        "drift_ratio": 0.0,
+        "ctx_validation_workflow": false,
+        "hook_validates_paths": false
+      },
+      "sub_scores": {},
+      "findings": [
+        "CI에 context / docs validation step 없음",
+        "pre-commit / pre-push hook에 path 검증 없음"
+      ]
+    },
+    "G": {
+      "name": "Agent Performance Outcomes",
+      "score": 0,
+      "max": 5,
+      "evidence": {
+        "eval_dirs": [],
+        "metric_files": [],
+        "telemetry_hint": false
+      },
+      "sub_scores": {},
+      "findings": [
+        "agent eval / benchmark 디렉터리·결과 파일 부재 — 성능 측정 인프라 없음",
+        "AI usage telemetry 단서 없음 (session log / OpenTelemetry)"
+      ]
+    }
+  },
+  "insights": [
+    "총점 20/100 · 등급 AI-Hostile",
+    "가장 낮은 카테고리: A AI Navigation & Coverage 0/15",
+    "가장 낮은 카테고리: C Tribal Knowledge Externalization 0/20",
+    "⚠️  context에 hallucinated path 4건 — Meta 기준으로는 0이어야 함"
+  ],
+  "actions": [
+    {
+      "title": "context의 hallucinated path 4건 수정 (referential trust)",
+      "category": "E",
+      "effort": "S",
+      "effort_hours": 0.5,
+      "impact": "agent의 잘못된 path-following 방지 — stale = worse than missing",
+      "impact_score": 10,
+      "priority": 20.0
+    },
+    {
+      "title": "CI 또는 pre-push hook에 context path 검증 추가",
+      "category": "F",
+      "effort": "S",
+      "effort_hours": 1.0,
+      "impact": "stale reference를 코드 머지 시점에 차단 — 회귀 방지",
+      "impact_score": 8,
+      "priority": 8.0
+    },
+    {
+      "title": "3개 핵심 module에 CLAUDE.md 신설 (scripts, src, supabase)",
+      "category": "A",
+      "effort": "S",
+      "effort_hours": 1.5,
+      "impact": "task당 ~3 min × ~5 task/일 절감 → 모듈 1개당 주 1-2 hr 회수",
+      "impact_score": 9,
+      "priority": 6.0
+    },
+    {
+      "title": "MEMORY.md 또는 docs/adr/ 도입으로 tribal knowledge 외부화",
+      "category": "C",
+      "effort": "M",
+      "effort_hours": 3.0,
+      "impact": "senior 의존 의사결정 외부화 → 신규 agent run 시 오류 ↓",
+      "impact_score": 8,
+      "priority": 2.6666666666666665
+    },
+    {
+      "title": "evals/ 디렉터리 + 대표 task pass-rate 측정 도입",
+      "category": "G",
+      "effort": "L",
+      "effort_hours": 6.0,
+      "impact": "AI 회귀 측정 가능 — 개선 ROI 자체를 정량화",
+      "impact_score": 6,
+      "priority": 1.0
+    },
+    {
+      "title": "god file 6개 분할 (>500 lines): src/lib/orchestration/index.test.ts (1136), src/lib/orchestration/index.ts (685), src/services/supabase/index.test.ts (667)",
+      "category": "B",
+      "effort": "L",
+      "effort_hours": 15.0,
+      "impact": "파일당 ~5K-10K token 절감 + 편집 정확도 ↑",
+      "impact_score": 6,
+      "priority": 0.4
+    }
+  ],
+  "extras": {
+    "modules": [
+      {
+        "path": "/Users/jaeha/Projects/finsight/scripts",
+        "rel": "scripts",
+        "code_files": 2,
+        "has_context": false,
+        "context_file": null,
+        "context_kind": ""
+      },
+      {
+        "path": "/Users/jaeha/Projects/finsight/src",
+        "rel": "src",
+        "code_files": 123,
+        "has_context": false,
+        "context_file": null,
+        "context_kind": ""
+      },
+      {
+        "path": "/Users/jaeha/Projects/finsight/supabase",
+        "rel": "supabase",
+        "code_files": 5,
+        "has_context": false,
+        "context_file": null,
+        "context_kind": ""
+      }
+    ],
+    "large_files": [
+      {
+        "path": "src/lib/orchestration/index.test.ts",
+        "lines": 1136
+      },
+      {
+        "path": "src/lib/orchestration/index.ts",
+        "lines": 685
+      },
+      {
+        "path": "src/services/supabase/index.test.ts",
+        "lines": 667
+      },
+      {
+        "path": "scripts/test_execute.py",
+        "lines": 567
+      },
+      {
+        "path": "src/services/supabase/index.ts",
+        "lines": 564
+      },
+      {
+        "path": "src/lib/csv/index.ts",
+        "lines": 563
+      },
+      {
+        "path": "scripts/execute.py",
+        "lines": 418
+      },
+      {
+        "path": "src/services/polar/index.test.ts",
+        "lines": 334
+      }
+    ]
+  }
+}
