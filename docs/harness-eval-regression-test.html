@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HARNESS EVAL — 반증 테스트 (게이트에 이빨이 있나)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f4f3ec; --paper:#ffffff; --ink:#0a0a0a;
+    --muted:#3a3a3a; --soft:#6f6f6f;
+    --yellow:#ffe000; --green:#00b341; --red:#ff2e2e; --blue:#2b4cff; --lilac:#c9b8ff;
+    --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink); --sh-lg:9px 9px 0 var(--ink);
+    --disp:'Space Mono',ui-monospace,monospace;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --kr:'Apple SD Gothic Neo','Pretendard',system-ui,sans-serif;
+    --bw:2.5px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--mono),var(--kr);line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:linear-gradient(var(--ink) .5px,transparent .5px),linear-gradient(90deg,var(--ink) .5px,transparent .5px);
+    background-size:26px 26px;background-position:-1px -1px;}
+  body::before{content:"";position:fixed;inset:0;background:var(--bg);opacity:.93;z-index:-1}
+  .wrap{max-width:1060px;margin:0 auto;padding:40px 22px 96px}
+  h1,h2,h3{font-family:var(--disp);font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.15}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  code{font-family:var(--mono);font-size:.86em;background:var(--yellow);border:1.5px solid var(--ink);padding:0 5px}
+
+  .eyebrow{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.2em;
+    text-transform:uppercase;background:var(--ink);color:var(--bg);display:inline-block;padding:4px 10px}
+  header h1{font-size:44px;margin:16px 0 12px;text-transform:uppercase}
+  header p.sub{font-family:var(--mono);color:var(--muted);font-size:15px;max-width:72ch;margin:0}
+  header p.sub b{color:var(--ink);background:var(--yellow);padding:0 3px}
+  .meta{display:flex;flex-wrap:wrap;gap:0;margin-top:22px;border:var(--bw) solid var(--ink);
+    box-shadow:var(--sh-sm);background:var(--paper)}
+  .meta div{font-family:var(--mono);font-size:12px;color:var(--soft);padding:9px 14px;
+    border-right:1.5px solid var(--ink);flex:1;min-width:150px}
+  .meta div:last-child{border-right:0}
+  .meta b{display:block;color:var(--ink);font-weight:600;font-size:13px;margin-top:2px}
+
+  /* hero verdict */
+  .hero{margin-top:26px;border:var(--bw) solid var(--ink);box-shadow:var(--sh-lg);background:var(--paper)}
+  .hero-top{background:var(--ink);color:var(--bg);padding:24px 26px}
+  .hero-top .q{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    background:var(--yellow);color:var(--ink);display:inline-block;padding:2px 9px}
+  .hero-top .a{font-family:var(--disp);font-size:25px;font-weight:700;margin-top:13px;line-height:1.3}
+  .hero-top .a em{font-style:normal;background:var(--red);color:var(--bg);padding:1px 9px}
+  .hero-bot{display:grid;grid-template-columns:repeat(3,1fr)}
+  .hero-cell{padding:15px 18px;border-right:1.5px solid var(--ink)}
+  .hero-cell:last-child{border-right:0}
+  .hero-cell .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+  .hero-cell .v{font-family:var(--mono);font-size:13.5px;font-weight:600;margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .flip{font-family:var(--disp);font-weight:700;padding:1px 7px;border:2px solid var(--ink)}
+  .flip.p{background:var(--green);color:var(--ink)} .flip.f{background:var(--red);color:var(--ink)}
+
+  section{margin-top:50px}
+  .sec-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;
+    border-bottom:var(--bw) solid var(--ink);padding-bottom:10px}
+  .sec-head .n{font-family:var(--disp);font-size:15px;font-weight:700;background:var(--ink);
+    color:var(--bg);width:34px;height:34px;display:flex;align-items:center;justify-content:center}
+  .sec-head h2{font-size:23px;text-transform:uppercase}
+  .lead{font-family:var(--mono);color:var(--muted);font-size:14.5px;max-width:80ch;margin:0 0 6px}
+  .lead b{color:var(--ink);background:var(--yellow);padding:0 3px}
+  .card{background:var(--paper);border:var(--bw) solid var(--ink);box-shadow:var(--sh)}
+
+  /* method */
+  .method{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap;overflow-x:auto}
+  .mstep{flex:1;min-width:140px;padding:15px 16px;border-right:2px solid var(--ink);display:flex;flex-direction:column;gap:4px}
+  .mstep:last-child{border-right:0}
+  .mstep .mt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--bg);background:var(--ink);align-self:flex-start;padding:2px 6px}
+  .mstep .md{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:3px}
+
+  /* experiment */
+  .exp{padding:20px 20px 18px;margin-top:18px}
+  .exp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:12px}
+  .exp-head .tag{font-family:var(--mono);font-size:11px;font-weight:700;padding:3px 9px;
+    border:2px solid var(--ink);text-transform:uppercase}
+  .exp-head .tag.rev{background:var(--blue);color:#fff}
+  .exp-head .tag.qa{background:var(--lilac);color:var(--ink)}
+  .exp-head h3{font-size:18px;text-transform:uppercase}
+  .exp-head .src{font-family:var(--mono);font-size:12px;color:var(--soft);margin-left:auto}
+  .exp .what{font-family:var(--mono);font-size:13px;color:var(--muted);margin:13px 0 16px;line-height:1.55}
+  .exp .what b{color:var(--ink)} .exp .what b.hl{background:var(--yellow)}
+
+  .ab{display:grid;grid-template-columns:1fr 40px 1fr;align-items:stretch;gap:0}
+  .panel{border:2px solid var(--ink);padding:15px 16px;display:flex;flex-direction:column;gap:11px}
+  .panel.before{background:#f2fbf5} .panel.after{background:#fff3f3}
+  .panel .ph{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    border-bottom:1.5px solid var(--ink);padding-bottom:9px}
+  .panel .ph .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--soft)}
+  .verdict{font-family:var(--disp);font-size:13px;font-weight:700;padding:3px 10px;border:2px solid var(--ink)}
+  .verdict.p{background:var(--green);color:var(--ink)} .verdict.f{background:var(--red);color:var(--ink)}
+  .panel .jr{font-family:var(--mono);font-size:12.5px;color:var(--muted);line-height:1.55}
+  .panel .jr b{color:var(--ink)} .panel .jr .jl{background:var(--ink);color:var(--bg);padding:0 5px;font-weight:600}
+  .flipmid{display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:22px}
+  .diff{margin-top:14px;background:var(--ink);padding:13px 15px;font-family:var(--mono);
+    font-size:12px;line-height:1.65;overflow-x:auto;color:#ddd;border:2px solid var(--ink)}
+  .diff .del{color:#ff6b6b;font-weight:600} .diff .ctx{color:#888}
+
+  /* table */
+  .card.tbl{padding:0;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+  thead th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--ink);
+    color:var(--bg);font-weight:600;text-align:left;padding:11px 16px;border-right:1.5px solid var(--bg)}
+  thead th:last-child{border-right:0}
+  thead th.c{text-align:center}
+  tbody td{padding:12px 16px;border-bottom:1.5px solid var(--ink);border-right:1.5px solid var(--ink);vertical-align:top}
+  tbody td:last-child{border-right:0}
+  tbody tr:last-child td{border-bottom:0}
+  td.c{text-align:center}
+  td .src{font-family:var(--disp);font-size:13px;font-weight:700}
+  td .sub{font-family:var(--mono);font-size:11px;color:var(--soft);margin-top:3px}
+  .vt{font-family:var(--disp);font-size:12px;font-weight:700;padding:2px 8px;border:2px solid var(--ink);display:inline-block}
+  .vt.p{background:var(--green);color:var(--ink)} .vt.f{background:var(--red);color:var(--ink)}
+  .arrowcell{font-family:var(--disp);font-weight:700}
+
+  /* key finding */
+  .callout{border:var(--bw) solid var(--ink);background:var(--yellow);box-shadow:var(--sh);padding:22px 24px}
+  .callout .ct{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .callout .ic{flex:0 0 34px;height:34px;background:var(--ink);color:var(--yellow);
+    display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:18px}
+  .callout h3{font-size:17px;text-transform:uppercase}
+  .callout p{font-family:var(--mono);font-size:13.5px;color:var(--ink);margin:0;line-height:1.6}
+  .callout p b{background:var(--ink);color:var(--yellow);padding:0 4px}
+  .gates{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+  .gate{border:2px solid var(--ink);padding:15px 17px;background:var(--paper)}
+  .gate .gc{font-family:var(--disp);font-size:14px;font-weight:700;padding:5px 11px;border:2px solid var(--ink);display:inline-block}
+  .gate.weak .gc{background:var(--red);color:var(--ink)}
+  .gate.strong .gc{background:var(--green);color:var(--ink)}
+  .gate p{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:12px 0 0;line-height:1.55}
+  .gate p b{color:var(--ink)}
+
+  .restore{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
+  .chip{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);
+    background:var(--green);border:2px solid var(--ink);box-shadow:var(--sh-sm);padding:7px 13px}
+
+  footer{margin-top:56px;border-top:var(--bw) solid var(--ink);padding-top:16px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    font-family:var(--mono);font-size:11.5px;color:var(--soft)}
+
+  @media (max-width:760px){
+    .hero-bot{grid-template-columns:1fr}
+    .hero-cell{border-right:0;border-bottom:1.5px solid var(--ink)}
+    .ab{grid-template-columns:1fr}
+    .flipmid{transform:rotate(90deg);padding:7px 0}
+    .gates{grid-template-columns:1fr}
+    header h1{font-size:30px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">finsight // harness eval // falsification</span>
+    <h1>반증 테스트</h1>
+    <p class="sub">게이트가 <b>rubber stamp(항상 green)</b>가 아니라 실제 회귀를 잡는지 확인한다. 방법은 단순하다 — eval이 의존하는 <b>지식원을 일부러 깨뜨리고</b>, 같은 케이스가 PASS에서 FAIL로 뒤집히는지 본다(A/B 대조).</p>
+    <div class="meta">
+      <div>RUN<b>2026-06-23 PDT</b></div>
+      <div>방식<b>scoped probe · 실제 subject→judge</b></div>
+      <div>대상<b>CLAUDE.md · rules.ts</b></div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-top">
+      <div class="q">결론</div>
+      <div class="a">게이트는 이빨이 있다 — 지식원을 깨면 두 트랙 모두 <em>PASS → FAIL</em>로 뒤집힌다.</div>
+    </div>
+    <div class="hero-bot">
+      <div class="hero-cell"><div class="k">review 트랙</div><div class="v"><span class="flip p">PASS</span>→<span class="flip f">FAIL</span> rules.ts 룰 삭제</div></div>
+      <div class="hero-cell"><div class="k">qa 트랙</div><div class="v"><span class="flip p">PASS</span>→<span class="flip f">FAIL</span> CLAUDE.md 줄 삭제</div></div>
+      <div class="hero-cell"><div class="k">원복 · 무결성</div><div class="v">전부 복구 · 26 PASSED</div></div>
+    </div>
+  </div>
+
+  <!-- 01 METHOD -->
+  <section>
+    <div class="sec-head"><span class="n">01</span><h2>방법 — A/B 반증</h2></div>
+    <p class="lead">정상 코드에 대해 항상 green을 내는 eval은 회귀를 못 잡는다. 그래서 <b>같은 케이스</b>를 두 조건으로 돌려 비교한다 — 지식원이 온전할 때(대조군)와, 그 지식원에서 핵심 한 줄을 지웠을 때(처치군).</p>
+    <div class="card method">
+      <div class="mstep"><span class="mt">대조군</span><span class="md">원본 CLAUDE.md / rules.ts</span></div>
+      <div class="mstep"><span class="mt">처치</span><span class="md">핵심 1줄 삭제</span></div>
+      <div class="mstep"><span class="mt">실행</span><span class="md">실제 subject → Opus judge</span></div>
+      <div class="mstep"><span class="mt">관찰</span><span class="md">PASS가 FAIL로 뒤집히나</span></div>
+    </div>
+  </section>
+
+  <!-- 02 EXPERIMENTS -->
+  <section>
+    <div class="sec-head"><span class="n">02</span><h2>실험 결과</h2></div>
+
+    <div class="card exp">
+      <div class="exp-head">
+        <span class="tag rev">review 트랙</span>
+        <h3>실험 A — 룰 요약을 깬다</h3>
+        <span class="src">지식원: evals/harness/rules.ts</span>
+      </div>
+      <p class="what"><b>처치 ▸</b> 리뷰어 system prompt의 <b class="hl">레이어 의존성 룰(#1)</b>을 삭제. 케이스 <code>01-lib-imports-sdk</code>(lib/가 Anthropic SDK 직접 import — expect: violation)를 돌린다.</p>
+      <div class="ab">
+        <div class="panel before">
+          <div class="ph"><span class="lab">원본 (룰 있음)</span><span class="verdict p">✓ PASS</span></div>
+          <div class="jr"><span class="jl">judge</span> 리뷰어가 룰 1 위반으로 lib/가 외부 SDK(@anthropic-ai/sdk)를 직접 import하는 문제를 <b>정확히 critical로 지적</b>했고, 포트 인터페이스·주입이라는 올바른 수정 방향도 제시했다.</div>
+        </div>
+        <div class="flipmid">▶</div>
+        <div class="panel after">
+          <div class="ph"><span class="lab">처치 (룰 삭제)</span><span class="verdict f">✕ FAIL</span></div>
+          <div class="jr"><span class="jl">judge</span> 리뷰어는 지연 생성·마스킹 문제만 지적했을 뿐 <b>lib가 외부 SDK를 직접 의존하지 말아야 한다는 핵심 위반을 놓쳤다.</b> 권고안조차 lib 안에서 SDK를 직접 import하는 구조를 그대로 유지 → 대상 룰 위반 놓침.</div>
+        </div>
+      </div>
+      <div class="diff"><span class="ctx">// evals/harness/rules.ts · FINSIGHT_RULES</span>
+<span class="del">- "레이어 의존성은 단방향이다. lib/는 … 외부 SDK를 import하면 안 된다 …",</span>
+<span class="ctx">  "외부 클라이언트는 호출 시점에 지연 생성한다.",</span></div>
+    </div>
+
+    <div class="card exp">
+      <div class="exp-head">
+        <span class="tag qa">qa 트랙</span>
+        <h3>실험 B — 라이브 CLAUDE.md를 깬다</h3>
+        <span class="src">지식원: CLAUDE.md (responder가 직접 읽음)</span>
+      </div>
+      <p class="what"><b>처치 ▸</b> Pro 게이팅 불릿에서 <b class="hl">"402가 아니라 200+Free 결과+pro.status=locked"</b> 문장 1줄을 삭제. 케이스 <code>q01</code>(미구독자 호출 시 응답 설계)을 돌린다.</p>
+      <div class="ab">
+        <div class="panel before">
+          <div class="ph"><span class="lab">원본 (문장 있음)</span><span class="verdict p">✓ PASS</span></div>
+          <div class="jr"><span class="jl">judge</span> 답변이 402가 아닌 <b>HTTP 200으로 응답</b>(must1), Free 결과를 함께 반환(must2), <b>pro.status를 locked/unavailable로 표시</b>(must3)를 모두 정확히 안내. 402로 막는 오답을 사실로 주장하지 않음.</div>
+        </div>
+        <div class="flipmid">▶</div>
+        <div class="panel after">
+          <div class="ph"><span class="lab">처치 (문장 삭제)</span><span class="verdict f">✕ FAIL</span></div>
+          <div class="jr"><span class="jl">judge</span> 근거를 잃은 답변이 <b>오히려 402 Payment Required 응답 설계를 적극 권장</b> → must_not(402 반환) 위반. pro.status를 locked로 표시하는 통합 응답이 아니라 별도 402로 막는 방식 채택 → must3도 미충족.</div>
+        </div>
+      </div>
+      <div class="diff"><span class="ctx">// CLAUDE.md · 아키텍처 규칙 (Pro 게이팅)</span>
+<span class="ctx">  … 요청 본문/헤더의 tier를 신뢰하지 마라.</span>
+<span class="del">- 미구독/쿼터소진 시 /api/analyze는 402가 아니라 200 + Free 결과 + pro.status=locked|unavailable 를 반환한다.</span></div>
+    </div>
+  </section>
+
+  <!-- 03 SUMMARY -->
+  <section>
+    <div class="sec-head"><span class="n">03</span><h2>A/B 요약</h2></div>
+    <div class="card tbl">
+      <table>
+        <thead><tr><th>지식원 · 트랙</th><th>깬 내용</th><th>케이스</th><th class="c">원본</th><th class="c"></th><th class="c">깬 후</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="src">CLAUDE.md</div><div class="sub">qa 트랙 · 라이브 컨텍스트</div></td>
+            <td>"402가 아니라 200+Free+locked" 문장 1줄</td>
+            <td class="mono">q01</td>
+            <td class="c"><span class="vt p">PASS</span></td>
+            <td class="c arrowcell">▶</td>
+            <td class="c"><span class="vt f">FAIL</span></td>
+          </tr>
+          <tr>
+            <td><div class="src">rules.ts</div><div class="sub">review 트랙 · 룰 요약</div></td>
+            <td>레이어 의존성 룰(#1)</td>
+            <td class="mono">01</td>
+            <td class="c"><span class="vt p">PASS</span></td>
+            <td class="c arrowcell">▶</td>
+            <td class="c"><span class="vt f">FAIL</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="margin-top:14px;font-size:12.5px;color:var(--soft)">→ README가 주장한 <b style="background:none;color:var(--muted)">"gotcha 한 줄을 CLAUDE.md에서 지우면 해당 qa 케이스가 회귀로 잡힌다"</b>가 실측으로 성립. review 트랙도 룰 요약이 탐지를 구동함을 증명.</p>
+  </section>
+
+  <!-- 04 KEY FINDING -->
+  <section>
+    <div class="sec-head"><span class="n">04</span><h2>핵심 발견 — 어느 게이트에 이빨이 있나</h2></div>
+    <div class="callout">
+      <div class="ct"><div class="ic">!</div><h3>의미적 회귀 탐지는 라이브 npm run eval에만 있다</h3></div>
+      <p>두 번의 break 모두 <b>키 없는 npm test는 여전히 green(26 passed)</b>이었다. 무결성 테스트는 구조·균형(위반4+정상1, id 유일)만 박제할 뿐, "rules.ts의 룰이 케이스와 매칭되는지"나 "CLAUDE.md에 그 사실이 있는지"는 검사하지 않는다 — <b>설계상 의도된 분리</b>다. 따라서 CI에서 룰/gotcha 삭제를 막으려면 게이트에 <b>npm run eval이 포함</b>돼야 한다.</p>
+      <div class="gates">
+        <div class="gate weak">
+          <span class="gc">npm test</span>
+          <p><b>이 break들을 통과시킴.</b> 키 불필요·빠름·결정적이지만, 룰/사실 삭제 같은 <b>의미적 회귀는 못 잡는다.</b></p>
+        </div>
+        <div class="gate strong">
+          <span class="gc">npm run eval</span>
+          <p><b>이 break들을 FAIL로 잡음.</b> 라이브 Claude 호출(비용·비결정)이지만 회귀 탐지의 <b>실제 이빨은 여기 있다.</b></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 RESTORE -->
+  <section>
+    <div class="sec-head"><span class="n">05</span><h2>원복</h2></div>
+    <p class="lead">모든 처치는 일시적이었고 원본으로 되돌렸다. 레포에 남은 변경 없음(probe는 scratchpad에만 존재).</p>
+    <div class="restore">
+      <span class="chip">✓ CLAUDE.md — git checkout · clean</span>
+      <span class="chip">✓ rules.ts — 백업과 byte 동일</span>
+      <span class="chip">✓ 무결성 테스트 26 passed</span>
+    </div>
+  </section>
+
+  <footer>
+    <span>finsight // 하네스 EVAL 반증 테스트</span>
+    <span>2 트랙 · PASS→FAIL 확인 · 전부 원복</span>
+  </footer>
+
+</div>
+</body>
+</html>

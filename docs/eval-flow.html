@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>하네스 Eval, 쉽게 이해하기 (ELI5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --line:#e7eaef;
+    --ink:#0a0e1a; --muted:#5b6472; --soft:#8a93a3;
+    --primary:#0052ff; --green:#00a878; --red:#e5484d; --amber:#d9890a;
+    --violet:#6b4eff;
+    --ai-grad:linear-gradient(135deg,#0052ff 0%,#6b4eff 100%);
+    --kr:'Pretendard',system-ui,sans-serif;
+    --en:'Inter',var(--kr); --mono:'JetBrains Mono',ui-monospace,monospace;
+    --r:16px; --shadow:0 1px 2px rgba(10,14,26,.04),0 8px 24px rgba(10,14,26,.05);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--kr);
+    line-height:1.65;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-family:var(--en);font-weight:700;font-size:clamp(28px,4vw,40px);
+    letter-spacing:-.02em;margin:0 0 8px;line-height:1.15}
+  h2{font-family:var(--en);font-weight:600;font-size:22px;letter-spacing:-.01em;
+    margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-family:var(--mono);font-size:13px;font-weight:600;color:#fff;
+    background:var(--ink);width:26px;height:26px;border-radius:8px;
+    display:grid;place-items:center;flex:none}
+  .sub{color:var(--muted);font-size:16px;margin:0 0 40px;max-width:62ch}
+  section{margin:0 0 56px}
+  .mono{font-family:var(--mono)}
+  .pill{font-family:var(--mono);font-size:12px;font-weight:600;padding:3px 9px;
+    border-radius:999px;background:#eef1f6;color:var(--muted);display:inline-block}
+
+  /* big idea */
+  .idea{background:var(--ink);color:#fff;border-radius:var(--r);padding:26px 28px;
+    margin:0 0 48px;box-shadow:var(--shadow)}
+  .idea b{background:var(--ai-grad);-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;font-weight:700}
+  .idea p{margin:0;font-size:18px;line-height:1.55}
+  .idea .small{color:#aeb6c4;font-size:14px;margin-top:10px}
+
+  /* ELI5 role cards */
+  .roles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:760px){.roles{grid-template-columns:repeat(2,1fr)}}
+  .role{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:18px 16px;box-shadow:var(--shadow)}
+  .role .emoji{font-size:30px;line-height:1}
+  .role h3{font-size:15px;margin:12px 0 2px;font-weight:700}
+  .role .real{font-family:var(--mono);font-size:11px;color:var(--primary);
+    text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+  .role p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.55}
+
+  /* pipeline */
+  .pipe{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap}
+  @media(max-width:820px){.pipe{flex-direction:column}}
+  .stage{flex:1;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:18px 16px;box-shadow:var(--shadow);position:relative}
+  .stage .top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .stage .ic{font-size:22px}
+  .stage .tag{font-family:var(--mono);font-size:11px;font-weight:600;
+    padding:2px 7px;border-radius:6px;background:#eef1f6;color:var(--muted)}
+  .stage.ai .tag{background:#efeaff;color:var(--violet)}
+  .stage h3{font-size:15.5px;margin:0 0 6px;font-weight:700}
+  .stage .eli{font-size:13px;color:var(--ink);background:#f4f6f9;border-radius:8px;
+    padding:8px 10px;margin:0 0 8px}
+  .stage .eli b{color:var(--primary)}
+  .stage ul{margin:6px 0 0;padding-left:16px}
+  .stage li{font-size:12.5px;color:var(--muted);margin:3px 0}
+  .stage code{font-family:var(--mono);font-size:11.5px;background:#eef1f6;
+    padding:1px 5px;border-radius:5px;color:var(--ink)}
+  .arrow{flex:none;display:grid;place-items:center;width:40px;color:var(--soft);
+    font-size:22px;font-weight:700}
+  @media(max-width:820px){.arrow{width:auto;height:30px;transform:rotate(90deg)}}
+
+  .loop{margin-top:14px;display:flex;align-items:center;gap:10px;
+    background:#f4f6f9;border:1px dashed var(--line);border-radius:12px;
+    padding:12px 16px;font-size:13.5px;color:var(--muted)}
+  .loop b{color:var(--ink)}
+
+  /* example */
+  .ex{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.ex{grid-template-columns:1fr}}
+  .code{background:#0e1320;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .code .hd{font-family:var(--mono);font-size:11.5px;color:#aeb6c4;padding:10px 14px;
+    border-bottom:1px solid #1c2436;display:flex;justify-content:space-between}
+  .code pre{margin:0;padding:14px;overflow:auto;font-family:var(--mono);
+    font-size:12.5px;line-height:1.7;color:#dfe5ef}
+  .code .c1{color:#8a93a3}.code .add{color:#7ee2b8}.code .key{color:#9db4ff}
+  .code .str{color:#f0c987}
+
+  /* outcomes */
+  .out{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.out{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:20px;box-shadow:var(--shadow)}
+  .card.pass{border-top:3px solid var(--green)}
+  .card.fail{border-top:3px solid var(--red)}
+  .card .res{font-family:var(--mono);font-size:13px;font-weight:600;margin-bottom:12px}
+  .card.pass .res{color:var(--green)}.card.fail .res{color:var(--red)}
+  .rows{font-family:var(--mono);font-size:12.5px;line-height:1.9}
+  .rows .ok{color:var(--green)}.rows .no{color:var(--red)}
+  .card .light{font-size:14px;margin-top:12px;color:var(--muted)}
+  .card .light b{color:var(--ink)}
+
+  /* file map */
+  .files{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:8px 4px;box-shadow:var(--shadow)}
+  .frow{display:grid;grid-template-columns:230px 1fr;gap:12px;padding:11px 18px;
+    border-bottom:1px solid var(--line);align-items:baseline}
+  .frow:last-child{border-bottom:none}
+  @media(max-width:680px){.frow{grid-template-columns:1fr}}
+  .frow .p{font-family:var(--mono);font-size:12.5px;color:var(--primary)}
+  .frow .d{font-size:13.5px;color:var(--muted)}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.two{grid-template-columns:1fr}}
+  .why{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:20px;box-shadow:var(--shadow)}
+  .why h3{margin:0 0 6px;font-size:15px;font-family:var(--mono)}
+  .why.k h3{color:var(--green)}.why.e h3{color:var(--violet)}
+  .why p{margin:0;font-size:13.5px;color:var(--muted)}
+  .why .cmd{font-family:var(--mono);font-size:12.5px;background:#0e1320;color:#dfe5ef;
+    padding:8px 12px;border-radius:8px;margin:12px 0 0;display:block}
+
+  footer{color:var(--soft);font-size:12.5px;text-align:center;margin-top:64px;
+    font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="pill">finsight · 하네스 Eval</span>
+  <h1 style="margin-top:14px">우리 코드 검사기, 누가 검사하지?</h1>
+  <p class="sub">우리는 코드를 검사하는 도구(<b>리뷰 하네스</b>)를 만들었어요. 그런데 그 도구 자체가
+  잘 작동하는지는 누가 확인할까요? 이 <b>Eval</b>이 바로 그 검사기를 시험하는 "쪽지시험"입니다.</p>
+
+  <div class="idea">
+    <p>코드엔 <b>테스트</b>가 있다면, 하네스엔 <b>Eval</b>이 있다.</p>
+    <p class="small">CLAUDE.md 한 줄, 프롬프트 한 문장만 바꿔도 AI 도구의 행동은 통째로 달라질 수 있어요.
+    코드가 회귀하듯, 하네스도 회귀합니다. Eval은 그 회귀를 잡는 안전망이에요.</p>
+  </div>
+
+  <!-- ELI5 -->
+  <section>
+    <h2><span class="n">1</span>받아쓰기 시험으로 비유하면</h2>
+    <p class="sub" style="margin-bottom:22px">등장인물은 딱 넷이에요. 이 넷만 알면 끝.</p>
+    <div class="roles">
+      <div class="role">
+        <div class="emoji">📋</div>
+        <div class="real">Golden Set</div>
+        <h3>정답지</h3>
+        <p>문제(코드)와 정답(이건 위반 / 이건 정상)이 미리 적힌 시험지 5장.</p>
+      </div>
+      <div class="role">
+        <div class="emoji">🧑‍🎓</div>
+        <div class="real">Reviewer</div>
+        <h3>학생</h3>
+        <p>시험을 보는 사람 = <b>우리가 만든 리뷰 도구</b>. 코드를 보고 "룰 위반!"을 찾아냅니다.</p>
+      </div>
+      <div class="role">
+        <div class="emoji">🧑‍🏫</div>
+        <div class="real">Judge</div>
+        <h3>채점 선생님</h3>
+        <p>학생 답을 정답지와 대조해 <b>맞음/틀림</b>을 매깁니다. 학생과는 <b>다른 사람(다른 모델)</b>.</p>
+      </div>
+      <div class="role">
+        <div class="emoji">🚦</div>
+        <div class="real">Gate · run.ts</div>
+        <h3>성적표 &amp; 버저</h3>
+        <p>하나라도 틀리면 <b>빨간불(버저)</b>. 배포·머지를 막습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FLOW -->
+  <section>
+    <h2><span class="n">2</span>전체 흐름도</h2>
+    <p class="sub" style="margin-bottom:22px">정답지 한 장이 왼쪽에서 들어가 오른쪽 성적표로 나옵니다. 이걸 5장 반복해요.</p>
+    <div class="pipe">
+
+      <div class="stage">
+        <div class="top"><span class="ic">📋</span><span class="tag">cases/*.md</span></div>
+        <h3>정답지 한 장</h3>
+        <div class="eli">문제 + <b>정답 라벨</b>이 같이 들어있어요</div>
+        <ul>
+          <li>위에: <code>expect</code> (violation/pass)</li>
+          <li>아래: 검사할 <b>코드 조각</b></li>
+          <li>위반 4장 + 정상 1장</li>
+        </ul>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <div class="stage ai">
+        <div class="top"><span class="ic">🧑‍🎓</span><span class="tag">Sonnet</span></div>
+        <h3>학생이 푼다</h3>
+        <div class="eli"><b>리뷰어</b>가 코드를 읽고 리뷰를 씀</div>
+        <ul>
+          <li>CLAUDE.md 룰을 기준으로</li>
+          <li>"이 코드 위반? 정상?"</li>
+          <li>= 우리가 <b>시험하는 대상</b></li>
+        </ul>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <div class="stage ai">
+        <div class="top"><span class="ic">🧑‍🏫</span><span class="tag">Opus</span></div>
+        <h3>선생님이 채점</h3>
+        <div class="eli">학생 답 ↔ <b>정답 라벨</b> 대조</div>
+        <ul>
+          <li>기대대로면 → <b class="mono" style="color:var(--green)">pass</b></li>
+          <li>놓치거나 오탐 → <b class="mono" style="color:var(--red)">fail</b></li>
+          <li>이유(reasoning)도 함께</li>
+        </ul>
+      </div>
+
+      <div class="arrow">→</div>
+
+      <div class="stage">
+        <div class="top"><span class="ic">🚦</span><span class="tag">run.ts</span></div>
+        <h3>성적표</h3>
+        <div class="eli">5장 모아서 <b>최종 판정</b></div>
+        <ul>
+          <li>전부 pass → <code>exit 0</code> 🟢</li>
+          <li>하나라도 fail → <code>exit 1</code> 🔴</li>
+          <li>= 회귀 게이트</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="loop">
+      🔁 <span><b>정답지는 자란다.</b> 운영하다 새로 발견한 실패를 정답지(<span class="mono">cases/</span>)에
+      한 장씩 추가해요. 테스트 스위트가 버그 하나당 한 줄씩 늘듯이 — 5장으로 시작해서 천천히.</span>
+    </div>
+  </section>
+
+  <!-- EXAMPLE -->
+  <section>
+    <h2><span class="n">3</span>정답지 한 장은 이렇게 생겼다</h2>
+    <p class="sub" style="margin-bottom:22px">왼쪽이 실제 시험지 한 장(케이스 1). 오른쪽이 그게 흘러가는 모습.</p>
+    <div class="ex">
+      <div class="code">
+        <div class="hd"><span>cases/01-lib-imports-sdk.md</span><span>정답지</span></div>
+<pre><span class="c1">--- 정답 라벨 ---</span>
+<span class="key">id</span>: 01-lib-imports-sdk
+<span class="key">rule</span>: lib는 외부 SDK를 import 금지
+<span class="key">expect</span>: <span class="str">violation</span>   <span class="c1">← 정답</span>
+<span class="key">severity</span>: critical
+<span class="c1">--- 검사할 코드 ---</span>
+<span class="c1">// src/lib/analysis/summarize.ts</span>
+<span class="add">+import Anthropic from "@anthropic-ai/sdk";</span>
+<span class="add">+const client = new Anthropic({ ... });</span></pre>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="mono" style="font-size:12.5px;color:var(--muted)">🧑‍🎓 학생(리뷰어) 답</div>
+          <p style="margin:8px 0 0;font-size:14px">"lib/가 외부 SDK를 직접 import하네요. 레이어 의존성 룰 위반,
+          <b style="color:var(--red)">critical</b>입니다."</p>
+        </div>
+        <div class="card pass">
+          <div class="mono" style="font-size:12.5px;color:var(--muted)">🧑‍🏫 선생님(judge) 채점</div>
+          <p style="margin:8px 0 0;font-size:14px">정답은 <span class="mono">violation</span>. 학생이 위반을
+          정확히 critical로 잡았다 → <b style="color:var(--green)">PASS ✓</b></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OUTCOMES -->
+  <section>
+    <h2><span class="n">4</span>돌리면 두 가지 결과</h2>
+    <p class="sub" style="margin-bottom:22px">실제로 셋업하고 둘 다 확인했어요 — 통과도, <b>고장도 제대로 잡는지</b>까지.</p>
+    <div class="out">
+      <div class="card pass">
+        <div class="res">🟢 정상 — 5/5 통과 · exit 0</div>
+        <div class="rows">
+          <div class="ok">✓ 01 lib-imports-sdk</div>
+          <div class="ok">✓ 02 money-parsefloat</div>
+          <div class="ok">✓ 03 service-role-public-env</div>
+          <div class="ok">✓ 04 pro-gating-request-body</div>
+          <div class="ok">✓ 05 lazy-provider-injection (정상)</div>
+        </div>
+        <p class="light"><b>초록불.</b> 리뷰 도구가 위반 4개를 잡고, 정상 코드는 오탐 안 함. 배포 OK.</p>
+      </div>
+      <div class="card fail">
+        <div class="res">🔴 회귀 시뮬 — 4/5 · exit 1</div>
+        <div class="rows">
+          <div class="no">✗ 01 lib-imports-sdk &nbsp;← 일부러 정답을 틀리게</div>
+          <div class="ok">✓ 02 money-parsefloat</div>
+          <div class="ok">✓ 03 service-role-public-env</div>
+          <div class="ok">✓ 04 pro-gating-request-body</div>
+          <div class="ok">✓ 05 lazy-provider-injection</div>
+        </div>
+        <p class="light"><b>빨간불.</b> 케이스 1의 정답을 일부러 뒤집자 선생님이 "오탐"으로 잡아내
+        <span class="mono">exit 1</span>. <b>버저가 진짜 울린다</b>는 증명.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FILE MAP -->
+  <section>
+    <h2><span class="n">5</span>어디에 뭐가 있나</h2>
+    <div class="files">
+      <div class="frow"><span class="p">evals/harness/cases/*.md</span><span class="d">📋 정답지 5장 (라벨 + 코드)</span></div>
+      <div class="frow"><span class="p">evals/harness/reviewer.ts</span><span class="d">🧑‍🎓 학생 — 시험 대상 (Sonnet, 룰 적용 리뷰)</span></div>
+      <div class="frow"><span class="p">evals/harness/judge.ts</span><span class="d">🧑‍🏫 선생님 — 채점 (Opus, pass/fail)</span></div>
+      <div class="frow"><span class="p">evals/harness/rules.ts</span><span class="d">📖 CLAUDE.md 룰 요약 → 학생에게 주는 채점 기준</span></div>
+      <div class="frow"><span class="p">evals/harness/run.ts</span><span class="d">🚦 성적표 + 버저 (게이트, exit 1)</span></div>
+      <div class="frow"><span class="p">evals/harness/lib/*.ts</span><span class="d">🧰 정답지 읽기·집계 (순수 함수, 유닛테스트 O)</span></div>
+    </div>
+  </section>
+
+  <!-- WHY SPLIT -->
+  <section>
+    <h2><span class="n">6</span>왜 명령어를 둘로 나눴나</h2>
+    <div class="two">
+      <div class="why k">
+        <h3>npm test &nbsp;— 공짜·항상</h3>
+        <p>정답지가 5장 맞는지(위반4+정상1), 읽고 집계하는 함수가 멀쩡한지만 검사. AI를 안 부르니
+        <b>키도 돈도 필요 없고</b> CI가 매번 돌려요.</p>
+        <span class="cmd">$ npm test &nbsp;→ 367 passed</span>
+      </div>
+      <div class="why e">
+        <h3>npm run eval &nbsp;— 진짜 시험</h3>
+        <p>학생·선생님(Claude)을 실제로 불러 5장을 채점. <b>키·비용·시간</b>이 들고 결과가 조금
+        흔들려서, 평소 그린 게이트와 떼어놨어요.</p>
+        <span class="cmd">$ npm run eval &nbsp;→ 5/5 통과</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>finsight · evals/harness · 코드엔 테스트, 하네스엔 Eval</footer>
+
+</div>
+</body>
+</html>

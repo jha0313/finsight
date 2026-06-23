@@ -8,6 +8,7 @@
     "build": "next build",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
+    "eval": "node --env-file-if-exists=.env --import tsx evals/harness/run.ts",
     "prepare": "husky"
   },
   "dependencies": {
@@ -42,6 +43,7 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.7",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.22.4",
     "typescript": "^5.0.0",
     "vitest": "^4.1.8"
   },

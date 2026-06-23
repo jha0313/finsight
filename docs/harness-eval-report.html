@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HARNESS EVAL — CLAUDE.md 룰 준수 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f4f3ec; --paper:#ffffff; --ink:#0a0a0a;
+    --muted:#3a3a3a; --soft:#6f6f6f;
+    --yellow:#ffe000; --green:#00b341; --red:#ff2e2e; --blue:#2b4cff; --lilac:#c9b8ff;
+    --sh:6px 6px 0 var(--ink); --sh-sm:4px 4px 0 var(--ink); --sh-lg:9px 9px 0 var(--ink);
+    --disp:'Space Mono',ui-monospace,monospace;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --kr:'Apple SD Gothic Neo','Pretendard',system-ui,sans-serif;
+    --bw:2.5px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--mono),var(--kr);line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:linear-gradient(var(--ink) .5px,transparent .5px),linear-gradient(90deg,var(--ink) .5px,transparent .5px);
+    background-size:26px 26px;background-position:-1px -1px;background-blend-mode:normal;}
+  body::before{content:"";position:fixed;inset:0;background:var(--bg);opacity:.93;z-index:-1}
+  .wrap{max-width:1060px;margin:0 auto;padding:40px 22px 96px}
+  h1,h2,h3{font-family:var(--disp);font-weight:700;margin:0;letter-spacing:-.02em;line-height:1.15}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  a{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--yellow);
+    border:1.5px solid var(--ink);padding:0 5px}
+
+  /* header */
+  .eyebrow{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.22em;
+    text-transform:uppercase;background:var(--ink);color:var(--bg);display:inline-block;
+    padding:4px 10px}
+  header h1{font-size:46px;margin:16px 0 12px;text-transform:uppercase}
+  header p.sub{font-family:var(--mono);color:var(--muted);font-size:15px;max-width:70ch;margin:0}
+  header p.sub b{color:var(--ink);background:var(--yellow);padding:0 3px}
+  .meta{display:flex;flex-wrap:wrap;gap:0;margin-top:22px;border:var(--bw) solid var(--ink);
+    box-shadow:var(--sh-sm);background:var(--paper)}
+  .meta div{font-family:var(--mono);font-size:12px;color:var(--soft);padding:9px 14px;
+    border-right:1.5px solid var(--ink);flex:1;min-width:140px}
+  .meta div:last-child{border-right:0}
+  .meta b{display:block;color:var(--ink);font-weight:600;font-size:13px;margin-top:2px}
+
+  /* hero — inverted black block */
+  .hero{margin-top:26px;border:var(--bw) solid var(--ink);box-shadow:var(--sh-lg);background:var(--paper)}
+  .hero-top{background:var(--ink);color:var(--bg);padding:24px 26px;display:flex;
+    align-items:center;gap:24px;flex-wrap:wrap}
+  .hero-score{display:flex;align-items:baseline;gap:8px;font-family:var(--disp)}
+  .hero-score .big{font-size:62px;font-weight:700;line-height:.9}
+  .hero-score .of{font-size:26px;opacity:.6}
+  .chip-pass{font-family:var(--mono);font-weight:700;font-size:14px;background:var(--green);
+    color:var(--ink);padding:7px 14px;border:2px solid var(--bg);text-transform:uppercase}
+  .hero-exit{margin-left:auto;text-align:right;font-family:var(--mono)}
+  .hero-exit .l{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.6}
+  .hero-exit .v{font-family:var(--disp);font-size:22px;font-weight:700;margin-top:2px}
+  .hero-bot{display:grid;grid-template-columns:repeat(4,1fr)}
+  .hero-cell{padding:15px 18px;border-right:1.5px solid var(--ink)}
+  .hero-cell:last-child{border-right:0}
+  .hero-cell .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--soft)}
+  .hero-cell .v{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px}
+
+  /* sections */
+  section{margin-top:50px}
+  .sec-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;
+    border-bottom:var(--bw) solid var(--ink);padding-bottom:10px}
+  .sec-head .n{font-family:var(--disp);font-size:15px;font-weight:700;background:var(--ink);
+    color:var(--bg);width:34px;height:34px;display:flex;align-items:center;justify-content:center}
+  .sec-head h2{font-size:23px;text-transform:uppercase}
+  .lead{font-family:var(--mono);color:var(--muted);font-size:14.5px;max-width:78ch;margin:0 0 6px}
+  .lead b{color:var(--ink);background:var(--yellow);padding:0 3px}
+
+  .card{background:var(--paper);border:var(--bw) solid var(--ink);box-shadow:var(--sh)}
+
+  /* flow */
+  .flow{padding:26px 22px}
+  .flow-row{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap;overflow-x:auto}
+  .node{flex:1 1 0;min-width:158px;border:2px solid var(--ink);padding:13px 14px;
+    display:flex;flex-direction:column;gap:6px;background:var(--paper)}
+  .node .tag{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--bg);background:var(--ink);align-self:flex-start;padding:2px 6px}
+  .node .ttl{font-family:var(--disp);font-size:15px;font-weight:700}
+  .node .desc{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.5}
+  .node.start{background:repeating-linear-gradient(45deg,#fff,#fff 7px,#f0eee4 7px,#f0eee4 9px)}
+  .node.judge{background:var(--lilac)}
+  .node.judge .tag{background:var(--ink)}
+  .node.gate{background:var(--yellow)}
+  .branch{flex:1 1 0;min-width:170px;display:flex;flex-direction:column;gap:10px}
+  .branch .node{flex:1}
+  .node.review{border-left:7px solid var(--blue)}
+  .node.qa{border-left:7px solid var(--lilac)}
+  .arrow{flex:0 0 34px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--disp);font-weight:700;font-size:20px}
+  .flow-note{margin-top:16px;border-top:2px dashed var(--ink);padding-top:13px;
+    font-family:var(--mono);font-size:12.5px;color:var(--muted);display:flex;gap:10px}
+  .flow-note b{background:var(--ink);color:var(--bg);padding:1px 7px;height:fit-content;white-space:nowrap}
+
+  /* two tracks */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .track{padding:20px 20px 18px}
+  .track .th{display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:11px}
+  .track h3{font-size:18px;text-transform:uppercase}
+  .sq{width:14px;height:14px;border:2px solid var(--ink)}
+  .sq.b{background:var(--blue)} .sq.v{background:var(--lilac)}
+  .track .role{font-family:var(--mono);font-size:11.5px;color:var(--soft);margin:11px 0 0}
+  .track ul{margin:12px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+  .track li{font-family:var(--mono);font-size:13px;color:var(--muted);padding-left:20px;position:relative;line-height:1.5}
+  .track li::before{content:"▪";position:absolute;left:2px;top:0;color:var(--ink);font-size:14px}
+  .track li b{color:var(--ink)}
+
+  /* badges */
+  .badge{font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 8px;
+    border:2px solid var(--ink);text-transform:uppercase;white-space:nowrap;display:inline-block}
+  .badge.viol{background:var(--red);color:var(--ink)}
+  .badge.pass{background:var(--green);color:var(--ink)}
+  .badge.crit{background:#ffb000;color:var(--ink)}
+  .badge.qa{background:var(--lilac);color:var(--ink)}
+  .badge.rev{background:var(--blue);color:#fff}
+  .badge.guard{background:var(--ink);color:var(--yellow)}
+
+  /* golden set */
+  .subhead{font-family:var(--disp);font-size:14px;font-weight:700;text-transform:uppercase;
+    background:var(--ink);color:var(--bg);display:inline-block;padding:5px 12px;margin:26px 0 14px}
+  .gset{display:flex;flex-direction:column;gap:16px}
+  .gcase{background:var(--paper);border:var(--bw) solid var(--ink);box-shadow:var(--sh-sm);padding:16px 18px}
+  .gcase-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .gcase-head .id{font-family:var(--disp);font-size:14px;font-weight:700}
+  .gcase-head .badges{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  .gcase .rule{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-top:11px;line-height:1.55}
+  .gcase .rule b{background:var(--yellow);color:var(--ink);padding:0 3px}
+  .gcase .body{font-family:var(--mono);font-size:12.5px;color:var(--ink);margin-top:11px}
+  .gcase .lbls{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin-top:12px;
+    font-family:var(--mono);font-size:12.5px;align-items:start}
+  .lk{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    padding:3px 7px;border:2px solid var(--ink);white-space:nowrap;height:fit-content}
+  .lk.must{background:var(--green);color:var(--ink)}
+  .lk.mustnot{background:var(--red);color:var(--ink)}
+  .gcase .lbls ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+  .gcase .lbls li{color:var(--muted);padding-left:14px;position:relative}
+  .gcase .lbls li::before{content:"·";position:absolute;left:3px;color:var(--ink);font-weight:700}
+  .gcase .lbls li b{color:var(--ink)}
+  .gcase pre{margin:12px 0 0;background:var(--ink);color:#eee;padding:13px 15px;overflow-x:auto;
+    font-family:var(--mono);font-size:11.5px;line-height:1.6;border:2px solid var(--ink)}
+  .gcase pre .add{color:var(--green);font-weight:600} .gcase pre .cmt{color:#888}
+  .guard{box-shadow:6px 6px 0 var(--blue);border-color:var(--ink)}
+
+  /* table */
+  .card.tbl{padding:0;overflow-x:auto;box-shadow:var(--sh)}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+  thead th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--ink);
+    color:var(--bg);font-weight:600;text-align:left;padding:11px 16px;border-right:1.5px solid var(--bg)}
+  thead th:last-child{border-right:0}
+  thead th.v{text-align:right}
+  tbody td{padding:11px 16px;border-bottom:1.5px solid var(--ink);border-right:1.5px solid var(--ink)}
+  tbody td:last-child{border-right:0}
+  tbody tr:last-child td{border-bottom:0}
+  td .id{font-family:var(--disp);font-size:12.5px;font-weight:700}
+  td.v{text-align:right}
+  .verdict{font-family:var(--disp);font-size:12px;font-weight:700;background:var(--green);
+    color:var(--ink);padding:3px 9px;border:2px solid var(--ink);display:inline-block}
+
+  /* split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .lane{padding:18px 20px}
+  .lane .cmd{font-family:var(--disp);font-size:14px;font-weight:700;display:inline-block;
+    padding:6px 13px;border:2px solid var(--ink)}
+  .lane.test .cmd{background:var(--green);color:var(--ink)}
+  .lane.live .cmd{background:var(--lilac);color:var(--ink)}
+  .lane p{font-family:var(--mono);font-size:13px;color:var(--muted);margin:14px 0 0}
+  .lane ul{margin:11px 0 0;padding-left:18px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .lane li{margin:6px 0} .lane li b{color:var(--ink)}
+
+  .limits{padding:0}
+  .limit{display:flex;gap:14px;padding:16px 18px;border-bottom:2px solid var(--ink)}
+  .limit:last-child{border-bottom:0}
+  .limit .ic{flex:0 0 30px;height:30px;background:var(--yellow);border:2px solid var(--ink);
+    display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:700;font-size:15px}
+  .limit .t{font-family:var(--mono);font-size:13px;color:var(--muted);line-height:1.55}
+  .limit .t b{color:var(--ink)}
+
+  footer{margin-top:56px;border-top:var(--bw) solid var(--ink);padding-top:16px;
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    font-family:var(--mono);font-size:11.5px;color:var(--soft)}
+
+  @media (max-width:760px){
+    .hero-bot{grid-template-columns:1fr 1fr}
+    .grid2,.split{grid-template-columns:1fr}
+    .flow-row{flex-direction:column}
+    .arrow{transform:rotate(90deg);flex-basis:26px}
+    header h1{font-size:32px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">finsight // harness eval</span>
+    <h1>Harness Eval 리포트</h1>
+    <p class="sub">finsight의 비즈니스 로직이 아니라 <b>하네스 품질</b>을 잰다 — CLAUDE.md 한 줄·프롬프트 한 문장이 에이전트 행동을 바꾸므로, 하네스도 코드처럼 회귀한다. golden set을 subject에 돌리고 <b>다른 모델(Opus)</b>이 채점한다.</p>
+    <div class="meta">
+      <div>RUN<b>2026-06-23 PDT</b></div>
+      <div>COMMIT<b>43a5ef8</b></div>
+      <div>BRANCH<b>perf/lighthouse-autoresearch</b></div>
+      <div>PATH<b>evals/harness/</b></div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-top">
+      <div class="hero-score"><span class="big">9</span><span class="of">/9</span></div>
+      <span class="chip-pass">100% PASS · 회귀 0</span>
+      <div class="hero-exit"><div class="l">gate exit code</div><div class="v">0 · GREEN</div></div>
+    </div>
+    <div class="hero-bot">
+      <div class="hero-cell"><div class="k">subject</div><div class="v">claude-sonnet-4-6</div></div>
+      <div class="hero-cell"><div class="k">judge</div><div class="v">claude-opus-4-8</div></div>
+      <div class="hero-cell"><div class="k">golden set</div><div class="v">9 (review 5 / qa 4)</div></div>
+      <div class="hero-cell"><div class="k">무결성 테스트</div><div class="v">26 PASSED · npm test</div></div>
+    </div>
+  </div>
+
+  <!-- 01 WHAT -->
+  <section>
+    <div class="sec-head"><span class="n">01</span><h2>무엇을, 왜 재는가</h2></div>
+    <p class="lead">코드에 테스트가 있다면, 하네스엔 Eval이 있다. 두 축을 본다 — 리뷰 하네스가 룰 위반을 일관되게 잡는가(<b>review</b>), 그리고 라이브 CLAUDE.md가 코드베이스 질문에 정확히 답할 만큼 충분한가(<b>qa</b>). gotcha 한 줄을 CLAUDE.md에서 지우면 해당 qa 케이스가 회귀로 잡힌다.</p>
+  </section>
+
+  <!-- 02 FLOW -->
+  <section>
+    <div class="sec-head"><span class="n">02</span><h2>플로우</h2></div>
+    <div class="card flow">
+      <div class="flow-row">
+        <div class="node start">
+          <span class="tag">golden set</span>
+          <span class="ttl">cases/*.md</span>
+          <span class="desc">frontmatter=라벨(정답) · 본문=subject 입력. <code>kind</code>로 트랙을 가른다.</span>
+        </div>
+        <div class="arrow">▶</div>
+        <div class="branch">
+          <div class="node review">
+            <span class="tag">kind=review</span>
+            <span class="ttl">Reviewer</span>
+            <span class="desc">Sonnet · temp 0 · CLAUDE.md CRITICAL 룰 요약을 system prompt로. 코드→산문 리뷰.</span>
+          </div>
+          <div class="node qa">
+            <span class="tag">kind=qa</span>
+            <span class="ttl">Responder</span>
+            <span class="desc">Sonnet · temp 0 · <b style="background:var(--yellow)">라이브 CLAUDE.md</b>를 컨텍스트로. 질문→산문 답변.</span>
+          </div>
+        </div>
+        <div class="arrow">▶</div>
+        <div class="node judge">
+          <span class="tag">llm-as-judge</span>
+          <span class="ttl">Judge · Opus</span>
+          <span class="desc">다른 모델이 채점. review=expect/severity · qa=must/must_not. structured <code>pass|fail</code>.</span>
+        </div>
+        <div class="arrow">▶</div>
+        <div class="node gate">
+          <span class="tag">회귀 게이트</span>
+          <span class="ttl">run.ts</span>
+          <span class="desc">kind로 분기·집계. 하나라도 fail이면 <code>exit 1</code>. CI/로컬 회귀 차단.</span>
+        </div>
+      </div>
+      <div class="flow-note">
+        <b>분리</b>
+        <span>파서(<code>lib/case.ts</code>)·집계(<code>lib/verdict.ts</code>)는 순수 함수 — 키 없이 <code>npm test</code>가 무결성·균형을 지킨다. 네트워크·비용 있는 라이브 채점만 <code>npm run eval</code>로 분리.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 TRACKS -->
+  <section>
+    <div class="sec-head"><span class="n">03</span><h2>두 트랙</h2></div>
+    <div class="grid2">
+      <div class="card track">
+        <div class="th"><span class="sq b"></span><h3>① review</h3></div>
+        <div class="role">subject: Reviewer (Sonnet · temp 0) · judge: Opus</div>
+        <ul>
+          <li><b>측정</b> — 리뷰 하네스가 CRITICAL 룰 위반을 잡고, 정상 코드를 오탐하지 않는가.</li>
+          <li><b>입력</b> — 본문=코드(diff/스니펫). 라벨=<code>expect</code>(violation·pass)/<code>severity</code>/<code>rule</code>.</li>
+          <li><b>균형</b> — 위반 4 + 정상(오탐 방지) 1. 정상 케이스가 거짓 양성 회귀를 잡는다.</li>
+          <li><b>채점</b> — judge가 기대 위반 지적 + 심각도 부합을 본다.</li>
+        </ul>
+      </div>
+      <div class="card track">
+        <div class="th"><span class="sq v"></span><h3>② qa</h3></div>
+        <div class="role">subject: Responder (Sonnet · temp 0 · live CLAUDE.md) · judge: Opus</div>
+        <ul>
+          <li><b>측정</b> — CLAUDE.md가 규약·예외처리·gotcha에 답할 만큼 충분한가 + 틀린 전제에 동조 안 하는가.</li>
+          <li><b>입력</b> — 본문=질문. 라벨=<code>must</code>(담겨야 할 사실)/<code>must_not</code>(오답).</li>
+          <li><b>균형</b> — 사실 검증 3 + 전제반박 가드 1(환각 방지).</li>
+          <li><b>센티넬</b> — positive 케이스는 추론 테스트가 아니라 CLAUDE.md 커버리지 회귀 감지기(그 줄 지우면 red).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 GOLDEN SET -->
+  <section>
+    <div class="sec-head"><span class="n">04</span><h2>Golden set — 9 케이스</h2></div>
+    <p class="lead">라벨이 <b>정답</b>이고 본문이 subject에게 줄 <b>입력</b>이다. 라벨은 사람이 검수해 박제한다 — 자동 라벨은 judge와 같은 모델 편향을 공유해 회귀를 놓친다.</p>
+
+    <div class="subhead">REVIEW · 위반 4 + 정상 1</div>
+    <div class="gset">
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">01-lib-imports-sdk</span>
+          <span class="badges"><span class="badge rev">review</span><span class="badge viol">violation</span><span class="badge crit">critical</span></span></div>
+        <div class="rule"><b>RULE</b> 레이어 의존성은 단방향. <code>lib/</code>는 외부 SDK(@anthropic-ai/sdk 등)를 import하지 않고, 어댑터는 route handler에서 주입한다.</div>
+        <pre><span class="cmt">// src/lib/analysis/summarize.ts</span>
+<span class="add">+import Anthropic from "@anthropic-ai/sdk";</span>
+<span class="add">+  const client = new Anthropic({ apiKey: process.env... });</span></pre>
+      </div>
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">02-money-parsefloat</span>
+          <span class="badges"><span class="badge rev">review</span><span class="badge viol">violation</span><span class="badge crit">critical</span></span></div>
+        <div class="rule"><b>RULE</b> 금액은 numeric으로 다루고 float(parseFloat 등)을 쓰지 않는다. 통화기호·콤마·괄호음수를 정규화한다.</div>
+        <pre><span class="cmt">// src/lib/csv/amount.ts</span>
+<span class="add">+  return parseFloat(raw.replace(/[$,]/g, ""));</span></pre>
+      </div>
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">03-service-role-public-env</span>
+          <span class="badges"><span class="badge rev">review</span><span class="badge viol">violation</span><span class="badge crit">critical</span></span></div>
+        <div class="rule"><b>RULE</b> service_role 키는 웹훅 모듈에서만 쓰고 <code>server-only</code>로 가드. <code>NEXT_PUBLIC_</code>에 비밀키 금지(클라이언트 번들 노출).</div>
+        <pre><span class="cmt">// src/lib/supabase/admin-client.ts</span>
+<span class="add">+  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!,</span></pre>
+      </div>
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">04-pro-gating-request-body</span>
+          <span class="badges"><span class="badge rev">review</span><span class="badge viol">violation</span><span class="badge crit">critical</span></span></div>
+        <div class="rule"><b>RULE</b> Pro 게이팅은 서버측 DB 구독상태(status active AND current_period_end &gt; now())로만 판정. 요청 본문/헤더의 tier를 신뢰하지 않는다.</div>
+        <pre><span class="cmt">// src/app/api/analyze/route.ts</span>
+<span class="add">+  const body = await request.json();</span>
+<span class="add">+  const isPro = body.tier === "pro";</span></pre>
+      </div>
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">05-lazy-provider-injection</span>
+          <span class="badges"><span class="badge rev">review</span><span class="badge pass">pass</span></span></div>
+        <div class="rule"><b>오탐 방지</b> 포트 인터페이스(<code>types/</code>)에만 의존하고 주입된 factory로 호출 시점에 지연 생성하는 <b>정상</b> 코드. 외부 결합을 다루는 듯 보여도 SDK import가 없으므로 위반이 아니다.</div>
+        <pre><span class="cmt">// src/lib/orchestration/insight-provider.ts</span>
+import type { InsightProvider } from "@/types/ports";
+  <span class="add">provider ??= insightProviderFactory();</span></pre>
+      </div>
+    </div>
+
+    <div class="subhead">QA · 사실 검증 3 + 전제반박 가드 1</div>
+    <div class="gset">
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">q01-pro-gating-unsubscribed-status</span>
+          <span class="badges"><span class="badge qa">qa</span></span></div>
+        <div class="body">“미구독 사용자가 <code>/api/analyze</code>를 호출하면 402로 막으면 되나요?”</div>
+        <div class="lbls">
+          <span class="lk must">must</span>
+          <ul><li>402가 아니라 <b>HTTP 200</b>으로 응답</li><li>Free(규칙·통계) 결과를 함께 반환</li><li><code>pro.status</code>를 locked/unavailable로 표시</li></ul>
+          <span class="lk mustnot">must_not</span>
+          <ul><li>402 Payment Required 반환</li><li>결제 전까지 분석 거부</li></ul>
+        </div>
+      </div>
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">q02-claude-timeout-isolation</span>
+          <span class="badges"><span class="badge qa">qa</span></span></div>
+        <div class="body">“Pro 심층 분석 중 Opus 호출이 타임아웃됩니다. 요청 전체를 500으로 실패시키면 되나요?”</div>
+        <div class="lbls">
+          <span class="lk must">must</span>
+          <ul><li>요청 전체를 실패시키지 않는다</li><li>규칙·통계 결과는 보존</li><li>AI 인사이트만 <b>unavailable로 격리</b></li><li>Opus 호출에 timeout(예 30s)</li></ul>
+          <span class="lk mustnot">must_not</span>
+          <ul><li>요청 전체를 500으로 실패</li><li>규칙·통계 결과까지 버림</li></ul>
+        </div>
+      </div>
+
+      <div class="gcase">
+        <div class="gcase-head"><span class="id">q03-csv-summary-rows-gotcha</span>
+          <span class="badges"><span class="badge qa">qa</span></span></div>
+        <div class="body">“CSV에 합계·소계 요약행이 섞이고 금액에 통화기호·콤마·괄호음수가 있습니다. 파싱에서 무엇을 주의해야 하나요?”</div>
+        <div class="lbls">
+          <span class="lk must">must</span>
+          <ul><li>합계·소계 <b>요약행을 필터링</b></li><li>통화기호·콤마·괄호음수 정규화</li><li>float이 아니라 numeric으로</li><li>부호 규약을 <code>direction</code>(debit/credit/refund)으로 단일화</li></ul>
+          <span class="lk mustnot">must_not</span>
+          <ul><li>parseFloat로 금액 파싱</li><li>요약행을 거래처럼 합산</li></ul>
+        </div>
+      </div>
+
+      <div class="gcase guard">
+        <div class="gcase-head"><span class="id">q04-sync-not-async-premise</span>
+          <span class="badges"><span class="badge qa">qa</span><span class="badge guard">전제반박 가드</span></span></div>
+        <div class="body"><b>틀린 전제 ▸</b> “finsight는 분석을 백그라운드 작업 큐(비동기 job)로 처리하죠? 그 큐 이름이 뭔가요?”</div>
+        <div class="lbls">
+          <span class="lk must">must</span>
+          <ul><li>비동기 큐가 아니라 <b>동기 처리</b>다(전제 바로잡기)</li><li>저장은 RPC 단일 트랜잭션(<code>save_statement_analysis</code>)</li><li>중간 실패 시 전체 rollback</li></ul>
+          <span class="lk mustnot">must_not</span>
+          <ul><li>비동기 큐가 맞다고 동조</li><li>존재하지 않는 큐 이름을 <b>지어냄</b>(환각)</li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 RESULTS -->
+  <section>
+    <div class="sec-head"><span class="n">05</span><h2>실행 결과</h2></div>
+    <div class="card tbl">
+      <table>
+        <thead><tr><th>케이스</th><th>트랙</th><th>기대 라벨</th><th class="v">판정</th></tr></thead>
+        <tbody>
+          <tr><td><span class="id">01-lib-imports-sdk</span></td><td><span class="badge rev">review</span></td><td>violation · critical</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">02-money-parsefloat</span></td><td><span class="badge rev">review</span></td><td>violation · critical</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">03-service-role-public-env</span></td><td><span class="badge rev">review</span></td><td>violation · critical</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">04-pro-gating-request-body</span></td><td><span class="badge rev">review</span></td><td>violation · critical</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">05-lazy-provider-injection</span></td><td><span class="badge rev">review</span></td><td>pass (오탐 방지)</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">q01-pro-gating-unsubscribed-status</span></td><td><span class="badge qa">qa</span></td><td>must ×3 · must_not ×2</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">q02-claude-timeout-isolation</span></td><td><span class="badge qa">qa</span></td><td>must ×4 · must_not ×2</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">q03-csv-summary-rows-gotcha</span></td><td><span class="badge qa">qa</span></td><td>must ×4 · must_not ×2</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+          <tr><td><span class="id">q04-sync-not-async-premise</span></td><td><span class="badge qa">qa</span></td><td>전제반박 · must ×3 · must_not ×2</td><td class="v"><span class="verdict">✓ PASS</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="margin-top:14px;font-size:12.5px;color:var(--soft)">게이트는 실패한 케이스의 judge 사유만 콘솔에 노출한다(전부 통과 시 사유 생략). 회귀 발생 시 해당 행에 <code>↳ reasoning</code>이 붙는다.</p>
+  </section>
+
+  <!-- 06 SPLIT -->
+  <section>
+    <div class="sec-head"><span class="n">06</span><h2>왜 두 명령으로 나뉘나</h2></div>
+    <div class="split">
+      <div class="card lane test">
+        <span class="cmd">npm test</span>
+        <p>키 불필요 · 결정적 · 빠름. 순수 함수와 golden set 무결성만 검증하는 green 게이트.</p>
+        <ul>
+          <li><b>parseCase</b> — frontmatter/본문 분리, 잘못된 라벨 throw</li>
+          <li><b>loadCases</b> — 균형 박제: review 위반4+정상1, qa must&gt;0·가드≥1, id 유일</li>
+          <li><b>summarize/formatSummary</b> — 집계·리포트</li>
+          <li><b>system prompt</b> — 룰 전량 포함·전제반박 지시</li>
+        </ul>
+      </div>
+      <div class="card lane live">
+        <span class="cmd">npm run eval</span>
+        <p>네트워크·비용·비결정. 라이브 Claude 호출로 subject를 돌리고 Opus가 채점. <code>.env</code> 자동 로드, 키 없으면 exit 2.</p>
+        <ul>
+          <li>review 5 → Reviewer(Sonnet) → Judge(Opus)</li>
+          <li>qa 4 → Responder(Sonnet) → Judge(Opus)</li>
+          <li>하나라도 fail → <b>exit 1</b> (회귀 게이트)</li>
+          <li>일시 과부하(529) 대비 <code>maxRetries:5</code> 백오프</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 LIMITS -->
+  <section>
+    <div class="sec-head"><span class="n">07</span><h2>한계 — 의도된 트레이드오프</h2></div>
+    <div class="card limits">
+      <div class="limit"><div class="ic">!</div><div class="t"><b>judge는 흔들린다.</b> 리뷰어는 temp 0으로 고정하지만 Opus judge는 temperature를 지원하지 않아 채점이 완벽히 결정적이지 않다. 애매하면 사람이 최종 검토(judge 맹신 금지).</div></div>
+      <div class="limit"><div class="ic">≈</div><div class="t"><b>경량 리뷰어 ≠ 실제 /review-code.</b> 게이트 속도를 위해 단일 호출로 대리한다. 산문 in/out 계약이라 <code>reviewer.ts</code>만 headless <code>/review-code</code>로 교체하면 실제 워크플로우를 eval할 수 있다(judge·게이트 불변).</div></div>
+      <div class="limit"><div class="ic">∋</div><div class="t"><b>qa 응답자는 CLAUDE.md를 통째로 받는다.</b> 사실이 거기 있으면 거의 맞힌다 — positive qa는 추론 테스트가 아니라 커버리지 회귀 센티넬이다. 진짜 변별력은 전제반박 가드와, 아직 CLAUDE.md에 없는 사실을 묻는 케이스에서 나온다.</div></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>finsight // 하네스 EVAL 리포트</span>
+    <span>9/9 PASS · EXIT 0 · 2026-06-23</span>
+  </footer>
+
+</div>
+</body>
+</html>
