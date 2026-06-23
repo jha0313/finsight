@@ -273,7 +273,8 @@ samp {
   font-weight: 400;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--muted);
+  /* --muted(#7c828a)는 흰 배경에서 대비 3.87(<4.5 AA 미달). --body로 상향해 접근성 통과. */
+  color: var(--body);
 }
 
 .caption-strong {
