@@ -1,0 +1,182 @@
+name: owasp-security-scan (격주 정기 스캔)
+
+# finsight 레포를 OWASP Top 10 2025 + finsight 휴리스틱으로 정기 감사하고,
+# verified critical/high가 있으면 GitHub 이슈를 자동 생성한다(없으면 워크플로 요약만).
+#
+# 스케줄: 매월 1일·15일 09:00 KST (= 00:00 UTC). cron은 순수 격주가 어려워 월 2회로 근사한다.
+# 수동 실행: Actions 탭 > 이 워크플로 > "Run workflow"(workflow_dispatch).
+#
+# 설계 메모(code-review.yml과 동일 철학):
+#   claude-code-action은 슬래시 커맨드/스킬 fan-out을 그대로 싣기엔 무겁고 불안정하다.
+#   그래서 CI에선 ① 결정론 pre-scan(scan.py)을 별도 스텝으로 먼저 돌려 결과를 보장하고,
+#   ② LLM 레이어는 5+15개 서브에이전트 fan-out 대신 단일패스 자기완결 프롬프트로 평탄화한다.
+#   (멀티에이전트 병렬 리뷰 + adversarial 검증은 인터랙티브 `/owasp-security-scan` 전용으로 유지.)
+#   판정·이슈 생성은 LLM이 아니라 owasp-verdict.json을 읽는 bash 스텝이 결정론적으로 한다.
+#
+# 사전 준비:
+#   1) repo Secret ANTHROPIC_API_KEY (이미 등록됨 — review-code.yml과 공유).
+#   2) .claude/skills/owasp-security-scan/ 가 레포에 커밋돼 있어야 한다(scan.py·rubric·template.html 사용).
+# 비용: 월 2회, 단일패스라 PR 리뷰보다 가벼움. 더 줄이려면 claude_args의 --model을 하향.
+
+on:
+  schedule:
+    - cron: "0 0 1,15 * *" # 매월 1일·15일 00:00 UTC = 09:00 KST
+  workflow_dispatch: {} # 수동 트리거(테스트용)
+
+permissions:
+  contents: read
+  issues: write # 결정론 게이트가 이슈를 생성
+  id-token: write
+
+concurrency:
+  group: owasp-security-scan
+  cancel-in-progress: false
+
+jobs:
+  owasp-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 의존성 설치 (npm audit 정확도용)
+        run: npm ci
+
+      - name: 결정론 pre-scan (scan.py — npm audit·시크릿·lead-grep)
+        run: |
+          python3 .claude/skills/owasp-security-scan/scripts/scan.py . \
+            --json owasp-prescan.json --scope "full repository"
+
+      - name: LLM 보안 리뷰 + 대시보드 생성 (단일패스)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          prompt: |
+            너는 finsight 보안 감사관이다. 이 레포를 OWASP Top 10 2025 기준으로 점검한다.
+            범위: 전체 레포(src/·supabase/·next.config·middleware 중심). read-only로 분석하고, 산출물 파일만 Write 하라.
+
+            먼저 다음을 Read 하라:
+            - 루브릭: `.claude/skills/owasp-security-scan/references/owasp-2025.md` (10개 카테고리 점검 기준 + finsight 휴리스틱)
+            - 결정론 pre-scan 결과: `owasp-prescan.json` (leads·supply_chain(npm audit)·secrets·coverage_notes). 이미 실행됐으니 scan.py를 다시 돌리지 마라.
+            - 가드레일 맥락: `CLAUDE.md` (보안 관련 CRITICAL 규칙). 있으면 `docs/ARCHITECTURE.md`·`docs/ADR.md`도 참고.
+
+            점검 규칙:
+            - 10개 카테고리(A01~A10)를 모두 본다. lead는 단서일 뿐 — 코드를 직접 Read/Grep해 실제 의미로 확인하거나 기각하라. grep이 못 본 설계 결함도 찾아라.
+            - finsight 휴리스틱을 반드시 적용: 모든 테이블 RLS auth.uid()=user_id, getUser()/getClaims() 검증(getSession 불신), service_role은 server-only, Pro 게이팅은 서버 DB 구독상태로만, customerExternalId=세션 getUser().id, 웹훅 raw body 서명검증+event_id 멱등, 카드/계좌 마스킹(전체 PAN 평문 저장 금지), Claude엔 마스킹된 거래단위만.
+            - 추측 금지. 모든 finding은 파일:라인 + 코드 인용 근거가 있어야 한다.
+            - critical/high finding은 반드시 해당 코드를 다시 Read해 교차검증하라: 실제로 악용 가능한가? 이미 다른 레이어(RLS·미들웨어·서명검증)가 막고 있지 않은가? 확신 없으면 싣지 마라(severity를 낮추거나 제거).
+            - secrets의 env_ref:true는 placeholder/환경변수 참조 → 실제 비밀 아님. finding 아님.
+            - 미설치 스캐너(osv/gitleaks/semgrep)로 못 본 영역은 finding이 아니라 coverage gap이다.
+
+            severity: critical · high · medium · low · info (루브릭 가이드 따름).
+
+            산출물 3개를 Write 하라:
+
+            1) `docs/owasp-security-scan.html` — `.claude/skills/owasp-security-scan/assets/template.html`을 Read한 뒤,
+               `<script id="scan-data" type="application/json">` 블록의 JSON만 실제 결과로 교체해서 통째로 Write 하라(HTML/CSS·렌더러는 절대 손대지 마라).
+               채울 필드: repo·scope·date(오늘)·branch·files_scanned(pre-scan meta에서) · posture{label,level,desc} · counts ·
+               categories[10]{id,name,max,status} · findings[]{owasp,severity,title,file,line,evidence,fix,confidence,verified} ·
+               coverage{ran[],gaps[]}. critical/high는 교차검증 통과분만 verified:true.
+
+            2) `docs/owasp-security-scan.json` — 위 scan-data와 **동일한 객체**를 그대로 저장(다른 도구가 소비).
+
+            3) `owasp-verdict.json` — 결정론 게이트가 읽는다. 다른 키·주석·코드펜스 없이 순수 JSON만:
+               {"posture":"<label>","level":"<green|amber|red>","counts":{"critical":0,"high":0,"medium":0,"low":0,"info":0},"top":["[high] A01 제목","..."]}
+               counts는 최종 리스트 기준 정수. top은 critical/high 상위 1~3개를 "[severity] OWASP 제목" 형식으로.
+
+            4) `owasp-issue-body.md` — 게이트가 critical/high가 있을 때 이슈 본문으로 쓴다. 마크다운으로:
+               - 첫 줄: posture 한 줄 요약(예: "**At Risk** — verified high 1건").
+               - severity 집계 표(critical/high/medium/low/info).
+               - critical/high finding 목록: 각 `### [severity] OWASP 제목` + `위치 file:line` + `근거` + `수정` 3~4줄.
+               - 마지막에 "전체 대시보드는 워크플로 아티팩트(owasp-dashboard)에서 내려받으세요." 안내.
+               critical/high가 0건이면 owasp-issue-body.md에 "검증된 critical/high 없음 — 이슈 불필요"만 한 줄 써라.
+
+            금지: `open` 같은 셸 명령 실행 금지. GitHub에 직접 코멘트/이슈 작성 금지(게이트가 한다). 리뷰 본문을 응답 메시지로 장황하게 출력하지 마라 — 파일로만 남겨라.
+          claude_args: |
+            --allowedTools "Read,Write,Glob,Grep"
+            # 비용 절감: 아래 주석 해제로 모델 하향.
+            # --model claude-sonnet-4-6
+
+      - name: 대시보드·JSON 아티팩트 업로드
+        if: always() # LLM 스텝이 실패해도 pre-scan 결과는 보존
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dashboard
+          path: |
+            owasp-prescan.json
+            docs/owasp-security-scan.html
+            docs/owasp-security-scan.json
+            owasp-verdict.json
+            owasp-issue-body.md
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: 결정론 게이트 (critical/high → GitHub 이슈)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f owasp-verdict.json ]; then
+            echo "::warning::owasp-verdict.json 없음 — 이슈 생성 보류(fail-safe). LLM 스텝 로그 확인."
+            exit 0
+          fi
+
+          echo "verdict 원문: $(cat owasp-verdict.json)"
+          posture=$(jq -r '.posture // "unknown"' owasp-verdict.json)
+          critical=$(jq -r '.counts.critical // 0' owasp-verdict.json)
+          high=$(jq -r '.counts.high // 0' owasp-verdict.json)
+
+          # 정수가 아니면(LLM이 형식을 어기면) 보류
+          for v in "$critical" "$high"; do
+            case "$v" in
+              ''|*[!0-9]*)
+                echo "::warning::verdict 숫자 파싱 실패(critical=$critical high=$high) — 이슈 보류"
+                exit 0
+                ;;
+            esac
+          done
+
+          actionable=$((critical + high))
+          echo "집계: posture=$posture · critical=$critical · high=$high · 합계=$actionable"
+
+          if [ "$actionable" -eq 0 ]; then
+            echo "→ 검증된 critical/high 없음 — 이슈 생성 안 함."
+            {
+              echo "## 🔒 OWASP 정기 스캔 — $posture"
+              echo ""
+              echo "검증된 critical/high 발견 없음. 대시보드는 아티팩트(owasp-dashboard)에서 확인."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # 이슈 본문: 에이전트가 쓴 body + 실행 링크 footer
+          body_file="$(mktemp)"
+          if [ -f owasp-issue-body.md ]; then
+            cat owasp-issue-body.md > "$body_file"
+          else
+            echo "owasp-issue-body.md 누락 — verdict 요약만 첨부." > "$body_file"
+            cat owasp-verdict.json >> "$body_file"
+          fi
+          {
+            echo ""
+            echo "---"
+            echo "- 전체 대시보드(HTML/JSON): [워크플로 실행 아티팩트]($RUN_URL) → owasp-dashboard"
+            echo "- 자동 생성: owasp-security-scan.yml ($(date +%F))"
+          } >> "$body_file"
+
+          # 라벨 보장(없으면 생성)
+          gh label create "owasp-scan" --color "B60205" --description "OWASP 정기 보안 스캔" 2>/dev/null || true
+
+          title="🔒 OWASP 스캔 $(date +%F) — $posture (critical ${critical}·high ${high})"
+          gh issue create --title "$title" --body-file "$body_file" --label "owasp-scan" \
+            && echo "→ 이슈 생성 완료" \
+            || echo "::warning::이슈 생성 실패(권한 또는 라벨 문제) — 로그 확인."
