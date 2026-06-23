@@ -50,6 +50,9 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true # 모델 동작을 로그에 노출(진단용)
+          # oncall-ci-fix가 연 수정 PR은 봇(claude app)이 author다. 기본값은 봇 PR
+          # 리뷰를 거부하므로 허용한다. 단 oncall PR의 auto-merge는 아래 게이트에서 차단(사람 게이트 유지).
+          allowed_bots: claude
           prompt: |
             PR #${{ github.event.pull_request.number }} (base: ${{ github.event.pull_request.base.ref }})를 코드 리뷰하라. PR 브랜치는 이미 체크아웃돼 있다.
             변경분은 `git diff origin/${{ github.event.pull_request.base.ref }}...HEAD` 로 얻는다.
@@ -79,6 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }} # oncall/* 면 auto-merge 차단
         run: |
           set -euo pipefail
 
@@ -115,10 +119,21 @@ jobs:
               --body "🟡 minor만 발견 — auto-approve. 머지는 수동으로 진행하라." \
               || echo "::warning::approve 실패(Settings > Actions: 'Allow GitHub Actions to create and approve pull requests' 필요)"
           else
-            echo "→ nit 이하/깨끗: approve + auto-merge(--squash)"
+            echo "→ nit 이하/깨끗: approve"
             gh pr review "$PR" --approve \
-              --body "⚪ nit 이하 — auto-approve + auto-merge 설정." \
+              --body "⚪ nit 이하 — auto-approve." \
               || echo "::warning::approve 실패(Settings > Actions: 'Allow GitHub Actions to create and approve pull requests' 필요)"
-            gh pr merge "$PR" --auto --squash \
-              || echo "::warning::auto-merge 실패(Settings > General: 'Allow auto-merge' 필요, 또는 required check 미설정)"
+            # oncall 수정 PR은 깨끗해도 auto-merge하지 않는다 — oncall 원칙은 '출력은 PR, 사람이 머지'.
+            case "$HEAD_REF" in
+              oncall/*)
+                echo "→ oncall PR: auto-merge 생략(사람 게이트). 리뷰는 통과, 머지는 사람이."
+                gh pr comment "$PR" --body "⚪ 리뷰 clean. 단 oncall 수정 PR은 자동 머지하지 않습니다 — 사람이 확인 후 머지하세요(사람 게이트)." \
+                  || true
+                ;;
+              *)
+                echo "→ auto-merge(--squash)"
+                gh pr merge "$PR" --auto --squash \
+                  || echo "::warning::auto-merge 실패(Settings > General: 'Allow auto-merge' 필요, 또는 required check 미설정)"
+                ;;
+            esac
           fi
