@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{REPO}} · OWASP Top 10 2025 Security Scan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --crit: #991b1b;
+        --crit-soft: #fee2e2;
+        --slate: #64748b;
+        --slate-soft: #f1f5f9;
+        --grid: #f1f5f9;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        background: var(--bg); color: var(--text);
+        font-family: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+      .page { max-width: 1200px; margin: 0 auto; padding: 48px 40px 64px; }
+      a { color: var(--accent); text-decoration: none; }
+
+      /* ===== HEADER ===== */
+      .header { display: flex; justify-content: space-between; align-items: flex-end;
+        border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 28px; }
+      .header h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+      .header h1 .tag { color: var(--text-3); font-weight: 400; }
+      .header .sub { font-size: 13px; color: var(--text-2); margin-top: 6px; }
+      .header-meta { text-align: right; font-size: 12px; color: var(--text-3); line-height: 1.7; }
+      .header-meta b { color: var(--text-2); font-weight: 500; }
+
+      /* ===== HERO ===== */
+      .hero { display: grid; grid-template-columns: 280px 1fr; gap: 24px; margin-bottom: 32px; }
+      .posture { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 24px; display: flex; flex-direction: column; justify-content: center; }
+      .posture .label-sm { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 10px; }
+      .posture .badge { display: inline-block; font-size: 20px; font-weight: 600; padding: 8px 16px; border-radius: 8px; width: fit-content; }
+      .posture .desc { font-size: 12.5px; color: var(--text-2); margin-top: 14px; line-height: 1.6; }
+      .badge.green { background: var(--green-soft); color: var(--green); }
+      .badge.amber { background: var(--amber-soft); color: var(--amber); }
+      .badge.red { background: var(--red-soft); color: var(--red); }
+
+      .counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+      .count-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; }
+      .count-card .n { font-size: 30px; font-weight: 600; line-height: 1; }
+      .count-card .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin-top: 8px; }
+      .count-card.critical { border-top: 3px solid var(--crit); } .count-card.critical .n { color: var(--crit); }
+      .count-card.high { border-top: 3px solid var(--red); } .count-card.high .n { color: var(--red); }
+      .count-card.medium { border-top: 3px solid var(--amber); } .count-card.medium .n { color: var(--amber); }
+      .count-card.low { border-top: 3px solid var(--accent); } .count-card.low .n { color: var(--accent); }
+      .count-card.info { border-top: 3px solid var(--slate); } .count-card.info .n { color: var(--slate); }
+
+      /* ===== SECTION ===== */
+      .section { margin-bottom: 36px; }
+      .section > h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--text-2); font-weight: 600; margin: 0 0 16px; }
+
+      /* ===== CATEGORY GRID ===== */
+      .cats { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+      .cat-row { display: grid; grid-template-columns: 64px 1fr 200px 90px; gap: 16px;
+        align-items: center; padding: 13px 20px; border-bottom: 1px solid var(--grid); }
+      .cat-row:last-child { border-bottom: none; }
+      .cat-row .id { font-size: 13px; font-weight: 600; color: var(--text-2); }
+      .cat-row .name { font-size: 13.5px; font-weight: 500; }
+      .cat-row .status { font-size: 12px; color: var(--text-2); }
+      .cat-row .bar-wrap { display: flex; align-items: center; gap: 8px; }
+      .cat-row .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+      .dot.green { background: var(--green); } .dot.amber { background: var(--amber); }
+      .dot.red { background: var(--red); } .dot.crit { background: var(--crit); }
+      .dot.slate { background: var(--slate); }
+      .pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; text-align: center; }
+      .pill.crit { background: var(--crit-soft); color: var(--crit); }
+      .pill.red { background: var(--red-soft); color: var(--red); }
+      .pill.amber { background: var(--amber-soft); color: var(--amber); }
+      .pill.blue { background: var(--accent-soft); color: var(--accent); }
+      .pill.slate { background: var(--slate-soft); color: var(--slate); }
+      .pill.clean { background: var(--green-soft); color: var(--green); }
+
+      /* ===== FINDINGS ===== */
+      .finding { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 18px 20px; margin-bottom: 12px; border-left: 4px solid var(--border-strong); }
+      .finding.critical { border-left-color: var(--crit); }
+      .finding.high { border-left-color: var(--red); }
+      .finding.medium { border-left-color: var(--amber); }
+      .finding.low { border-left-color: var(--accent); }
+      .finding.info { border-left-color: var(--slate); }
+      .finding .f-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+      .finding .f-title { font-size: 14.5px; font-weight: 600; }
+      .finding .f-loc { font-size: 12px; color: var(--text-2); margin-bottom: 10px; }
+      .finding .f-body { font-size: 13px; color: var(--text-2); line-height: 1.65; }
+      .finding .f-body b { color: var(--text); font-weight: 600; }
+      .finding .f-fix { background: var(--slate-soft); border-radius: 8px; padding: 10px 12px; margin-top: 10px;
+        font-size: 12.5px; color: var(--text); line-height: 1.6; }
+      .finding .f-fix .lbl { font-weight: 600; color: var(--green); }
+      .tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px;
+        background: var(--accent-soft); color: var(--accent); }
+      .tag.unverified { background: var(--amber-soft); color: var(--amber); }
+      .tag.verified { background: var(--green-soft); color: var(--green); }
+      .empty { background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px;
+        padding: 28px; text-align: center; color: var(--text-2); font-size: 13.5px; }
+
+      /* ===== COVERAGE ===== */
+      .cov { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .cov-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+      .cov-box h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: 0 0 12px; }
+      .cov-box ul { margin: 0; padding-left: 0; list-style: none; }
+      .cov-box li { font-size: 12.5px; color: var(--text-2); padding: 5px 0; display: flex; gap: 8px; line-height: 1.5; }
+      .cov-box li .mk { flex: none; }
+      .mk.ok { color: var(--green); } .mk.gap { color: var(--amber); }
+
+      .footer { border-top: 1px solid var(--border); margin-top: 40px; padding-top: 18px;
+        font-size: 11.5px; color: var(--text-3); display: flex; justify-content: space-between; }
+    </style>
+  </head>
+  <body>
+    <div class="page" id="root"></div>
+
+    <!-- ┌──────────────────────────────────────────────────────────────────┐
+         │  SKILL이 채우는 곳: 아래 JSON 블록 하나만 교체하면 전체가 렌더된다. │
+         │  (HTML/CSS는 건드리지 말 것 — 데이터만 바꾼다)                      │
+         └──────────────────────────────────────────────────────────────────┘ -->
+    <script id="scan-data" type="application/json">
+{
+  "repo": "finsight",
+  "scope": "full repository",
+  "date": "2026-06-22",
+  "branch": "main",
+  "files_scanned": 0,
+  "posture": { "label": "At Risk", "level": "amber", "desc": "최약 카테고리 한두 개를 한 줄로 요약." },
+  "counts": { "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0 },
+  "categories": [
+    { "id": "A01", "name": "Broken Access Control", "max": "clean", "status": "확인된 위반 없음" },
+    { "id": "A02", "name": "Security Misconfiguration", "max": "clean", "status": "" },
+    { "id": "A03", "name": "Software Supply Chain Failures", "max": "clean", "status": "" },
+    { "id": "A04", "name": "Cryptographic Failures", "max": "clean", "status": "" },
+    { "id": "A05", "name": "Injection", "max": "clean", "status": "" },
+    { "id": "A06", "name": "Insecure Design", "max": "clean", "status": "" },
+    { "id": "A07", "name": "Authentication Failures", "max": "clean", "status": "" },
+    { "id": "A08", "name": "Software or Data Integrity Failures", "max": "clean", "status": "" },
+    { "id": "A09", "name": "Security Logging and Alerting Failures", "max": "clean", "status": "" },
+    { "id": "A10", "name": "Mishandling of Exceptional Conditions", "max": "clean", "status": "" }
+  ],
+  "findings": [],
+  "coverage": {
+    "ran": ["npm audit (A03)", "secret regex", "category pattern grep", "LLM 카테고리 리뷰", "adversarial 검증"],
+    "gaps": []
+  }
+}
+    </script>
+
+    <script>
+      const SEV_ORDER = ["critical", "high", "medium", "low", "info"];
+      const SEV_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low", info: "Info" };
+      const SEV_PILL = { critical: "crit", high: "red", medium: "amber", low: "blue", info: "slate", clean: "clean" };
+      const SEV_DOT = { critical: "crit", high: "red", medium: "amber", low: "blue", info: "slate", clean: "green" };
+      const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+      function render(d) {
+        const c = d.counts || {};
+        const cats = d.categories || [];
+        const findings = (d.findings || []).slice().sort(
+          (a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
+        const cov = d.coverage || { ran: [], gaps: [] };
+
+        const countCards = SEV_ORDER.map((k) =>
+          `<div class="count-card ${k}"><div class="n mono">${c[k] || 0}</div><div class="k">${SEV_LABEL[k]}</div></div>`
+        ).join("");
+
+        const catRows = cats.map((ct) => {
+          const max = ct.max || "clean";
+          const pillTxt = max === "clean" ? "Clean" : SEV_LABEL[max] || max;
+          return `<div class="cat-row">
+            <div class="id mono">${esc(ct.id)}</div>
+            <div class="name">${esc(ct.name)}</div>
+            <div class="status">${esc(ct.status || "")}</div>
+            <div class="bar-wrap"><span class="dot ${SEV_DOT[max] || "green"}"></span>
+              <span class="pill ${SEV_PILL[max] || "clean"}">${pillTxt}</span></div>
+          </div>`;
+        }).join("");
+
+        const findingHtml = findings.length ? findings.map((f) => {
+          const vtag = f.verified === true ? `<span class="tag verified">검증됨</span>`
+            : f.verified === false ? `<span class="tag unverified">미검증</span>` : "";
+          const conf = f.confidence ? `<span class="tag">confidence: ${esc(f.confidence)}</span>` : "";
+          const loc = f.line ? `${esc(f.file)}:${esc(f.line)}` : esc(f.file || "");
+          return `<div class="finding ${f.severity}">
+            <div class="f-top">
+              <span class="pill ${SEV_PILL[f.severity]}">${SEV_LABEL[f.severity] || f.severity}</span>
+              <span class="tag">${esc(f.owasp)}</span>${conf}${vtag}
+              <span class="f-title">${esc(f.title)}</span>
+            </div>
+            ${loc ? `<div class="f-loc mono">${loc}</div>` : ""}
+            <div class="f-body">${esc(f.evidence)}</div>
+            ${f.fix ? `<div class="f-fix"><span class="lbl">→ Fix:</span> ${esc(f.fix)}</div>` : ""}
+          </div>`;
+        }).join("") : `<div class="empty">검증을 통과한 finding이 없습니다. coverage 패널에서 점검 범위를 확인하세요.</div>`;
+
+        const ranList = (cov.ran || []).map((x) => `<li><span class="mk ok">✓</span>${esc(x)}</li>`).join("");
+        const gapList = (cov.gaps || []).length
+          ? (cov.gaps).map((x) => `<li><span class="mk gap">△</span>${esc(x)}</li>`).join("")
+          : `<li><span class="mk ok">✓</span>알려진 커버리지 공백 없음</li>`;
+
+        document.getElementById("root").innerHTML = `
+          <div class="header">
+            <div>
+              <h1>${esc(d.repo)} <span class="tag-dim">·</span> <span class="tag">OWASP Top 10 2025</span></h1>
+              <div class="sub">보안 스캔 리포트 · ${esc(d.scope || "full repository")}</div>
+            </div>
+            <div class="header-meta">
+              <div><b>${esc(d.date)}</b> 스캔</div>
+              <div>branch <b class="mono">${esc(d.branch)}</b></div>
+              <div><b class="mono">${esc(d.files_scanned)}</b> files scanned</div>
+            </div>
+          </div>
+
+          <div class="hero">
+            <div class="posture">
+              <div class="label-sm">Security Posture</div>
+              <div class="badge ${d.posture.level}">${esc(d.posture.label)}</div>
+              <div class="desc">${esc(d.posture.desc || "")}</div>
+            </div>
+            <div class="counts">${countCards}</div>
+          </div>
+
+          <div class="section">
+            <h2>OWASP Top 10 2025 — 카테고리별 상태</h2>
+            <div class="cats">${catRows}</div>
+          </div>
+
+          <div class="section">
+            <h2>Findings (severity 순)</h2>
+            ${findingHtml}
+          </div>
+
+          <div class="section">
+            <h2>Scan Coverage</h2>
+            <div class="cov">
+              <div class="cov-box"><h3>실행된 점검</h3><ul>${ranList}</ul></div>
+              <div class="cov-box"><h3>커버리지 공백 (정직 표기)</h3><ul>${gapList}</ul></div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <span>${esc(d.repo)} · OWASP Top 10 2025 security scan</span>
+            <span>generated ${esc(d.date)} · hybrid (deterministic + LLM)</span>
+          </div>`;
+      }
+
+      try {
+        render(JSON.parse(document.getElementById("scan-data").textContent));
+      } catch (e) {
+        document.getElementById("root").innerHTML =
+          '<div class="empty">scan-data JSON 파싱 오류: ' + (e && e.message) + "</div>";
+      }
+    </script>
+  </body>
+</html>

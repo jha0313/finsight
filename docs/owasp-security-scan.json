@@ -1,0 +1,163 @@
+{
+  "repo": "finsight",
+  "scope": "full repository",
+  "date": "2026-06-22",
+  "branch": "main",
+  "files_scanned": 236,
+  "posture": {
+    "label": "Hardened",
+    "level": "green",
+    "desc": "핵심 통제(접근제어·인증·암호화·무결성·설계)가 모두 견고 — 검증을 통과한 exploitable critical/high 0건. 남은 것은 low 수준 하드닝 4건(보안 응답 헤더 부재·웹훅 서명실패 무로깅·dev/빌드타임 트랜지티브 의존성 2건)."
+  },
+  "counts": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 4,
+    "info": 2
+  },
+  "categories": [
+    {
+      "id": "A01",
+      "name": "Broken Access Control",
+      "max": "clean",
+      "status": "RLS 전 테이블 + getUser 검증 + service_role server-only, IDOR 없음"
+    },
+    {
+      "id": "A02",
+      "name": "Security Misconfiguration",
+      "max": "low",
+      "status": "보안 응답 헤더(CSP/HSTS/X-Frame) 부재 · 비밀 노출은 없음"
+    },
+    {
+      "id": "A03",
+      "name": "Software Supply Chain Failures",
+      "max": "low",
+      "status": "npm audit high 1·moderate 2 — 전부 dev/빌드타임 트랜지티브, 프로덕션 런타임 노출 없음"
+    },
+    {
+      "id": "A04",
+      "name": "Cryptographic Failures",
+      "max": "info",
+      "status": "PAN 마스킹·sha256 dedup 견고 · 테스트 픽스처 토큰만"
+    },
+    {
+      "id": "A05",
+      "name": "Injection",
+      "max": "clean",
+      "status": "파라미터화 쿼리·React 이스케이프·structured output · dangerouslySetInnerHTML 0건"
+    },
+    {
+      "id": "A06",
+      "name": "Insecure Design",
+      "max": "clean",
+      "status": "레이어 경계 ESLint 강제·원자 quota·단일 트랜잭션·fail-safe 내장"
+    },
+    {
+      "id": "A07",
+      "name": "Authentication Failures",
+      "max": "clean",
+      "status": "getUser 네트워크 검증·OAuth 콜백 안전·오픈 리다이렉트 차단"
+    },
+    {
+      "id": "A08",
+      "name": "Software or Data Integrity Failures",
+      "max": "clean",
+      "status": "웹훅 raw body 서명검증 선행·event_id 멱등·stale(event_ts) 보호"
+    },
+    {
+      "id": "A09",
+      "name": "Security Logging and Alerting Failures",
+      "max": "low",
+      "status": "웹훅/인증 실패 과소 로깅 · 민감정보 로깅 누출은 없음"
+    },
+    {
+      "id": "A10",
+      "name": "Mishandling of Exceptional Conditions",
+      "max": "clean",
+      "status": "fail-safe 방향(에러→Free 강등)·단일 트랜잭션 rollback·에러 미노출"
+    }
+  ],
+  "findings": [
+    {
+      "owasp": "A03",
+      "severity": "low",
+      "title": "undici (dev 전용 트랜지티브) — TLS 인증서 검증 우회 외 다수",
+      "file": "package.json",
+      "line": 0,
+      "confidence": "high",
+      "verified": true,
+      "evidence": "npm audit가 undici@7.27.0을 high로 보고(GHSA-vmh5-mc38-953g TLS cert bypass CVSS 7.4 외 6건). 단일 의존 경로 finsight > jsdom(devDependency) > undici 로, jsdom은 vitest 테스트 환경 전용이라 Next.js 프로덕션 번들/런타임에 미포함. 취약 경로(SOCKS5 ProxyAgent·shared cache)는 jsdom의 테스트 fetch에서 사용되지 않음. adversarial 검증: isReal=true이나 실제 노출면이 dev/CI에 한정되어 적정 severity는 low로 강등(원 보고 high).",
+      "fix": "npm audit fix 또는 package.json overrides에 \"undici\": \">=7.28.0\" 추가(검증에서 확인된 실제 패치 버전은 7.28.0 — 원 finding의 7.27.3은 부정확). dev-only이므로 프로덕션 위험은 낮으나 CI 의존성 무결성 차원에서 갱신 권장."
+    },
+    {
+      "owasp": "A03",
+      "severity": "low",
+      "title": "postcss (next 번들 내 트랜지티브) — CSS Stringify XSS",
+      "file": "package.json",
+      "line": 0,
+      "confidence": "high",
+      "verified": false,
+      "evidence": "npm audit moderate: postcss <8.5.10 GHSA-qx2v-qp2m-jg93(Unescaped </style> via CSS Stringify, CVSS 6.1). 의존 경로는 next 내부 번들(node_modules/next/node_modules/postcss)로 직접 의존 아님. 빌드타임 CSS 처리 경로이며 finsight는 사용자 입력을 PostCSS stringify에 흘려보내지 않음(Tailwind 빌드 산출).",
+      "fix": "next 패치 릴리스로 번들 postcss가 8.5.10+로 올라갈 때 함께 갱신. 즉시 조치 불요(빌드타임·비사용자입력 경로) — 추적용으로 기록."
+    },
+    {
+      "owasp": "A02",
+      "severity": "low",
+      "title": "보안 응답 헤더(CSP/HSTS/X-Frame-Options/X-Content-Type-Options) 전무",
+      "file": "next.config.ts",
+      "line": 3,
+      "confidence": "high",
+      "verified": false,
+      "evidence": "next.config.ts에 async headers() 블록이 없고 middleware.ts도 인증 리다이렉트만 하여 응답에 보안 헤더를 부여하지 않는다. 클릭재킹·MIME 스니핑·XSS 심층방어가 부재. finsight는 사용자 CSV의 가맹점명을 대시보드에 렌더하므로(현재 React 이스케이프로 1차 방어) CSP가 없으면 XSS 발생 시 완화 수단이 없다.",
+      "fix": "next.config.ts에 async headers()로 전 경로 적용: Strict-Transport-Security(max-age=63072000; includeSubDomains; preload), X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin. 가능하면 CSP(script-src 'self' + PostHog, object-src 'none', base-uri 'self')."
+    },
+    {
+      "owasp": "A09",
+      "severity": "low",
+      "title": "웹훅 서명검증 실패가 로깅 없이 삼켜져 위조·재생 시도가 관측 불가",
+      "file": "src/lib/orchestration/index.ts",
+      "line": 379,
+      "confidence": "high",
+      "verified": false,
+      "evidence": "runPolarWebhookRequest의 catch가 verifyWebhook(서명검증) 실패를 빈 catch로 받아 401만 반환하고 로깅을 남기지 않는다. 웹훅 서명 실패는 결제 이벤트 위조/재생의 직접 신호인데 반복 401이 로그에 남지 않아 침해 탐지가 불가능. 인증 실패 경로(getUser error→null, exchangeCodeForSession 실패)도 무로깅. (거부 동작 자체는 정상이라 A10 아님 — 로깅 누락 = A09 과소 로깅)",
+      "fix": "catch에서 구조화 로그로 서명검증 실패 기록(remote IP·timestamp·사유만, raw body·서명 시크릿 제외). 실패 카운트를 PostHog로 집계해 임계 초과 시 경보 훅."
+    },
+    {
+      "owasp": "A04",
+      "severity": "info",
+      "title": "테스트 픽스처의 하드코딩된 'polar-token' (실 비밀 아님)",
+      "file": "src/services/polar/index.test.ts",
+      "line": 103,
+      "confidence": "high",
+      "verified": false,
+      "evidence": "pre-scan secrets가 가리킨 line 103·201은 둘 다 toHaveBeenCalledWith({ accessToken: \"polar-token\" }) 형태의 테스트 단정값으로, setPolarEnv()가 주입하는 가짜 토큰이다. 실제 Polar 자격증명 아니며 프로덕션 번들에 미포함(운영 비밀은 requireEnv(\"POLAR_ACCESS_TOKEN\")로 런타임 env에서만 로드).",
+      "fix": "조치 불필요. 정리하려면 픽스처를 test-polar-token 등 명백한 테스트 값으로 명명해 시크릿 스캐너 오탐 감소(선택)."
+    },
+    {
+      "owasp": "A09",
+      "severity": "info",
+      "title": "중앙 보안 경보·이상탐지 부재 (MVP 설계 한계)",
+      "file": "src/lib/orchestration/index.ts",
+      "line": 667,
+      "confidence": "high",
+      "verified": false,
+      "evidence": "보안 이벤트 로깅이 Vercel stdout(console.error 1곳: AI insight 실패)에만 의존하고, 인증 실패·quota 소진·웹훅 검증 실패의 중앙 집계나 임계 기반 경보(SIEM/alert)가 없다. CLAUDE.md/루브릭이 인정하는 MVP 흔한 한계로 1건 압축.",
+      "fix": "Post-MVP에서 인증 실패율·웹훅 401율·quota 소진을 메트릭으로 집계, 비정상 급증 시 알림(Slack/PagerDuty) 트리거. MVP 단계는 수용 가능 한계로 문서화."
+    }
+  ],
+  "coverage": {
+    "ran": [
+      "npm audit — 의존성 취약점 (A03)",
+      "시크릿 정규식 스캔 (작업트리)",
+      "카테고리 패턴 grep — 78 leads",
+      "LLM 카테고리 리뷰 — 5 번들 병렬 서브에이전트",
+      "adversarial 검증 — high 1건 skeptic 반박"
+    ],
+    "gaps": [
+      "osv-scanner 미설치 → OS/언어 패키지 취약점 DB 교차조회 생략(npm audit만 사용)",
+      "gitleaks 미설치 → 시크릿은 작업트리 정규식 스캔만(git 히스토리 전수 미점검)",
+      "semgrep 미설치 → 데이터플로우 기반 taint 분석 없음(패턴 grep + LLM 추론으로 대체)"
+    ]
+  }
+}
