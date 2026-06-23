@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{PROJECT}} · Supabase DB Advisor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --slate: #64748b;
+        --slate-soft: #f1f5f9;
+        --grid: #f1f5f9;
+        --code-bg: #0f172a;
+        --code-fg: #e2e8f0;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        background: var(--bg); color: var(--text);
+        font-family: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+      .page { max-width: 1120px; margin: 0 auto; padding: 48px 40px 64px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      /* ===== HEADER ===== */
+      .header { display: flex; justify-content: space-between; align-items: flex-end;
+        border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 28px; }
+      .header h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+      .header .sub { font-size: 13px; color: var(--text-2); margin-top: 6px; }
+      .header-meta { text-align: right; font-size: 12px; color: var(--text-3); line-height: 1.7; }
+      .header-meta b { color: var(--text-2); font-weight: 500; }
+
+      /* ===== HERO ===== */
+      .hero { display: grid; grid-template-columns: 290px 1fr; gap: 24px; margin-bottom: 32px; }
+      .posture { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 24px; display: flex; flex-direction: column; justify-content: center; }
+      .posture .label-sm { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 10px; }
+      .posture .badge { display: inline-block; font-size: 19px; font-weight: 600; padding: 8px 16px; border-radius: 8px; width: fit-content; }
+      .posture .desc { font-size: 12.5px; color: var(--text-2); margin-top: 14px; line-height: 1.6; }
+      .badge.green { background: var(--green-soft); color: var(--green); }
+      .badge.amber { background: var(--amber-soft); color: var(--amber); }
+      .badge.red { background: var(--red-soft); color: var(--red); }
+
+      .counts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+      .count-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; }
+      .count-card .n { font-size: 28px; font-weight: 600; line-height: 1; }
+      .count-card .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin-top: 8px; }
+      .count-card.security { border-top: 3px solid var(--red); } .count-card.security .n { color: var(--red); }
+      .count-card.performance { border-top: 3px solid var(--amber); } .count-card.performance .n { color: var(--amber); }
+      .count-card.proposed { border-top: 3px solid var(--accent); } .count-card.proposed .n { color: var(--accent); }
+      .count-card.applied { border-top: 3px solid var(--green); } .count-card.applied .n { color: var(--green); }
+      .count-card.kept { border-top: 3px solid var(--slate); } .count-card.kept .n { color: var(--slate); }
+
+      /* ===== SECTION ===== */
+      .section { margin-bottom: 34px; }
+      .section > h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--text-2); font-weight: 600; margin: 0 0 14px; }
+
+      /* ===== TIER GROUP ===== */
+      .tier-head { display: flex; align-items: center; gap: 10px; margin: 26px 0 12px; }
+      .tier-head .ttl { font-size: 14px; font-weight: 600; }
+      .tier-head .cnt { font-size: 12px; color: var(--text-3); }
+      .tier-head .tdot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+      .tdot.auto { background: var(--green); }
+      .tdot.judgment { background: var(--amber); }
+      .tdot.config { background: var(--accent); }
+      .tdot.keep { background: var(--slate); }
+
+      /* ===== FINDINGS ===== */
+      .finding { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 16px 18px; margin-bottom: 12px; border-left: 4px solid var(--border-strong); }
+      .finding.auto { border-left-color: var(--green); }
+      .finding.judgment { border-left-color: var(--amber); }
+      .finding.config { border-left-color: var(--accent); }
+      .finding.keep { border-left-color: var(--slate); }
+      .finding .f-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+      .finding .f-title { font-size: 14px; font-weight: 600; margin-left: 2px; }
+      .finding .f-loc { font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+      .finding .f-body { font-size: 13px; color: var(--text-2); line-height: 1.65; }
+      .finding .f-body b { color: var(--text); font-weight: 600; }
+      .finding .f-verdict { font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin-top: 6px; }
+      .finding .f-verdict .lbl { font-weight: 600; color: var(--text); }
+      .finding .f-fix { background: var(--code-bg); color: var(--code-fg); border-radius: 8px;
+        padding: 11px 13px; margin-top: 10px; font-size: 12px; line-height: 1.6;
+        font-family: "JetBrains Mono", ui-monospace, monospace; white-space: pre-wrap; overflow-x: auto; }
+      .finding .f-fix .lbl { display: block; color: #7dd3a8; font-size: 11px; text-transform: uppercase;
+        letter-spacing: 0.05em; margin-bottom: 6px; }
+      .finding .f-link { font-size: 12px; margin-top: 8px; }
+
+      .pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; text-align: center; }
+      .pill.red { background: var(--red-soft); color: var(--red); }
+      .pill.amber { background: var(--amber-soft); color: var(--amber); }
+      .pill.slate { background: var(--slate-soft); color: var(--slate); }
+      .tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px;
+        background: var(--slate-soft); color: var(--slate); font-family: "JetBrains Mono", monospace; }
+      .tag.sec { background: var(--red-soft); color: var(--red); }
+      .tag.perf { background: var(--amber-soft); color: var(--amber); }
+      .status { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 5px; }
+      .status.proposed { background: var(--accent-soft); color: var(--accent); }
+      .status.applied { background: var(--green-soft); color: var(--green); }
+      .status.manual { background: var(--amber-soft); color: var(--amber); }
+      .status.kept { background: var(--slate-soft); color: var(--slate); }
+      .empty { background: var(--surface); border: 1px dashed var(--border-strong); border-radius: 12px;
+        padding: 28px; text-align: center; color: var(--text-2); font-size: 13.5px; }
+
+      .footer { border-top: 1px solid var(--border); margin-top: 40px; padding-top: 18px;
+        font-size: 11.5px; color: var(--text-3); display: flex; justify-content: space-between; }
+    </style>
+  </head>
+  <body>
+    <div class="page" id="root"></div>
+
+    <!-- ┌──────────────────────────────────────────────────────────────────┐
+         │  SKILL이 채우는 곳: 아래 JSON 블록 하나만 교체하면 전체가 렌더된다. │
+         │  (HTML/CSS·렌더러는 건드리지 말 것 — 데이터만 바꾼다)              │
+         └──────────────────────────────────────────────────────────────────┘ -->
+    <script id="advisor-data" type="application/json">
+{
+  "project": "finsight",
+  "project_ref": "ctvesfeetusmuyqljxji",
+  "date": "2026-06-22",
+  "posture": { "label": "Hardening Recommended", "level": "amber", "desc": "최약 항목을 한두 줄로 요약." },
+  "counts": { "security": 0, "performance": 0, "proposed": 0, "applied": 0, "kept": 0 },
+  "tiers": [
+    { "key": "auto", "n": 0 },
+    { "key": "judgment", "n": 0 },
+    { "key": "config", "n": 0 },
+    { "key": "keep", "n": 0 }
+  ],
+  "findings": []
+}
+    </script>
+
+    <script>
+      const TIER_ORDER = ["auto", "judgment", "config", "keep"];
+      const TIER_LABEL = {
+        auto: "🟢 안전 자동수정",
+        judgment: "🟡 판단 필요 (코드 교차분석)",
+        config: "⚙️ 설정 (비SQL)",
+        keep: "⚪ 유지 권장",
+      };
+      const LEVEL_PILL = { ERROR: "red", WARN: "amber", INFO: "slate" };
+      const STATUS_LABEL = { proposed: "제안됨", applied: "적용됨", manual: "수동 필요", kept: "유지" };
+      const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+      function findingCard(f) {
+        const cat = (f.category || "").toUpperCase();
+        const catCls = cat === "SECURITY" ? "sec" : cat === "PERFORMANCE" ? "perf" : "";
+        const catTxt = cat === "SECURITY" ? "SEC" : cat === "PERFORMANCE" ? "PERF" : esc(cat);
+        const lvl = (f.level || "INFO").toUpperCase();
+        const status = f.status ? `<span class="status ${esc(f.status)}">${STATUS_LABEL[f.status] || esc(f.status)}</span>` : "";
+        return `<div class="finding ${esc(f.tier)}">
+          <div class="f-top">
+            <span class="pill ${LEVEL_PILL[lvl] || "slate"}">${esc(lvl)}</span>
+            <span class="tag ${catCls}">${catTxt}</span>
+            <span class="tag mono">${esc(f.lint)}</span>
+            ${status}
+            <span class="f-title">${esc(f.title || f.lint)}</span>
+          </div>
+          ${f.target ? `<div class="f-loc mono">${esc(f.target)}</div>` : ""}
+          ${f.detail ? `<div class="f-body">${esc(f.detail)}</div>` : ""}
+          ${f.verdict ? `<div class="f-verdict"><span class="lbl">판정:</span> ${esc(f.verdict)}</div>` : ""}
+          ${f.fix ? `<div class="f-fix"><span class="lbl">${f.tier === "config" ? "수동 절차" : "수정"}</span>${esc(f.fix)}</div>` : ""}
+          ${f.remediation ? `<div class="f-link"><a href="${esc(f.remediation)}" target="_blank" rel="noopener">remediation 문서 →</a></div>` : ""}
+        </div>`;
+      }
+
+      function render(d) {
+        const c = d.counts || {};
+        const findings = d.findings || [];
+        const tierN = {};
+        (d.tiers || []).forEach((t) => { tierN[t.key] = t.n; });
+
+        const countCards = [
+          ["security", "Security", c.security],
+          ["performance", "Performance", c.performance],
+          ["proposed", "Proposed", c.proposed],
+          ["applied", "Applied", c.applied],
+          ["kept", "Keep", c.kept],
+        ].map(([k, label, n]) =>
+          `<div class="count-card ${k}"><div class="n mono">${n || 0}</div><div class="k">${label}</div></div>`
+        ).join("");
+
+        const groups = TIER_ORDER.map((tier) => {
+          const items = findings.filter((f) => f.tier === tier);
+          if (!items.length) return "";
+          return `<div class="tier-head">
+              <span class="tdot ${tier}"></span>
+              <span class="ttl">${TIER_LABEL[tier]}</span>
+              <span class="cnt">${items.length}건</span>
+            </div>
+            ${items.map(findingCard).join("")}`;
+        }).join("");
+
+        const body = findings.length ? groups
+          : `<div class="empty">advisor가 보고한 lint가 없습니다 — DB가 깨끗합니다.</div>`;
+
+        document.getElementById("root").innerHTML = `
+          <div class="header">
+            <div>
+              <h1>${esc(d.project)} <span class="tag">Supabase DB Advisor</span></h1>
+              <div class="sub">get_advisors 진단 · 보안 + 성능</div>
+            </div>
+            <div class="header-meta">
+              <div><b>${esc(d.date)}</b> 진단</div>
+              <div>project <b class="mono">${esc(d.project_ref)}</b></div>
+            </div>
+          </div>
+
+          <div class="hero">
+            <div class="posture">
+              <div class="label-sm">DB Posture</div>
+              <div class="badge ${esc(d.posture.level)}">${esc(d.posture.label)}</div>
+              <div class="desc">${esc(d.posture.desc || "")}</div>
+            </div>
+            <div class="counts">${countCards}</div>
+          </div>
+
+          <div class="section">
+            <h2>Findings — 티어별</h2>
+            ${body}
+          </div>
+
+          <div class="footer">
+            <span>${esc(d.project)} · Supabase DB Advisor</span>
+            <span>generated ${esc(d.date)} · MCP get_advisors + 코드 교차분석</span>
+          </div>`;
+      }
+
+      try {
+        render(JSON.parse(document.getElementById("advisor-data").textContent));
+      } catch (e) {
+        document.getElementById("root").innerHTML =
+          '<div class="empty">advisor-data JSON 파싱 오류: ' + (e && e.message) + "</div>";
+      }
+    </script>
+  </body>
+</html>

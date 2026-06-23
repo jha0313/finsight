@@ -1,0 +1,145 @@
+{
+  "project": "finsight",
+  "project_ref": "ctvesfeetusmuyqljxji",
+  "date": "2026-06-22",
+  "posture": {
+    "label": "Hardening Recommended",
+    "level": "amber",
+    "desc": "RLS initplan 5건 적용·검증 완료(재실행 시 성능 WARN 0건 확인). 잔여 advisor 항목은 전부 설계상 안전(SECURITY DEFINER 소유권 가드)·의도된 상태(인덱스·웹훅 RLS)라 실질 조치 대상 없음. 보안 WARN 3건은 설계상 잔존."
+  },
+  "counts": { "security": 5, "performance": 10, "proposed": 0, "applied": 5, "kept": 9 },
+  "tiers": [
+    { "key": "auto", "n": 5 },
+    { "key": "judgment", "n": 0 },
+    { "key": "config", "n": 1 },
+    { "key": "keep", "n": 9 }
+  ],
+  "findings": [
+    {
+      "lint": "auth_rls_initplan", "title": "Auth RLS Initialization Plan",
+      "category": "PERFORMANCE", "level": "WARN", "tier": "auto", "status": "applied",
+      "target": "public.statements · statements_owner_access",
+      "detail": "정책이 행마다 auth.uid()를 재평가 → 대규모에서 풀스캔 비용.",
+      "verdict": "정책 형태 (auth.uid() = user_id), cmd ALL. (select auth.uid()) 래핑은 동작 불변이고 init-plan 1회 평가로 전환.",
+      "fix": "alter policy \"statements_owner_access\" on public.statements\n  using ((select auth.uid()) = user_id)\n  with check ((select auth.uid()) = user_id);",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+    },
+    {
+      "lint": "auth_rls_initplan", "title": "Auth RLS Initialization Plan",
+      "category": "PERFORMANCE", "level": "WARN", "tier": "auto", "status": "applied",
+      "target": "public.transactions · transactions_owner_access",
+      "detail": "정책이 행마다 auth.uid()를 재평가 → 대규모에서 풀스캔 비용.",
+      "verdict": "정책 형태 (auth.uid() = user_id), cmd ALL. (select auth.uid()) 래핑은 동작 불변이고 init-plan 1회 평가로 전환.",
+      "fix": "alter policy \"transactions_owner_access\" on public.transactions\n  using ((select auth.uid()) = user_id)\n  with check ((select auth.uid()) = user_id);",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+    },
+    {
+      "lint": "auth_rls_initplan", "title": "Auth RLS Initialization Plan",
+      "category": "PERFORMANCE", "level": "WARN", "tier": "auto", "status": "applied",
+      "target": "public.analyses · analyses_owner_access",
+      "detail": "정책이 행마다 auth.uid()를 재평가 → 대규모에서 풀스캔 비용.",
+      "verdict": "정책 형태 (auth.uid() = user_id), cmd ALL. (select auth.uid()) 래핑은 동작 불변이고 init-plan 1회 평가로 전환.",
+      "fix": "alter policy \"analyses_owner_access\" on public.analyses\n  using ((select auth.uid()) = user_id)\n  with check ((select auth.uid()) = user_id);",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+    },
+    {
+      "lint": "auth_rls_initplan", "title": "Auth RLS Initialization Plan",
+      "category": "PERFORMANCE", "level": "WARN", "tier": "auto", "status": "applied",
+      "target": "public.subscriptions · subscriptions_owner_access",
+      "detail": "정책이 행마다 auth.uid()를 재평가 → 대규모에서 풀스캔 비용.",
+      "verdict": "정책 형태 (auth.uid() = user_id), cmd ALL. (select auth.uid()) 래핑은 동작 불변이고 init-plan 1회 평가로 전환.",
+      "fix": "alter policy \"subscriptions_owner_access\" on public.subscriptions\n  using ((select auth.uid()) = user_id)\n  with check ((select auth.uid()) = user_id);",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+    },
+    {
+      "lint": "auth_rls_initplan", "title": "Auth RLS Initialization Plan",
+      "category": "PERFORMANCE", "level": "WARN", "tier": "auto", "status": "applied",
+      "target": "public.ai_usage_daily · ai_usage_daily_owner_access",
+      "detail": "정책이 행마다 auth.uid()를 재평가 → 대규모에서 풀스캔 비용.",
+      "verdict": "정책 형태 (auth.uid() = user_id), cmd ALL. (select auth.uid()) 래핑은 동작 불변이고 init-plan 1회 평가로 전환.",
+      "fix": "alter policy \"ai_usage_daily_owner_access\" on public.ai_usage_daily\n  using ((select auth.uid()) = user_id)\n  with check ((select auth.uid()) = user_id);",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan"
+    },
+    {
+      "lint": "authenticated_security_definer_function_executable", "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+      "category": "SECURITY", "level": "WARN", "tier": "keep", "status": "kept",
+      "target": "public.consume_ai_quota(uuid, date, integer)",
+      "detail": "authenticated가 /rest/v1/rpc/consume_ai_quota로 호출 가능한 SECURITY DEFINER 함수.",
+      "verdict": "본문 첫 줄에서 auth.uid() is null 또는 ≠ p_user_id면 42501 raise(소유권 강제). 0003에서 anon EXECUTE revoke됨. authenticated 노출은 의도(서버가 사용자 세션으로 호출) → 유지. revoke하면 앱 호출 경로가 깨진다. WARN은 설계상 잔존.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+    },
+    {
+      "lint": "authenticated_security_definer_function_executable", "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+      "category": "SECURITY", "level": "WARN", "tier": "keep", "status": "kept",
+      "target": "public.release_ai_quota(uuid, date)",
+      "detail": "authenticated가 /rest/v1/rpc/release_ai_quota로 호출 가능한 SECURITY DEFINER 함수.",
+      "verdict": "본문 첫 줄에서 auth.uid() is null 또는 ≠ p_user_id면 42501 raise(소유권 강제). 0003에서 anon EXECUTE revoke됨. authenticated 노출은 의도 → 유지. WARN은 설계상 잔존.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+    },
+    {
+      "lint": "authenticated_security_definer_function_executable", "title": "Signed-In Users Can Execute SECURITY DEFINER Function",
+      "category": "SECURITY", "level": "WARN", "tier": "keep", "status": "kept",
+      "target": "public.save_statement_analysis(uuid, text, text, jsonb, jsonb)",
+      "detail": "authenticated가 /rest/v1/rpc/save_statement_analysis로 호출 가능한 SECURITY DEFINER 함수.",
+      "verdict": "본문 첫 줄에서 v_auth_uid(auth.uid())가 null 또는 ≠ p_user_id면 42501 raise(소유권 강제). search_path도 고정. 0003에서 anon revoke됨. authenticated 노출은 의도(다중 테이블 단일 트랜잭션을 사용자 세션으로 호출) → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+    },
+    {
+      "lint": "unused_index", "title": "Unused Index",
+      "category": "PERFORMANCE", "level": "INFO", "tier": "keep", "status": "kept",
+      "target": "public.statements.statements_user_id_idx",
+      "detail": "idx_scan = 0 — 아직 사용된 적 없음.",
+      "verdict": "저트래픽 MVP라 '미사용'은 오탐. 이 인덱스는 RLS (auth.uid()=user_id) 필터·user_id 조회를 받침. DROP하면 트래픽 증가 시 풀스캔 → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+    },
+    {
+      "lint": "unused_index", "title": "Unused Index",
+      "category": "PERFORMANCE", "level": "INFO", "tier": "keep", "status": "kept",
+      "target": "public.transactions.transactions_user_id_idx",
+      "detail": "idx_scan = 0 — 아직 사용된 적 없음.",
+      "verdict": "저트래픽 MVP라 '미사용'은 오탐. RLS user_id 필터·조회를 받침 → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+    },
+    {
+      "lint": "unused_index", "title": "Unused Index",
+      "category": "PERFORMANCE", "level": "INFO", "tier": "keep", "status": "kept",
+      "target": "public.analyses.analyses_user_id_idx",
+      "detail": "idx_scan = 0 — 아직 사용된 적 없음.",
+      "verdict": "저트래픽 MVP라 '미사용'은 오탐. RLS user_id 필터·조회를 받침 → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+    },
+    {
+      "lint": "unused_index", "title": "Unused Index",
+      "category": "PERFORMANCE", "level": "INFO", "tier": "keep", "status": "kept",
+      "target": "public.subscriptions.subscriptions_user_id_idx",
+      "detail": "idx_scan = 0 — 아직 사용된 적 없음.",
+      "verdict": "저트래픽 MVP라 '미사용'은 오탐. RLS user_id 필터·조회를 받침 → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+    },
+    {
+      "lint": "unused_index", "title": "Unused Index",
+      "category": "PERFORMANCE", "level": "INFO", "tier": "keep", "status": "kept",
+      "target": "public.ai_usage_daily.ai_usage_daily_user_id_idx",
+      "detail": "idx_scan = 0 — 아직 사용된 적 없음.",
+      "verdict": "저트래픽 MVP라 '미사용'은 오탐. RLS user_id 필터·조회를 받침 → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+    },
+    {
+      "lint": "rls_enabled_no_policy", "title": "RLS Enabled No Policy",
+      "category": "SECURITY", "level": "INFO", "tier": "keep", "status": "kept",
+      "target": "public.processed_webhook_events",
+      "detail": "RLS on + 정책 0건.",
+      "verdict": "RLS on + 정책 0 = service_role 외 전원 deny. 웹훅 멱등성 테이블(service_role 전용 적재)이라 의도된 deny-all → 유지.",
+      "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+    },
+    {
+      "lint": "auth_leaked_password_protection", "title": "Leaked Password Protection Disabled",
+      "category": "SECURITY", "level": "WARN", "tier": "config", "status": "manual",
+      "target": "Auth",
+      "detail": "HaveIBeenPwned 유출 비밀번호 검사 비활성.",
+      "verdict": "finsight는 Google OAuth 전용(비밀번호 로그인 없음) → 사실상 N/A. 이메일/비번 로그인을 도입할 때만 의미.",
+      "fix": "(선택) Dashboard → Authentication → Sign In / Providers → Password → 'Leaked password protection' 활성. 또는 Management API: PATCH /v1/projects/{ref}/config/auth  body {\"password_hibp_enabled\": true}",
+      "remediation": "https://supabase.com/docs/guides/auth/password-security"
+    }
+  ]
+}

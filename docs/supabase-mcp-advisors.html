@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Supabase MCP · get_advisors — DB가 떼주는 진단서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #0b0e14;
+    --bg-grid:   #11151f;
+    --panel:     #141925;
+    --panel-2:   #1a2031;
+    --border:    #262d3d;
+    --border-2:  #323a4d;
+    --ink:       #e7ecf3;
+    --body:      #aab3c5;
+    --muted:     #6b7689;
+    --green:     #3ecf8e;   /* Supabase brand green — accent */
+    --green-dim: #2aa974;
+    --blue:      #5b9dff;   /* security lens */
+    --violet:    #a78bfa;   /* LLM lens */
+    --amber:     #f0b429;   /* WARN */
+    --red:       #f76d6d;   /* ERROR/danger */
+    --gray-info: #7d8aa0;   /* INFO */
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans);
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(62,207,142,.10), transparent 60%),
+      radial-gradient(900px 500px at 0% 0%, rgba(91,157,255,.07), transparent 55%),
+      var(--bg);
+    color: var(--body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 0 80px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: var(--mono); }
+  code { font-family: var(--mono); font-size: .92em; }
+
+  /* ---------- HERO ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(20,25,37,.6), transparent);
+  }
+  .hero { padding: 64px 0 48px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+    color: var(--green); text-transform: uppercase;
+    border: 1px solid var(--border-2); border-radius: 100px;
+    padding: 5px 12px; margin-bottom: 22px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+         box-shadow: 0 0 10px var(--green); }
+  h1 {
+    font-size: clamp(30px, 5vw, 52px); font-weight: 700; color: var(--ink);
+    letter-spacing: -0.025em; line-height: 1.05;
+  }
+  h1 .accent { color: var(--green); }
+  .lede {
+    margin-top: 18px; font-size: clamp(16px, 2.4vw, 20px); max-width: 720px;
+    color: var(--body);
+  }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- SECTION ---------- */
+  section { padding: 56px 0 0; }
+  .sec-num {
+    font-family: var(--mono); font-size: 13px; color: var(--green);
+    letter-spacing: .1em;
+  }
+  h2 {
+    font-size: clamp(22px, 3.4vw, 30px); font-weight: 700; color: var(--ink);
+    letter-spacing: -0.02em; margin: 6px 0 8px;
+  }
+  .sub { color: var(--muted); max-width: 760px; margin-bottom: 28px; font-size: 15px; }
+
+  /* ---------- FLOW DIAGRAM ---------- */
+  .flow {
+    display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch;
+    gap: 0; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px 18px; box-shadow: var(--shadow);
+  }
+  .node {
+    border: 1px solid var(--border-2); border-radius: 12px; padding: 18px 16px;
+    background: var(--panel-2); text-align: center; display: flex; flex-direction: column; gap: 6px;
+  }
+  .node .ico { font-size: 26px; }
+  .node .nm { color: var(--ink); font-weight: 600; font-size: 15px; }
+  .node .role { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .node.mcp { border-color: var(--green-dim); box-shadow: inset 0 0 0 1px rgba(62,207,142,.15); }
+  .node.mcp .nm { color: var(--green); }
+  .arrow {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 8px; min-width: 92px;
+  }
+  .arrow .lbl { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-bottom: 4px; text-align: center; }
+  .arrow .line { width: 100%; height: 2px; background: linear-gradient(90deg, var(--border-2), var(--green-dim)); position: relative; }
+  .arrow .line::after { content: "▶"; position: absolute; right: -2px; top: -8px; color: var(--green-dim); font-size: 11px; }
+  .arrow .back { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+
+  .note-row { margin-top: 16px; font-size: 13.5px; color: var(--muted); display: flex; gap: 10px; align-items: flex-start; }
+  .note-row b { color: var(--body); }
+
+  /* ---------- FEATURE GROUPS ---------- */
+  .groups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .grp {
+    border: 1px solid var(--border); border-radius: 12px; padding: 16px 14px;
+    background: var(--panel); transition: .15s;
+  }
+  .grp .g-name { color: var(--ink); font-weight: 600; font-size: 14px; }
+  .grp .g-tools { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .grp.hot {
+    border-color: var(--green); background: linear-gradient(180deg, rgba(62,207,142,.10), var(--panel));
+    box-shadow: 0 0 0 1px rgba(62,207,142,.25), var(--shadow);
+  }
+  .grp.hot .g-name { color: var(--green); }
+  .grp.hot .pin { font-family: var(--mono); font-size: 10px; color: var(--green); display:block; margin-bottom: 4px; }
+
+  /* ---------- SPLIT (security/perf) ---------- */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .lens { border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; background: var(--panel); }
+  .lens.sec { border-top: 3px solid var(--blue); }
+  .lens.perf { border-top: 3px solid var(--green); }
+  .lens h3 { color: var(--ink); font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .lens .q { font-family: var(--mono); font-size: 13px; margin: 6px 0 16px; }
+  .lens.sec .q { color: var(--blue); }
+  .lens.perf .q { color: var(--green); }
+  .lens ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .lens li { padding-left: 22px; position: relative; font-size: 14px; color: var(--body); }
+  .lens li::before { content: "›"; position: absolute; left: 6px; color: var(--muted); font-family: var(--mono); }
+  .lens li b { color: var(--ink); font-weight: 600; }
+  .call { font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--bg-grid);
+          border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 18px; }
+  .call .k { color: var(--green); }
+
+  /* ---------- READ-A-FINDING TABLE ---------- */
+  table { width: 100%; border-collapse: collapse; border: 1px solid var(--border);
+          border-radius: var(--radius); overflow: hidden; }
+  th, td { text-align: left; padding: 13px 16px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--panel-2); color: var(--ink); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; }
+  td { color: var(--body); }
+  tr:last-child td { border-bottom: none; }
+  td code, td .mono { color: var(--green); }
+  .field { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+
+  /* ---------- LIVE RESULTS ---------- */
+  .live-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .live-pill { font-family: var(--mono); font-size: 12px; color: var(--green); border: 1px solid var(--green-dim);
+               border-radius: 100px; padding: 5px 12px; display: inline-flex; gap: 8px; align-items: center; }
+  .live-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .res-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .res-col { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); overflow: hidden; }
+  .res-col > .rc-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .rc-head .t { color: var(--ink); font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .counts { display: flex; gap: 6px; }
+  .badge { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 100px; border: 1px solid; }
+  .badge.warn { color: var(--amber); border-color: rgba(240,180,41,.4); background: rgba(240,180,41,.08); }
+  .badge.info { color: var(--gray-info); border-color: rgba(125,138,160,.4); background: rgba(125,138,160,.08); }
+  .badge.err  { color: var(--red); border-color: rgba(247,109,109,.4); background: rgba(247,109,109,.08); }
+
+  .finding { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-start; }
+  .finding:last-child { border-bottom: none; }
+  .lvl { flex: 0 0 auto; margin-top: 2px; font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; letter-spacing: .04em; }
+  .lvl.warn { color: #1c1402; background: var(--amber); }
+  .lvl.info { color: var(--ink); background: var(--border-2); }
+  .f-body .f-name { color: var(--ink); font-size: 13.5px; font-weight: 600; }
+  .f-body .f-tgt { font-family: var(--mono); font-size: 12px; color: var(--green); }
+  .f-body .f-desc { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+  /* ---------- LLM LOOP ---------- */
+  .loop {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; align-items: center;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px 12px; box-shadow: var(--shadow); margin-bottom: 26px; position: relative; overflow: hidden;
+  }
+  .loop::before { content: ""; position: absolute; inset: 0; background:
+     radial-gradient(400px 200px at 50% 0%, rgba(167,139,250,.10), transparent 70%); pointer-events: none; }
+  .step { text-align: center; padding: 4px 8px; position: relative; z-index: 1; }
+  .step .s-n { font-family: var(--mono); font-size: 11px; color: var(--violet); }
+  .step .s-t { color: var(--ink); font-weight: 600; font-size: 13.5px; margin: 4px 0; }
+  .step .s-d { font-size: 11.5px; color: var(--muted); }
+  .chev { color: var(--border-2); text-align: center; font-size: 18px; align-self: center; z-index: 1; }
+  .step.verify .s-t { color: var(--green); }
+  .loop-back { text-align: center; font-family: var(--mono); font-size: 12px; color: var(--violet); margin: -10px 0 30px; }
+
+  .triage { width: 100%; }
+  .triage td .verdict { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; white-space: nowrap; }
+  .v-auto { color: #04210f; background: var(--green); }
+  .v-judge { color: #1c1402; background: var(--amber); }
+  .v-no { color: var(--ink); background: var(--border-2); }
+  .v-dash { color: #fff; background: var(--blue); }
+
+  .takeaway {
+    margin-top: 30px; border: 1px solid var(--green-dim); border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(62,207,142,.08), var(--panel)); padding: 24px 26px;
+  }
+  .takeaway .tk { font-family: var(--mono); font-size: 12px; color: var(--green); letter-spacing: .08em; }
+  .takeaway p { color: var(--ink); font-size: 16px; margin-top: 8px; line-height: 1.6; }
+  .takeaway p b { color: var(--green); }
+
+  .models { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+  .model { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; background: var(--panel); }
+  .model .mh { color: var(--ink); font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .model p { font-size: 13px; color: var(--body); margin-top: 6px; }
+
+  .caution { margin-top: 24px; border-left: 3px solid var(--amber); background: rgba(240,180,41,.06);
+             border-radius: 0 10px 10px 0; padding: 16px 20px; }
+  .caution .ch { color: var(--amber); font-weight: 600; font-size: 14px; font-family: var(--mono); }
+  .caution ul { margin: 8px 0 0 18px; font-size: 13.5px; color: var(--body); }
+  .caution li { margin: 4px 0; }
+
+  footer { margin-top: 64px; border-top: 1px solid var(--border); padding-top: 24px;
+           font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  footer a { color: var(--green); text-decoration: none; }
+
+  @media (max-width: 860px) {
+    .flow { grid-template-columns: 1fr; gap: 16px; }
+    .arrow { flex-direction: row; min-width: 0; gap: 10px; }
+    .arrow .line { width: 40px; }
+    .groups { grid-template-columns: 1fr 1fr; }
+    .split, .res-grid, .models { grid-template-columns: 1fr; }
+    .loop { grid-template-columns: 1fr; gap: 14px; }
+    .chev { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hero">
+    <span class="eyebrow"><span class="dot"></span>Supabase MCP · github.com/supabase/mcp</span>
+    <h1><code class="accent">get_advisors</code><br/>DB가 스스로 떼주는 <span class="accent">진단서</span></h1>
+    <p class="lede">
+      <b>MCP</b>는 Claude가 Supabase에 손을 뻗게 해주는 "콘센트"고,
+      <b><code>get_advisors</code></b>는 그 콘센트로 누르는 <b>"DB 건강검진 버튼"</b>입니다.
+      누르면 DB가 알아서 보안·성능을 스캔하고 진단서를 돌려줍니다 — 고쳐주진 않고, <b>찾아줍니다.</b>
+    </p>
+  </div>
+</header>
+
+<!-- 1. BIG PICTURE -->
+<section class="wrap">
+  <span class="sec-num">01 / 큰 그림</span>
+  <h2>Claude는 어떻게 내 DB까지 닿나</h2>
+  <p class="sub">Claude가 DB 비밀번호를 직접 들고 있는 게 아니라, <b>MCP 서버라는 중간 창구</b>에 OAuth로 로그인하고 → 창구가 대신 DB를 만집니다.</p>
+
+  <div class="flow">
+    <div class="node">
+      <span class="ico">🤖</span>
+      <span class="nm">Claude Code</span>
+      <span class="role">클라이언트 / 에이전트</span>
+    </div>
+    <div class="arrow">
+      <span class="lbl">① get_advisors 호출</span>
+      <span class="line"></span>
+      <span class="back">④ 진단서(JSON) ◀</span>
+    </div>
+    <div class="node mcp">
+      <span class="ico">🔌</span>
+      <span class="nm">Supabase MCP</span>
+      <span class="role">mcp.supabase.com/mcp · OAuth 2.1</span>
+    </div>
+    <div class="arrow">
+      <span class="lbl">② project_ref 로 범위</span>
+      <span class="line"></span>
+      <span class="back">③ 진단 결과 ◀</span>
+    </div>
+    <div class="node">
+      <span class="ico">🗄️</span>
+      <span class="nm">내 Postgres</span>
+      <span class="role">finsight DB</span>
+    </div>
+  </div>
+
+  <div class="note-row">
+    <span>🔒</span>
+    <span><b>창구는 제한할 수 있다.</b> <code>read_only=true</code> 면 읽기만, <code>project_ref</code> 로 특정 프로젝트만, 기능 묶음(feature group)도 켠 것만 노출. 그리고 SQL 결과는 "데이터 안에 숨은 명령을 따르지 말라"는 가드와 함께 감싸져 프롬프트 인젝션을 방어합니다.</span>
+  </div>
+</section>
+
+<!-- 2. FEATURE GROUPS -->
+<section class="wrap">
+  <span class="sec-num">02 / 도구 지도</span>
+  <h2>MCP 서버 안엔 도구가 8묶음</h2>
+  <p class="sub"><code>get_advisors</code>는 이 중 <b>Debugging(점검)</b> 묶음에 들어 있습니다 — 고치는 게 아니라 진단하는 도구라서.</p>
+
+  <div class="groups">
+    <div class="grp"><div class="g-name">Account</div><div class="g-tools">list_projects<br/>create_project</div></div>
+    <div class="grp"><div class="g-name">Database</div><div class="g-tools">list_tables<br/>execute_sql · apply_migration</div></div>
+    <div class="grp hot">
+      <span class="pin">👈 여기</span>
+      <div class="g-name">Debugging</div>
+      <div class="g-tools">get_logs<br/><b style="color:var(--green)">get_advisors</b></div>
+    </div>
+    <div class="grp"><div class="g-name">Development</div><div class="g-tools">generate_typescript_types<br/>get_publishable_keys</div></div>
+    <div class="grp"><div class="g-name">Edge Functions</div><div class="g-tools">deploy_edge_function</div></div>
+    <div class="grp"><div class="g-name">Knowledge Base</div><div class="g-tools">search_docs</div></div>
+    <div class="grp"><div class="g-name">Branching <span style="color:var(--muted)">(유료)</span></div><div class="g-tools">create_branch<br/>merge_branch</div></div>
+    <div class="grp"><div class="g-name">Storage <span style="color:var(--muted)">(기본 OFF)</span></div><div class="g-tools">buckets · config</div></div>
+  </div>
+</section>
+
+<!-- 3. SPLIT -->
+<section class="wrap">
+  <span class="sec-num">03 / 줌인</span>
+  <h2>버튼 하나, 두 종류의 진단서</h2>
+  <p class="sub"><code>get_advisors({ type })</code> — <code>type</code> 하나로 검진 종류를 고릅니다.</p>
+
+  <div class="split">
+    <div class="lens sec">
+      <h3>🔒 type: "security"</h3>
+      <div class="q mono">"문 안 잠갔어?"</div>
+      <ul>
+        <li><b>RLS 꺼진 테이블</b> — 누구나 전체 조회 가능</li>
+        <li><b>정책 없는 테이블</b> — RLS는 켰는데 규칙이 없음</li>
+        <li><b>SECURITY DEFINER 함수</b> 노출 — 권한 상승 위험</li>
+        <li><b>유출 비번 보호 OFF</b> — HaveIBeenPwned 검사 비활성</li>
+      </ul>
+      <div class="call mono">get_advisors(<span class="k">type:"security"</span>)</div>
+    </div>
+    <div class="lens perf">
+      <h3>⚡ type: "performance"</h3>
+      <div class="q mono">"굼떠지는 데 없어?"</div>
+      <ul>
+        <li><b>FK에 인덱스 없음</b> — 조인이 풀스캔</li>
+        <li><b>안 쓰는 인덱스</b> — 쓰기만 느리게 하는 짐</li>
+        <li><b>RLS가 행마다 auth() 재평가</b> — 대규모에서 느림</li>
+      </ul>
+      <div class="call mono">get_advisors(<span class="k">type:"performance"</span>)</div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. READ A FINDING -->
+<section class="wrap">
+  <span class="sec-num">04 / 읽는 법</span>
+  <h2>진단서 한 줄을 읽는 법</h2>
+  <p class="sub">결과 한 줄은 <code>{ level, facing, detail, remediation }</code> 으로 구조화됩니다.</p>
+
+  <table>
+    <thead><tr><th style="width:170px">칸</th><th style="width:170px">ELI5</th><th>예시</th></tr></thead>
+    <tbody>
+      <tr><td class="field">level</td><td>얼마나 급해?</td><td><code>ERROR</code>(빨강) › <code>WARN</code>(노랑) › <code>INFO</code>(회색)</td></tr>
+      <tr><td class="field">facing</td><td>밖에서 보이는 면?</td><td><code>EXTERNAL</code> = 인터넷에 노출되는 표면</td></tr>
+      <tr><td class="field">detail</td><td>뭐가 문제야</td><td>"이 테이블 RLS 켰는데 정책이 없어"</td></tr>
+      <tr><td class="field">remediation</td><td>어떻게 고쳐</td><td>supabase 문서 링크 = 처방전</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 5. LIVE RESULTS -->
+<section class="wrap">
+  <span class="sec-num">05 / 라이브</span>
+  <h2>finsight DB에 실제로 돌린 결과</h2>
+  <div class="live-head">
+    <span class="live-pill"><span class="dot"></span>project · ctvesfeetusmuyqljxji</span>
+    <span class="live-meta">status: ACTIVE_HEALTHY · region ap-northeast-2 · pg 17.6</span>
+  </div>
+
+  <div class="res-grid">
+    <!-- security -->
+    <div class="res-col">
+      <div class="rc-head">
+        <span class="t">🔒 security</span>
+        <span class="counts"><span class="badge warn">4 WARN</span><span class="badge info">1 INFO</span></span>
+      </div>
+      <div class="finding">
+        <span class="lvl warn">WARN</span>
+        <div class="f-body">
+          <div class="f-name">Signed-In Users Can Execute SECURITY DEFINER Function</div>
+          <div class="f-tgt">consume_ai_quota()</div>
+          <div class="f-desc">authenticated 롤이 /rpc 로 호출 가능 — EXECUTE revoke 또는 INVOKER 검토</div>
+        </div>
+      </div>
+      <div class="finding">
+        <span class="lvl warn">WARN</span>
+        <div class="f-body">
+          <div class="f-name">Signed-In Users Can Execute SECURITY DEFINER Function</div>
+          <div class="f-tgt">release_ai_quota()</div>
+          <div class="f-desc">동일 — quota 롤백 RPC</div>
+        </div>
+      </div>
+      <div class="finding">
+        <span class="lvl warn">WARN</span>
+        <div class="f-body">
+          <div class="f-name">Signed-In Users Can Execute SECURITY DEFINER Function</div>
+          <div class="f-tgt">save_statement_analysis()</div>
+          <div class="f-desc">단일 트랜잭션 저장 RPC — p_user_id 내부 검증 여부가 관건</div>
+        </div>
+      </div>
+      <div class="finding">
+        <span class="lvl warn">WARN</span>
+        <div class="f-body">
+          <div class="f-name">Leaked Password Protection Disabled</div>
+          <div class="f-tgt">Auth · 설정</div>
+          <div class="f-desc">HaveIBeenPwned 유출 비번 검사 비활성 상태</div>
+        </div>
+      </div>
+      <div class="finding">
+        <span class="lvl info">INFO</span>
+        <div class="f-body">
+          <div class="f-name">RLS Enabled No Policy</div>
+          <div class="f-tgt">processed_webhook_events</div>
+          <div class="f-desc">RLS 켰지만 정책 0개 = authenticated엔 deny-all</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- performance -->
+    <div class="res-col">
+      <div class="rc-head">
+        <span class="t">⚡ performance</span>
+        <span class="counts"><span class="badge warn">5 WARN</span><span class="badge info">5 INFO</span></span>
+      </div>
+      <div class="finding">
+        <span class="lvl warn">WARN</span>
+        <div class="f-body">
+          <div class="f-name">Auth RLS Initialization Plan ×5</div>
+          <div class="f-tgt">statements · transactions · analyses · subscriptions · ai_usage_daily</div>
+          <div class="f-desc">RLS 정책이 행마다 auth.&lt;fn&gt;() 재평가 → <code style="color:var(--green)">(select auth.uid())</code> 로 감싸면 해결</div>
+        </div>
+      </div>
+      <div class="finding">
+        <span class="lvl info">INFO</span>
+        <div class="f-body">
+          <div class="f-name">Unused Index ×5</div>
+          <div class="f-tgt">*_user_id_idx (5개 테이블)</div>
+          <div class="f-desc">아직 호출된 적 없는 인덱스 — 단, 트래픽 0인 신규 DB라서 "미사용"일 뿐</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. LLM REMEDIATION -->
+<section class="wrap">
+  <span class="sec-num">06 / 핵심 질문</span>
+  <h2>LLM(Claude·Codex)으로 보안·성능을 고칠 수 있나?</h2>
+  <p class="sub">된다. 단, 진짜 레버리지는 LLM이 <b>무작정 고치는 것</b>이 아니라, <b>탐지→분류→처방→재검증 루프를 닫고</b>, 정적 린터가 못 하는 <b>"맥락 판단"</b>을 더하는 데 있다.</p>
+
+  <div class="loop">
+    <div class="step"><div class="s-n">STEP 1</div><div class="s-t">탐지</div><div class="s-d">get_advisors<br/>(결정론적·기계적)</div></div>
+    <div class="chev">→</div>
+    <div class="step"><div class="s-n">STEP 2</div><div class="s-t">분류 + 처방</div><div class="s-d">LLM이 finding + 문서<br/>+ <b>프로젝트 맥락</b> 읽고 판단</div></div>
+    <div class="chev">→</div>
+    <div class="step verify"><div class="s-n">STEP 3</div><div class="s-t">적용 + 재검증</div><div class="s-d">apply_migration →<br/>get_advisors 다시 (깨끗?)</div></div>
+  </div>
+  <div class="loop-back">↺ WARN 이 사라질 때까지 반복 — 사람이 못 보던 사이 사이를 채운다</div>
+
+  <table class="triage">
+    <thead><tr><th style="width:230px">실제 finding</th><th style="width:130px">LLM 판정</th><th>왜 / 어떻게</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>auth_rls_initplan</code> ×5<br/><span class="mono" style="font-size:12px;color:var(--muted)">(perf)</span></td>
+        <td><span class="verdict v-auto">자동 처방 ✓</span></td>
+        <td>완전 기계적: <code>auth.uid()</code> → <code>(select auth.uid())</code>. LLM이 마이그레이션 작성 → 적용 → 어드바이저가 <b>WARN 소멸로 검증</b>. 가장 이상적인 LLM 작업.</td>
+      </tr>
+      <tr>
+        <td><code>unused_index</code> ×5<br/><span class="mono" style="font-size:12px;color:var(--muted)">(perf)</span></td>
+        <td><span class="verdict v-judge">판단 필요 ⚠</span></td>
+        <td>맥락 없으면 위험. 트래픽 0인 신규 DB라 "미사용"일 뿐 — user_id 인덱스는 RLS 쿼리에 곧 필요. LLM은 <b>"섣불리 DROP 금지"</b>로 추론해야 함. ← 린터엔 없는 가치.</td>
+      </tr>
+      <tr>
+        <td>SECURITY DEFINER ×3<br/><span class="mono" style="font-size:12px;color:var(--muted)">(sec)</span></td>
+        <td><span class="verdict v-judge">판단 필요 ⚠</span></td>
+        <td>이 RPC들은 <b>의도된 설계</b>(단일 트랜잭션 규칙). 진짜 질문은 "함수가 내부에서 <code>p_user_id = auth.uid()</code> 를 검증하나?". LLM이 <code>execute_sql</code> 로 함수 소스를 읽고 권한상승 가능 여부를 판정 — 린터는 전부 일괄 플래그만.</td>
+      </tr>
+      <tr>
+        <td>Leaked Password OFF<br/><span class="mono" style="font-size:12px;color:var(--muted)">(sec)</span></td>
+        <td><span class="verdict v-dash">SQL 아님 ⛔</span></td>
+        <td>마이그레이션으로 못 고침 — Auth <b>대시보드 토글</b>. LLM이 헛 마이그레이션을 짜는 대신 "여기 켜세요"라고 경계를 인지하는 게 정답.</td>
+      </tr>
+      <tr>
+        <td>RLS no policy<br/><span class="mono" style="font-size:12px;color:var(--muted)">(sec · INFO)</span></td>
+        <td><span class="verdict v-no">의도됨 · 무시</span></td>
+        <td>webhook 테이블은 service_role(RLS 우회)만 씀. 정책 0개 = authenticated엔 deny-all = <b>오히려 안전</b>. LLM은 맥락 보고 "정책 추가하지 말 것"으로 결론.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="models">
+    <div class="model">
+      <div class="mh">🟢 Claude (Claude Code)</div>
+      <p>이 finsight 세션에 Supabase MCP가 <b>이미 연결</b>됨 — 방금 위 진단도 Claude가 직접 호출. CLAUDE.md·메모리(예: RPC grant 락다운)를 맥락으로 들고 있어 "의도된 설계 vs 진짜 구멍" 분류에 강함.</p>
+    </div>
+    <div class="model">
+      <div class="mh">🟣 Codex (OpenAI)</div>
+      <p>MCP 서버는 <b>모델 중립</b>인 HTTP 엔드포인트 — Codex도 같은 <code>mcp.supabase.com/mcp</code> 에 붙으면 동일하게 호출 가능. 차이는 모델이 아니라 <b>MCP 연결 + 프로젝트 맥락 보유 여부</b>.</p>
+    </div>
+  </div>
+
+  <div class="caution">
+    <div class="ch">⚠ 프로덕션에서 LLM에게 맡길 때</div>
+    <ul>
+      <li><b>탐지는 read-only</b>로. 적용 전 마이그레이션을 사람이 리뷰.</li>
+      <li><code>DROP INDEX</code>·정책 변경은 <b>무검토 자동적용 금지</b> — dev 프로젝트나 branch에서 먼저.</li>
+      <li>고친 뒤 <b>반드시 get_advisors 재실행</b>으로 검증 — 추측 말고 어드바이저로 확인.</li>
+    </ul>
+  </div>
+
+  <div class="takeaway">
+    <div class="tk">TAKEAWAY</div>
+    <p><b>린터는 후보를 결정론적으로 찾고, LLM은 맥락으로 분류·처방하고, 어드바이저가 다시 검증한다.</b> 셋이 한 루프를 이루면, 정적 도구 혼자서는 못 하는 "이건 진짜 위험 · 저건 의도된 설계"의 판단까지 자동화된다.</p>
+  </div>
+</section>
+
+<footer class="wrap">
+  <span>source · github.com/supabase/mcp · supabase database-linter</span>
+  <span>finsight · 2026-06-22 · live scan</span>
+</footer>
+
+</body>
+</html>
