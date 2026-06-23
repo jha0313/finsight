@@ -1,0 +1,94 @@
+{
+  "generatedAt": "2026-06-23T06:42:16.686Z",
+  "note": "accepted after-state: landing=clean re-measure, dashboard=iter2 (clean cells)",
+  "results": [
+    {
+      "target": "landing",
+      "device": "mobile",
+      "runsOk": 3,
+      "perfRuns": [
+        93,
+        92,
+        92
+      ],
+      "performance": 92,
+      "accessibility": 96,
+      "bestPractices": 100,
+      "seo": 100,
+      "metrics": {
+        "lcp": 2793,
+        "tbt": 21,
+        "cls": 0.0001483554327264946,
+        "fcp": 2481,
+        "si": 2481
+      },
+      "finalUrl": "http://localhost:4187/"
+    },
+    {
+      "target": "landing",
+      "device": "desktop",
+      "runsOk": 3,
+      "perfRuns": [
+        99,
+        99,
+        99
+      ],
+      "performance": 99,
+      "accessibility": 96,
+      "bestPractices": 100,
+      "seo": 100,
+      "metrics": {
+        "lcp": 815,
+        "tbt": 0,
+        "cls": 0.000788564048682252,
+        "fcp": 815,
+        "si": 815
+      },
+      "finalUrl": "http://localhost:4187/"
+    },
+    {
+      "target": "dashboard",
+      "device": "mobile",
+      "runsOk": 3,
+      "perfRuns": [
+        96,
+        95,
+        95
+      ],
+      "performance": 95,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "seo": 90,
+      "metrics": {
+        "lcp": 2576,
+        "tbt": 143,
+        "cls": 0,
+        "fcp": 1568,
+        "si": 1568
+      },
+      "finalUrl": "http://localhost:4187/dashboard"
+    },
+    {
+      "target": "dashboard",
+      "device": "desktop",
+      "runsOk": 3,
+      "perfRuns": [
+        100,
+        100,
+        100
+      ],
+      "performance": 100,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "seo": 90,
+      "metrics": {
+        "lcp": 581,
+        "tbt": 0,
+        "cls": 0.0003025537752094096,
+        "fcp": 466,
+        "si": 466
+      },
+      "finalUrl": "http://localhost:4187/dashboard"
+    }
+  ]
+}

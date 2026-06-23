@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>finsight · Lighthouse Auto-Research 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f3f4fb; --surface:#ffffff; --ink:#10131c; --body:#525a6e; --muted:#8990a4;
+    --line:#e6e8f3; --line-soft:#eff1f8;
+    --primary:#5b5bd6; --primary-2:#7c6cff; --teal:#11b3a3;
+    --pass:#0cce6b; --avg:#ffa400; --fail:#ff4e42;
+    --hero:linear-gradient(118deg,#4f4fd4 0%,#7257ff 42%,#10b6a6 100%);
+    --disp:'Space Grotesk','Pretendard',system-ui,sans-serif;
+    --sans:system-ui,-apple-system,'Pretendard','Segoe UI',sans-serif;
+    --kr:'Pretendard',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --r:18px; --r-sm:12px;
+    --shadow:0 2px 6px rgba(20,24,46,.05),0 16px 40px rgba(40,30,90,.07);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--kr);
+    line-height:1.65;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 400px at 80% -10%,rgba(124,108,255,.10),transparent 60%);}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 22px 100px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* topbar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:600;font-size:16px}
+  .brand .spark{width:22px;height:22px;border-radius:7px;background:var(--hero);display:inline-block}
+  .brand small{font-family:var(--kr);font-weight:400;color:var(--muted);font-size:13px}
+  .stamp{font-family:var(--mono);font-size:11.5px;font-weight:600;color:#fff;background:#10131c;
+    padding:6px 12px;border-radius:999px}
+
+  /* hero */
+  .hero{background:var(--hero);border-radius:24px;padding:40px 38px 34px;color:#fff;position:relative;
+    overflow:hidden;box-shadow:var(--shadow)}
+  .hero::after{content:"";position:absolute;inset:0;background:
+    radial-gradient(420px 200px at 100% 0%,rgba(255,255,255,.28),transparent 55%);pointer-events:none}
+  .hero .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(255,255,255,.82);margin:0 0 14px}
+  .hero h1{font-family:var(--disp);font-weight:700;font-size:clamp(32px,5.2vw,52px);line-height:1.02;
+    letter-spacing:-.02em;margin:0 0 14px}
+  .hero p{font-size:17px;line-height:1.55;color:rgba(255,255,255,.92);margin:0;max-width:60ch;position:relative;z-index:1}
+  .hero p b{color:#fff;font-weight:700}
+  .hero .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;position:relative;z-index:1}
+  .hero .meta span{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.16);
+    border:1px solid rgba(255,255,255,.22);padding:6px 12px;border-radius:999px}
+
+  /* section */
+  section{margin:46px 0 0}
+  .kicker{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--primary);margin:0 0 6px}
+  h2{font-family:var(--disp);font-weight:600;font-size:25px;letter-spacing:-.01em;color:var(--ink);margin:0 0 18px}
+
+  /* idea band */
+  .idea{margin:26px 0 0;background:#10131c;color:#fff;border-radius:var(--r);padding:26px 28px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .idea::after{content:"";position:absolute;right:-40px;top:-50px;width:220px;height:220px;
+    background:var(--hero);filter:blur(50px);opacity:.5;border-radius:50%}
+  .idea p{margin:0;font-size:18px;line-height:1.55;position:relative;z-index:1}
+  .idea b{background:linear-gradient(90deg,#9b8cff,#3fe0c8);-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;font-weight:700}
+  .idea .src{color:#aab0c6;font-size:13.5px;margin-top:12px;position:relative;z-index:1}
+
+  /* cards grid */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:18px;box-shadow:var(--shadow)}
+  .card .lbl{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--primary);
+    text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
+  .card .val{font-family:var(--disp);font-size:17px;font-weight:600;color:var(--ink);margin-bottom:5px}
+  .card .note{font-size:13px;color:var(--muted);line-height:1.5}
+
+  /* objective code */
+  .obj{background:#0c0f1a;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+  .obj .hd{font-family:var(--mono);font-size:12px;color:#9aa1bb;padding:13px 18px;
+    border-bottom:1px solid #1b2030;display:flex;justify-content:space-between}
+  .obj .bd{padding:22px 20px;font-family:var(--mono);font-size:13.5px;color:#e7ecf7;line-height:1.95}
+  .obj .c{color:#737b96}
+  .obj .v{color:#9b8cff} .obj .g{color:#3fe0a0} .obj .r{color:#ff8d82}
+  .obj-note{font-size:13.5px;color:var(--body);margin-top:13px;line-height:1.65}
+  .obj-note b{color:var(--ink)}
+
+  /* category target cards with gauges */
+  .cats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:820px){.cats{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.cats{grid-template-columns:1fr}}
+  .cat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:18px 16px;box-shadow:var(--shadow);text-align:center}
+  .cat .gauge{width:84px;height:84px;margin:2px auto 12px;position:relative}
+  .cat .gauge svg{transform:rotate(-90deg)}
+  .cat .gauge .gv{position:absolute;inset:0;display:grid;place-items:center;
+    font-family:var(--mono);font-weight:700;font-size:20px;color:var(--muted)}
+  .cat h3{font-family:var(--disp);font-size:15px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+  .cat .tg{font-size:12.5px;color:var(--body);line-height:1.7}
+  .cat .tg .num{font-size:13px;color:var(--ink)}
+  .cat .tg .d{color:var(--muted)}
+
+  /* phases */
+  .phases{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:820px){.phases{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.phases{grid-template-columns:1fr}}
+  .ph{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:18px;
+    box-shadow:var(--shadow);position:relative}
+  .ph.active{border-color:var(--primary);box-shadow:0 0 0 3px rgba(91,91,214,.12),var(--shadow)}
+  .ph .n{font-family:var(--mono);font-weight:700;font-size:13px;color:#fff;width:28px;height:28px;
+    border-radius:9px;background:#10131c;display:grid;place-items:center;margin-bottom:11px}
+  .ph.active .n{background:var(--hero)}
+  .ph h3{font-family:var(--disp);font-size:15px;font-weight:600;margin:0 0 6px;color:var(--ink)}
+  .ph p{font-size:12.5px;color:var(--muted);margin:0;line-height:1.55}
+  .ph .chip{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:10.5px;font-weight:600;
+    padding:3px 9px;border-radius:999px;background:#eef0ff;color:var(--primary)}
+
+  /* rails */
+  ul.rail{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  @media(max-width:680px){ul.rail{grid-template-columns:1fr}}
+  ul.rail li{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:14px 16px;font-size:14px;color:var(--body);display:flex;gap:11px;align-items:flex-start;box-shadow:var(--shadow)}
+  ul.rail li b{color:var(--ink);font-weight:600}
+  ul.rail li .ck{color:var(--pass);flex:none;font-weight:700;font-family:var(--mono)}
+  ul.rail code{font-family:var(--mono);font-size:12.5px;background:#f1f2fa;padding:1px 6px;border-radius:6px;color:var(--ink)}
+
+  .callout{background:linear-gradient(120deg,#fff,#f7f7ff);border:1px dashed #cfd2ec;border-radius:var(--r);
+    padding:20px 22px;font-size:14px;color:var(--body);line-height:1.7}
+  .callout b{color:var(--ink)}
+  .callout .num{color:var(--primary)}
+
+  footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted)}
+  footer .mono{font-size:12px}
+  .doclink{color:var(--primary);font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="spark"></span> finsight <small>· 성능 엔지니어링</small></div>
+    <span class="stamp">DONE · objective 94.6 → 97.4</span>
+  </div>
+
+  <div class="hero">
+    <p class="eyebrow">Lighthouse Auto-Research</p>
+    <h1>점수를 스스로 올리는<br/>자율 최적화 루프</h1>
+    <p>karpathy의 <span class="mono">autoresearch</span> 실험 루프를 finsight의 Lighthouse 점수에 적용한다. 에이전트가 측정 → 수정 → 재측정을 자율 반복하며, <b>개선되면 채택(keep)·악화되면 되돌림(revert)</b>으로 점수를 단조 증가시킨다.</p>
+    <div class="meta">
+      <span>Next.js 15 App Router</span>
+      <span>백그라운드 자율 keep-or-revert</span>
+      <span>2026-06-22</span>
+    </div>
+  </div>
+
+  <div class="idea">
+    <p>“작지만 진짜인 측정 루프를 에이전트에게 주고, 밤새 스스로 실험하게 한다 — 코드를 고치고, 점수를 재고, <b>개선되면 남기고 아니면 버린다</b>. 그리고 반복한다.”</p>
+    <p class="src">autoresearch에선 사람이 <span class="mono">program.md</span>만 편집해 방향을 제어한다. 여기서는 <span class="mono">scripts/lh/PROGRAM.md</span>(제약·목적·백로그)가 그 역할.</p>
+  </div>
+
+  <!-- DECISIONS -->
+  <section>
+    <p class="kicker">확정된 결정</p>
+    <h2>인터뷰로 잠근 6가지 파라미터</h2>
+    <div class="grid">
+      <div class="card"><div class="lbl">측정 환경</div><div class="val">로컬 프로덕션 빌드</div><div class="note"><span class="mono">next build → next start</span> 후 Lighthouse 실행. 배포 지연·비용 없이 결정론적.</div></div>
+      <div class="card"><div class="lbl">대상 페이지</div><div class="val">랜딩 + 대시보드</div><div class="note"><span class="mono">/</span> 와 <span class="mono">/dashboard</span>. 대시보드는 테스트 우회로 인증 화면 측정.</div></div>
+      <div class="card"><div class="lbl">카테고리 · 기기</div><div class="val">4개 × 모바일+데스크톱</div><div class="note">Performance·Accessibility·Best Practices·SEO. 반복당 LH <span class="num">2</span>×<span class="num">2</span>.</div></div>
+      <div class="card"><div class="lbl">자율성 · 범위</div><div class="val">자율 keep-or-revert</div><div class="note">전용 브랜치 커밋. 외과적 수정 + 디자인 시스템 준수(제품 코드).</div></div>
+      <div class="card"><div class="lbl">반복 · 중단</div><div class="val">백그라운드 자율</div><div class="note">목표 달성 또는 <b>2회 연속 무개선(dry)</b> 시 종료.</div></div>
+      <div class="card"><div class="lbl">목표 임계치</div><div class="val">균형 (현실적 고점)</div><div class="note">제품 UX를 해치지 않는 선에서 회귀 가드로 점수를 끌어올림.</div></div>
+    </div>
+  </section>
+
+  <!-- OBJECTIVE -->
+  <section>
+    <p class="kicker">목적함수</p>
+    <h2>채택/폐기의 단일 기준</h2>
+    <div class="obj">
+      <div class="hd"><span>objective.mjs</span><span>median-of-3 · 회귀 가드 ε=1pt</span></div>
+      <div class="bd">
+<span class="c">// cell = page P × device D × category C</span><br/>
+<span class="v">score</span>(P,D,C) = median( run₁, run₂, run₃ )<br/>
+<span class="v">objective</span> = Σ <span class="v">w_C</span> · score(P,D,C) / N<sub>cells</sub><br/><br/>
+<span class="g">KEEP</span>&nbsp;&nbsp;⇐ objective ↑ &nbsp;<span class="c">AND</span>&nbsp; ∀cell: score ≥ baseline − <span class="r">ε</span><br/>
+<span class="r">REVERT</span> ⇐ 그 외 전부 &nbsp;<span class="c">// 한 카테고리라도 1pt 넘게 떨어지면 폐기</span>
+      </div>
+    </div>
+    <p class="obj-note">Lighthouse 점수는 실행마다 출렁이므로 <b>타깃별 median-of-3</b>로 잡음을 줄인다. 단일 카테고리라도 baseline 대비 <span class="num">1</span>점 넘게 후퇴하면 그 변경은 폐기 — 한 점수를 올리려 다른 점수를 깎는 것을 막는다.</p>
+  </section>
+
+  <!-- TARGETS -->
+  <section>
+    <p class="kicker">목표 임계치 · 현재 상태</p>
+    <h2>균형 프로파일 — 중단 기준이 되는 고점</h2>
+    <div class="cats">
+      <div class="cat">
+        <div class="gauge"><svg viewBox="0 0 36 36" width="84" height="84">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9eaf3" stroke-width="3.4"/>
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#0cce6b" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="92 100"/>
+        </svg><span class="gv" style="color:#0aa757">92</span></div>
+        <h3>Performance</h3>
+        <div class="tg">목표 <span class="num">≥90</span>/<span class="num">95</span> · <span class="d">현재 92–100 ✓</span></div>
+      </div>
+      <div class="cat">
+        <div class="gauge"><svg viewBox="0 0 36 36" width="84" height="84">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9eaf3" stroke-width="3.4"/>
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#0cce6b" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="96 100"/>
+        </svg><span class="gv" style="color:#0aa757">96</span></div>
+        <h3>Accessibility</h3>
+        <div class="tg">목표 <span class="num">≥95</span> · <span class="d">현재 96–100 ✓</span></div>
+      </div>
+      <div class="cat">
+        <div class="gauge"><svg viewBox="0 0 36 36" width="84" height="84">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9eaf3" stroke-width="3.4"/>
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#0cce6b" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="100 100"/>
+        </svg><span class="gv" style="color:#0aa757">100</span></div>
+        <h3>Best Practices</h3>
+        <div class="tg">목표 <span class="num">≥95</span> · <span class="d">현재 100 ✓</span></div>
+      </div>
+      <div class="cat">
+        <div class="gauge"><svg viewBox="0 0 36 36" width="84" height="84">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e9eaf3" stroke-width="3.4"/>
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ffa400" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="90 100"/>
+        </svg><span class="gv" style="color:#d98e00">90</span></div>
+        <h3>SEO</h3>
+        <div class="tg">목표 <span class="num">≥95</span> · <span class="d">landing <b style="color:#0aa757">100</b> · dashboard 90</span></div>
+      </div>
+    </div>
+    <p class="obj-note"><b>objective 94.63 → 97.38</b> (median-of-3). landing(공개) SEO <b>90→100</b>·BP <b>96→100</b>, dashboard A11y <b>96→100</b>·BP <b>96→100</b>. 남은 <b>dashboard SEO 90</b>은 Next.js 동적 페이지 메타데이터 quirk(서버 HTML엔 description 있으나 클라이언트 DOM에서 제거)이며 <b>인증 게이트 페이지(비색인)</b>라 실효 영향이 없다.</p>
+  </section>
+
+  <!-- PHASES -->
+  <section>
+    <p class="kicker">실행 단계</p>
+    <h2>베이스라인 → 진단 → 루프 → PR</h2>
+    <div class="phases">
+      <div class="ph"><div class="n">0</div><h3>하베스트 + 베이스라인</h3><p>측정 하네스(<span class="mono">scripts/lh/</span>) 구축, 인증 우회, 베이스라인 측정.</p><span class="chip">완료</span></div>
+      <div class="ph"><div class="n">1</div><h3>진단</h3><p>LH 감사에서 결손을 결정론적으로 추출 → ROI 백로그.</p><span class="chip">완료</span></div>
+      <div class="ph"><div class="n">2</div><h3>최적화 루프</h3><p>2회 반복 — keep 1 / no-op 1. 회귀 가드로 perf 노이즈 방어.</p><span class="chip">완료</span></div>
+      <div class="ph active"><div class="n">3</div><h3>산출물</h3><p>before/after 점수표 + changelog + 브랜치 커밋.</p><span class="chip">이 리포트</span></div>
+    </div>
+  </section>
+
+  <!-- SAFETY -->
+  <section>
+    <p class="kicker">안전 레일</p>
+    <h2>점수 위해 제품을 망치지 않는다</h2>
+    <ul class="rail">
+      <li><span class="ck">✓</span><span><b>외과적 수정만.</b> 변경된 모든 줄은 점수 개선과 직접 연결.</span></li>
+      <li><span class="ck">✓</span><span><b>디자인 시스템 준수.</b> 제품 코드는 토큰만, 시각 일관성 불변.</span></li>
+      <li><span class="ck">✓</span><span><b>매 반복 green.</b> <code>lint &amp;&amp; build &amp;&amp; test</code> 통과가 keep의 전제.</span></li>
+      <li><span class="ck">✓</span><span><b>회귀 자동 revert.</b> 어떤 카테고리든 후퇴하면 폐기.</span></li>
+      <li><span class="ck">✓</span><span><b>인증/RLS/Pro 게이팅 불변.</b> 보안·결제 로직은 손대지 않음.</span></li>
+      <li><span class="ck">✓</span><span><b>측정 픽스처 커밋 금지.</b> 우회·자격증명은 측정 하베스트에만.</span></li>
+    </ul>
+  </section>
+
+  <!-- RESULTS -->
+  <section>
+    <p class="kicker">결과</p>
+    <h2>before → after</h2>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>페이지 · 기기</th><th>Performance</th><th>Accessibility</th><th>Best Practices</th><th>SEO</th></tr></thead>
+      <tbody>
+        <tr><td><b>landing</b> · mobile</td><td><span class="num">92 → 92</span></td><td><span class="num">96 → 96</span></td><td><span class="num" style="color:#0aa757">96 → 100</span></td><td><span class="num" style="color:#0aa757">90 → 100</span></td></tr>
+        <tr><td><b>landing</b> · desktop</td><td><span class="num">100 → 99</span></td><td><span class="num">96 → 96</span></td><td><span class="num" style="color:#0aa757">96 → 100</span></td><td><span class="num" style="color:#0aa757">90 → 100</span></td></tr>
+        <tr><td><b>dashboard</b> · mobile</td><td><span class="num">94 → 95</span></td><td><span class="num" style="color:#0aa757">96 → 100</span></td><td><span class="num" style="color:#0aa757">96 → 100</span></td><td><span class="num">90 → 90</span></td></tr>
+        <tr><td><b>dashboard</b> · desktop</td><td><span class="num">100 → 100</span></td><td><span class="num" style="color:#0aa757">96 → 100</span></td><td><span class="num" style="color:#0aa757">96 → 100</span></td><td><span class="num">90 → 90</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="callout" style="margin-top:16px">
+      <b>objective 94.63 → 97.38</b> · 변경 ① <span class="mono">layout.tsx</span> description+OpenGraph ② <span class="mono">icon.svg</span> favicon(콘솔 404 제거 → BP) ③ <span class="mono">.caption</span> 대비 상향 <span class="mono">--muted→--body</span>(A11y). 전부 <span class="mono">lint·build·test</span> green, <span class="num">376</span> 테스트 통과.
+      <br/><br/>
+      <b>주석 1 — dashboard SEO 90:</b> Next.js 동적 페이지 메타데이터 quirk로 클라이언트 DOM에서 description이 제거됨(LH MetaElements로 확인). 비색인 인증 페이지라 실효 영향 없음.
+      <br/>
+      <b>주석 2 — Perf 측정 노이즈:</b> OBS·시스템 부하로 단발 outlier(LCP 19s, P=55)가 났으나 <span class="mono">median-of-3</span> + 재측정으로 검증 — 실제 Performance는 불변(landing/mobile 92 유지).
+    </div>
+  </section>
+
+  <footer>
+    <span>finsight · Lighthouse Auto-Research — 자율 keep-or-revert 최적화</span>
+    <span><a class="doclink" href="lighthouse-autoresearch-design.html">설계 &amp; 다이어그램 →</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

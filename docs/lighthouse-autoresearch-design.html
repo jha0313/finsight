@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>finsight · Lighthouse Auto-Research 설계 &amp; 다이어그램</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.min.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#f3f4fb; --surface:#ffffff; --ink:#10131c; --body:#525a6e; --muted:#8990a4;
+    --line:#e6e8f3; --line-soft:#eff1f8;
+    --primary:#5b5bd6; --primary-2:#7c6cff; --teal:#11b3a3;
+    --pass:#0cce6b; --avg:#ffa400; --fail:#ff4e42;
+    --hero:linear-gradient(118deg,#4f4fd4 0%,#7257ff 42%,#10b6a6 100%);
+    --disp:'Space Grotesk','Pretendard',system-ui,sans-serif;
+    --kr:'Pretendard',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --r:18px; --r-sm:12px;
+    --shadow:0 2px 6px rgba(20,24,46,.05),0 16px 40px rgba(40,30,90,.07);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--kr);
+    line-height:1.65;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 400px at 80% -10%,rgba(124,108,255,.10),transparent 60%);}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 22px 100px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .num{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:600;font-size:16px}
+  .brand .spark{width:22px;height:22px;border-radius:7px;background:var(--hero);display:inline-block}
+  .brand small{font-family:var(--kr);font-weight:400;color:var(--muted);font-size:13px}
+  .stamp{font-family:var(--mono);font-size:11.5px;font-weight:600;color:#fff;background:#5b5bd6;
+    padding:6px 12px;border-radius:999px}
+
+  .hero{background:var(--hero);border-radius:24px;padding:38px 36px 32px;color:#fff;position:relative;
+    overflow:hidden;box-shadow:var(--shadow)}
+  .hero::after{content:"";position:absolute;inset:0;background:
+    radial-gradient(420px 200px at 100% 0%,rgba(255,255,255,.26),transparent 55%);pointer-events:none}
+  .hero .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:rgba(255,255,255,.82);margin:0 0 13px}
+  .hero h1{font-family:var(--disp);font-weight:700;font-size:clamp(30px,4.8vw,46px);line-height:1.04;
+    letter-spacing:-.02em;margin:0 0 13px}
+  .hero p{font-size:16.5px;line-height:1.55;color:rgba(255,255,255,.92);margin:0;max-width:64ch;position:relative;z-index:1}
+  .hero p .mono{color:#fff}
+
+  section{margin:46px 0 0}
+  .kicker{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--primary);margin:0 0 6px}
+  h2{font-family:var(--disp);font-weight:600;font-size:25px;letter-spacing:-.01em;color:var(--ink);margin:0 0 8px}
+  .h-sub{color:var(--body);font-size:15px;margin:0 0 22px;max-width:72ch}
+
+  /* ELI5 */
+  .eli5{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:26px 28px;
+    box-shadow:var(--shadow);position:relative;overflow:hidden;margin-top:30px}
+  .eli5::before{content:"ELI5";position:absolute;top:18px;right:22px;font-family:var(--mono);font-size:11px;
+    font-weight:700;letter-spacing:.1em;color:var(--primary);background:#eef0ff;padding:4px 10px;border-radius:999px}
+  .eli5 .lead{font-family:var(--disp);font-weight:600;font-size:20px;color:var(--ink);margin:0 0 10px;max-width:34ch}
+  .eli5 p{font-size:14.5px;color:var(--body);margin:0 0 18px;line-height:1.7;max-width:74ch}
+  .eli5 p b{color:var(--ink)}
+  .eli5 .cats4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:0 0 20px}
+  @media(max-width:680px){.eli5 .cats4{grid-template-columns:1fr 1fr}}
+  .eli5 .c4{background:#f7f8fd;border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:13px 14px}
+  .eli5 .c4 .emo{font-size:20px;line-height:1}
+  .eli5 .c4 h4{font-family:var(--disp);font-size:14px;font-weight:600;margin:8px 0 3px;color:var(--ink)}
+  .eli5 .c4 span{font-size:12px;color:var(--muted);line-height:1.45;display:block}
+  .bands{display:flex;border-radius:var(--r-sm);overflow:hidden;border:1px solid var(--line);margin:0 0 8px}
+  .band{flex:1;padding:11px 14px;color:#fff;display:flex;flex-direction:column;gap:1px}
+  .band.fail{background:var(--fail)} .band.avg{background:var(--avg)} .band.pass{background:var(--pass)}
+  .band .rg{font-family:var(--mono);font-weight:700;font-size:14px}
+  .band .nm{font-size:12px;opacity:.95}
+  .bands-cap{font-size:12.5px;color:var(--muted);margin:0}
+  .analogy{margin:18px 0 0;background:linear-gradient(120deg,#eef0ff,#e6fbf5);border:1px solid #d9ddf6;
+    border-radius:var(--r-sm);padding:14px 16px;font-size:14px;color:var(--ink)}
+  .analogy b{color:var(--primary)}
+
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r-sm);overflow:hidden;box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:13px 16px;font-size:14px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  th{font-family:var(--disp);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted);background:#fafbff}
+  tbody tr:last-child td{border-bottom:none}
+  td.k{font-family:var(--mono);font-size:13px;color:var(--primary);white-space:nowrap}
+  td .ar{color:var(--muted);padding:0 4px}
+  td b{color:var(--ink)}
+
+  /* diagram */
+  .diagram{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px 20px 16px;
+    box-shadow:var(--shadow);overflow-x:auto}
+  .diagram svg{display:block;width:100%;min-width:780px;height:auto}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:14px 4px 2px;font-size:12.5px;color:var(--muted)}
+  .legend .it{display:flex;align-items:center;gap:7px}
+  .legend .sw{width:14px;height:14px;border-radius:4px;flex:none}
+  .legend .sw.keep{background:#effaf3;border:1.5px solid var(--pass)}
+  .legend .sw.rev{background:#fff1f0;border:1.5px solid var(--fail)}
+  .legend .sw.stop{background:var(--ink)}
+  .legend .sw.step{background:#fff;border:1.5px solid var(--line)}
+  .legend .sw.loop{background:#fff;border:1.5px solid var(--primary)}
+
+  .s-box{fill:#fff;stroke:#dfe2f1;stroke-width:1.5}
+  .s-keep{fill:#effaf3;stroke:#0cce6b;stroke-width:1.5}
+  .s-rev{fill:#fff1f0;stroke:#ff4e42;stroke-width:1.5}
+  .s-stop{fill:#10131c}
+  .s-gate{fill:#fff;stroke:#10131c;stroke-width:1.5}
+  .t-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;fill:#10131c}
+  .t-sub{font-family:'Pretendard',sans-serif;font-weight:400;font-size:11px;fill:#8990a4}
+  .t-sub-r{font-family:'Pretendard',sans-serif;font-weight:400;font-size:11px;fill:#ff4e42}
+  .t-keep{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;fill:#0a9d52}
+  .t-rev{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;fill:#e23b30}
+  .t-stop{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;fill:#fff}
+  .t-stop-s{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10.5px;fill:#aab0c6}
+  .t-gate{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;fill:#10131c}
+  .t-rail{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11.5px;fill:#5b5bd6}
+  .flow{fill:none;stroke:#aeb4c8;stroke-width:2}
+  .flow-loop{fill:none;stroke:#5b5bd6;stroke-width:2.2}
+  .conn{fill:none;stroke:#cfd3e6;stroke-width:1.6}
+  .dot{fill:#5b5bd6}
+
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+  @media(max-width:880px){.stages{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.stages{grid-template-columns:1fr}}
+  .stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:16px 15px;box-shadow:var(--shadow)}
+  .stage .n{font-family:var(--mono);font-size:12px;font-weight:700;color:#fff;background:var(--hero);
+    width:25px;height:25px;border-radius:8px;display:grid;place-items:center;margin-bottom:11px}
+  .stage h3{font-family:var(--disp);font-size:14px;font-weight:600;margin:0 0 6px;color:var(--ink)}
+  .stage p{font-size:12.5px;color:var(--muted);margin:0;line-height:1.55}
+  .stage code{font-family:var(--mono);font-size:11px;background:#f1f2fa;padding:1px 5px;border-radius:5px;color:var(--ink)}
+
+  .code{background:#0c0f1a;border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+  .code .hd{font-family:var(--mono);font-size:12px;color:#9aa1bb;padding:13px 18px;border-bottom:1px solid #1b2030;
+    display:flex;justify-content:space-between}
+  .code pre{margin:0;padding:20px;font-family:var(--mono);font-size:13px;line-height:1.85;color:#e7ecf7;overflow-x:auto}
+  .code .c{color:#737b96} .code .f{color:#9b8cff} .code .d{color:#3fe0a0}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.two{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:20px;box-shadow:var(--shadow)}
+  .panel.seq{border-top:3px solid var(--primary)}
+  .panel.par{border-top:3px solid var(--teal)}
+  .panel .tt{font-family:var(--disp);font-weight:600;font-size:16px;color:var(--ink);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .panel .badge{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .panel.seq .badge{background:#eef0ff;color:var(--primary)}
+  .panel.par .badge{background:#e1faf6;color:#0c8c7f}
+  .panel p{font-size:13.5px;color:var(--body);margin:8px 0 0;line-height:1.6}
+  .panel ul{margin:10px 0 0;padding-left:18px}
+  .panel li{font-size:13px;color:var(--muted);margin:5px 0}
+
+  .callout{background:#10131c;color:#fff;border-radius:var(--r);padding:24px 26px;box-shadow:var(--shadow);
+    position:relative;overflow:hidden}
+  .callout::after{content:"";position:absolute;right:-50px;bottom:-60px;width:200px;height:200px;
+    background:var(--hero);filter:blur(54px);opacity:.5;border-radius:50%}
+  .callout .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#aab0c6;margin:0 0 10px}
+  .callout h3{font-family:var(--disp);font-weight:600;font-size:20px;margin:0 0 10px;color:#fff;position:relative;z-index:1}
+  .callout p{font-size:14.5px;color:#cdd2e0;margin:0;line-height:1.65;position:relative;z-index:1;max-width:76ch}
+  .callout code{font-family:var(--mono);font-size:13px;color:#9b8cff;background:rgba(155,140,255,.12);padding:1px 6px;border-radius:5px}
+  .callout b{color:#fff}
+
+  footer{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;
+    flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted)}
+  .doclink{color:var(--primary);font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="spark"></span> finsight <small>· 성능 엔지니어링 · 설계</small></div>
+    <span class="stamp">DESIGN &amp; DIAGRAM</span>
+  </div>
+
+  <div class="hero">
+    <p class="eyebrow">Lighthouse Auto-Research</p>
+    <h1>keep-or-revert 루프 설계</h1>
+    <p>finsight Lighthouse 최적화를 위한 자율 <span class="mono">keep-or-revert</span> 루프의 구조와 동작. 한 반복은 “수정 → 게이트 → 측정 → 판정”이며, 판정 결과가 다음 반복의 기준선(baseline)을 결정한다.</p>
+  </div>
+
+  <!-- ELI5 (맨 앞) -->
+  <section style="margin-top:30px">
+    <p class="kicker">먼저, 아주 쉽게</p>
+    <h2>Lighthouse 점수가 뭐예요?</h2>
+    <div class="eli5">
+      <p class="lead">웹페이지의 “건강검진 점수표”예요.</p>
+      <p>구글이 만든 <b>Lighthouse</b>는 페이지를 보이지 않는 크롬(headless Chrome)으로 열어, <b>휴대폰·데스크톱 환경을 흉내내며</b> 페이지가 얼마나 잘 만들어졌는지 채점합니다. 결과는 4개 영역에 대해 각각 <b>0~100점</b>으로 나옵니다.</p>
+      <div class="cats4">
+        <div class="c4"><div class="emo">⚡</div><h4>Performance</h4><span>얼마나 빨리 뜨고 반응하나</span></div>
+        <div class="c4"><div class="emo">♿</div><h4>Accessibility</h4><span>모두가 쓸 수 있나(대비·라벨)</span></div>
+        <div class="c4"><div class="emo">✅</div><h4>Best Practices</h4><span>정석·안전하게 만들었나</span></div>
+        <div class="c4"><div class="emo">🔍</div><h4>SEO</h4><span>검색엔진이 이해하나</span></div>
+      </div>
+      <div class="bands">
+        <div class="band fail"><span class="rg">0–49</span><span class="nm">나쁨</span></div>
+        <div class="band avg"><span class="rg">50–89</span><span class="nm">개선 필요</span></div>
+        <div class="band pass"><span class="rg">90–100</span><span class="nm">좋음</span></div>
+      </div>
+      <p class="bands-cap">점수 색 띠 — Lighthouse가 쓰는 그대로의 신호등(빨강·주황·초록). 90점 이상이면 초록(좋음).</p>
+      <div class="analogy">🚗 <b>자동차 정기검사 점수표</b> 같은 거예요. 이 프로젝트의 루프는 그 점수표를 보고 <b>스스로 고쳐서 점수를 계속 끌어올리는 장치</b>입니다.</div>
+    </div>
+  </section>
+
+  <!-- MAPPING -->
+  <section>
+    <p class="kicker">방법론 매핑</p>
+    <h2>autoresearch → Lighthouse</h2>
+    <p class="h-sub">karpathy의 자율 ML 실험 루프 구조를 그대로 웹 성능 최적화에 옮긴다. “단일 측정 가능한 목표 + keep/discard + 사람은 program.md만 편집”이 핵심 골격이다.</p>
+    <table>
+      <thead><tr><th style="width:34%">autoresearch</th><th>finsight 적용</th></tr></thead>
+      <tbody>
+        <tr><td class="k">train.py <span class="ar">→</span></td><td>사이트 코드 — 폰트/이미지/메타/스크립트 전략/lazy-load/번들 (에이전트가 수정하는 단일 표면)</td></tr>
+        <tr><td class="k">5분 학습 <span class="ar">→</span></td><td><span class="mono">next build → next start</span> → Lighthouse 매트릭스 실행 (고정 예산 실험)</td></tr>
+        <tr><td class="k">val bits/byte <span class="ar">→</span></td><td>목적함수 — 4 카테고리 × 2 기기 × 2 페이지 가중 점수 (높을수록 ↑)</td></tr>
+        <tr><td class="k">keep / discard <span class="ar">→</span></td><td>점수 ↑ <b>AND</b> lint·build·test green → commit, 아니면 revert</td></tr>
+        <tr><td class="k">program.md <span class="ar">→</span></td><td><span class="mono">PROGRAM.md</span> — 제약·목적·ROI 백로그. 사람이 편집해 탐색 방향을 제어</td></tr>
+        <tr><td class="k">밤새 ~100회 <span class="ar">→</span></td><td>백그라운드 자율 반복 — 목표 달성 또는 2회 연속 무개선(dry) 시 종료</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- DIAGRAM -->
+  <section>
+    <p class="kicker">루프 다이어그램</p>
+    <h2>한 반복의 흐름과 피드백</h2>
+    <p class="h-sub">파이프라인은 좌→우로 흐르고, 판정(⑤) 이후 채택/되돌림이 갈린 뒤 <b style="color:var(--primary)">보라색 피드백 경로</b>를 따라 다음 반복으로 돌아간다. 게이트(③) 실패나 회귀(⑤)는 곧바로 REVERT로 떨어진다.</p>
+    <div class="diagram">
+      <svg viewBox="0 0 1000 430" role="img" aria-label="keep-or-revert 루프 다이어그램">
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L9,4.5 L0,9 Z" fill="#aeb4c8"/>
+          </marker>
+          <marker id="ahb" markerWidth="10" markerHeight="10" refX="7.5" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#5b5bd6"/>
+          </marker>
+        </defs>
+
+        <!-- feedback loop (behind) -->
+        <path class="conn" d="M625,232 V300"/>
+        <path class="conn" d="M845,232 V300"/>
+        <circle class="dot" cx="625" cy="300" r="3"/>
+        <circle class="dot" cx="845" cy="300" r="3"/>
+        <path class="flow-loop" d="M845,300 H95 V106" marker-end="url(#ahb)"/>
+        <text class="t-rail" x="690" y="293" text-anchor="middle">다음 반복 · next iteration</text>
+
+        <!-- stop gate -->
+        <rect class="s-gate" x="398" y="284" width="132" height="32" rx="16"/>
+        <text class="t-gate" x="464" y="304" text-anchor="middle">목표 / 2회 dry?</text>
+        <path class="flow" d="M464,316 V348" marker-end="url(#ah)"/>
+        <rect class="s-stop" x="388" y="350" width="152" height="46" rx="12"/>
+        <text class="t-stop" x="464" y="372" text-anchor="middle">STOP</text>
+        <text class="t-stop-s" x="464" y="388" text-anchor="middle">요약 + PR</text>
+
+        <!-- pipeline -->
+        <rect class="s-box" x="16" y="30" width="158" height="72" rx="12"/>
+        <text class="t-title" x="95" y="62" text-anchor="middle">① SELECT</text>
+        <text class="t-sub" x="95" y="82" text-anchor="middle">PROGRAM.md 백로그 top</text>
+        <rect class="s-box" x="212" y="30" width="158" height="72" rx="12"/>
+        <text class="t-title" x="291" y="62" text-anchor="middle">② EDIT</text>
+        <text class="t-sub" x="291" y="82" text-anchor="middle">외과적 수정 · 토큰만</text>
+        <rect class="s-box" x="408" y="30" width="158" height="72" rx="12"/>
+        <text class="t-title" x="487" y="62" text-anchor="middle">③ VERIFY</text>
+        <text class="t-sub-r" x="487" y="82" text-anchor="middle">lint·build·test green 필수</text>
+        <rect class="s-box" x="604" y="30" width="158" height="72" rx="12"/>
+        <text class="t-title" x="683" y="62" text-anchor="middle">④ MEASURE</text>
+        <text class="t-sub" x="683" y="82" text-anchor="middle">LH 2×2 · median-of-3</text>
+        <rect class="s-box" x="800" y="30" width="158" height="72" rx="12"/>
+        <text class="t-title" x="879" y="62" text-anchor="middle">⑤ DECIDE</text>
+        <text class="t-sub" x="879" y="82" text-anchor="middle">Δ≥0 &amp; 무회귀?</text>
+
+        <path class="flow" d="M174,66 H210" marker-end="url(#ah)"/>
+        <path class="flow" d="M370,66 H406" marker-end="url(#ah)"/>
+        <path class="flow" d="M566,66 H602" marker-end="url(#ah)"/>
+        <path class="flow" d="M762,66 H798" marker-end="url(#ah)"/>
+
+        <!-- decide → keep/revert -->
+        <path class="flow" d="M879,102 V144"/>
+        <path class="flow" d="M879,144 H625 V178" marker-end="url(#ah)"/>
+        <path class="flow" d="M879,144 H845 V178" marker-end="url(#ah)"/>
+
+        <rect class="s-keep" x="540" y="178" width="170" height="54" rx="12"/>
+        <text class="t-keep" x="625" y="203" text-anchor="middle">KEEP ✓</text>
+        <text class="t-sub" x="625" y="221" text-anchor="middle">commit · baseline 갱신</text>
+        <rect class="s-rev" x="760" y="178" width="170" height="54" rx="12"/>
+        <text class="t-rev" x="845" y="203" text-anchor="middle">REVERT ✗</text>
+        <text class="t-sub" x="845" y="221" text-anchor="middle">discard · baseline 유지</text>
+      </svg>
+      <div class="legend">
+        <span class="it"><span class="sw step"></span> 파이프라인 단계</span>
+        <span class="it"><span class="sw keep"></span> 채택(개선 &amp; green)</span>
+        <span class="it"><span class="sw rev"></span> 되돌림(게이트 실패·회귀)</span>
+        <span class="it"><span class="sw stop"></span> 종료 조건</span>
+        <span class="it"><span class="sw loop"></span> 피드백 경로</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANATOMY -->
+  <section>
+    <p class="kicker">한 반복의 해부</p>
+    <h2>SELECT → EDIT → VERIFY → MEASURE → DECIDE</h2>
+    <div class="stages">
+      <div class="stage"><div class="n">1</div><h3>SELECT</h3><p><code>PROGRAM.md</code> 백로그에서 ROI 최상위 1개. 가설·파일·예상 Δ 명시.</p></div>
+      <div class="stage"><div class="n">2</div><h3>EDIT</h3><p>외과적 구현. 디자인 토큰만, hex 금지. 변경 줄은 그 항목과 직접 연결.</p></div>
+      <div class="stage"><div class="n">3</div><h3>VERIFY</h3><p><code>lint &amp;&amp; build &amp;&amp; test</code> green이어야 통과. red면 즉시 REVERT.</p></div>
+      <div class="stage"><div class="n">4</div><h3>MEASURE</h3><p>로컬 prod 빌드에 LH 2×2(페이지×기기), 타깃별 <span class="mono">median-of-3</span>.</p></div>
+      <div class="stage"><div class="n">5</div><h3>DECIDE</h3><p>목적함수 ↑ &amp; 무회귀면 commit·baseline 갱신, 아니면 폐기. 종료 조건 확인.</p></div>
+    </div>
+  </section>
+
+  <!-- HARNESS -->
+  <section>
+    <p class="kicker">하베스트 구성</p>
+    <h2>측정 하네스 · 파일 레이아웃</h2>
+    <p class="h-sub">루프의 결정론은 측정 하네스에서 나온다. 앱 코드와 분리된 <span class="mono">scripts/lh/</span> 아래에 측정·우회·판정·기준선을 둔다.</p>
+    <div class="code">
+      <div class="hd"><span>scripts/lh/</span><span>측정 하네스</span></div>
+<pre><span class="d">scripts/lh/</span>
+├─ <span class="f">measure.mjs</span>     <span class="c"># build → start(격리 .next-lh/포트) → LH 매트릭스 → scores.json</span>
+├─ <span class="f">run.sh</span>          <span class="c"># F-1 미들웨어 우회 임시 적용 → measure → 원복(/dashboard 측정용)</span>
+├─ <span class="f">objective.mjs</span>   <span class="c"># 가중 점수 + 회귀 가드(ε=1pt) → keep/revert 판정</span>
+├─ <span class="f">PROGRAM.md</span>      <span class="c"># 제약·목적·ROI 백로그 — 사람이 편집해 방향 제어</span>
+├─ <span class="f">baseline.json</span>   <span class="c"># 현재 채택된 점수 기준선 (keep마다 갱신)</span>
+└─ <span class="d">reports/</span>        <span class="c"># 반복별 LH HTML 리포트 보관 (감사 추적)</span></pre>
+    </div>
+  </section>
+
+  <!-- PARALLEL vs SEQUENTIAL -->
+  <section>
+    <p class="kicker">병렬 vs 순차</p>
+    <h2>진단은 팬아웃, 루프는 순차</h2>
+    <p class="h-sub">진단(Phase 1)은 카테고리별로 독립적이라 병렬 Workflow가 맞다. 최적화 루프(Phase 2)는 매 반복이 직전 코드 상태에 의존하는 <b>상태 누적</b>이라 병렬화할 수 없다.</p>
+    <div class="two">
+      <div class="panel par">
+        <div class="tt">Phase 1 · 진단 <span class="badge">/workflows 팬아웃</span></div>
+        <p>LH 감사 결과를 입력으로 카테고리별 finder 에이전트를 병렬 실행해 ROI 백로그를 만든다.</p>
+        <ul>
+          <li>카테고리(Perf·A11y·BP·SEO)별 동시 분석</li>
+          <li>각 발견 = {가설, 파일, 예상 Δ, 리스크, 적합성}</li>
+          <li>dedup → ROI 랭킹 → <span class="mono">PROGRAM.md</span></li>
+        </ul>
+      </div>
+      <div class="panel seq">
+        <div class="tt">Phase 2 · 최적화 <span class="badge">순차 구동</span></div>
+        <p>keep-or-revert는 baseline이 매 반복 갱신되는 순차 상태기계라 Workflow에 부적합하다.</p>
+        <ul>
+          <li>반복 N의 시작 = 반복 N−1이 채택한 코드</li>
+          <li>측정·커밋·되돌림이 단일 작업트리에서 순서대로</li>
+          <li>충돌·경합 방지 위해 동시 변경 없음</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRAM.md -->
+  <section>
+    <p class="kicker">사람의 제어점</p>
+    <h2>PROGRAM.md</h2>
+    <div class="callout">
+      <p class="k">human-in-the-loop</p>
+      <h3>탐색은 자율, 가드레일은 사람이 정의</h3>
+      <p>autoresearch에서 연구자가 <code>program.md</code>만 편집하듯, 여기서는 <code>scripts/lh/PROGRAM.md</code>에 <b>제약</b>(디자인 토큰만 · 외과적 수정 · 인증/RLS/Pro 게이팅 불변 · 측정 픽스처 커밋 금지), <b>목적함수 정의</b>, <b>ROI 백로그</b>를 둔다. 방향을 바꾸려면 이 문서만 수정하고 루프 코드는 그대로다. 점수를 올리려 제품을 망치는 해킹성 변경은 회귀 가드와 green 게이트가 자동으로 막는다.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>finsight · Lighthouse Auto-Research — 설계 &amp; 다이어그램</span>
+    <span><a class="doclink" href="lighthouse-autoresearch-report.html">← 리포트</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

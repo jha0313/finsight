@@ -23,3 +23,8 @@ __pycache__/
 
 # git worktrees (격리 작업용 — 커밋 대상 아님)
 .claude/worktrees/
+
+# Lighthouse auto-research (isolated build + heavy reports)
+.next-lh/
+/scripts/lh/reports/
+/scripts/lh/scores*.json
