@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finsight · AI-Readiness Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fafafa;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #0f172a;
+        --text-2: #475569;
+        --text-3: #94a3b8;
+        --accent: #2563eb;
+        --accent-soft: #eff6ff;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --red: #dc2626;
+        --red-soft: #fee2e2;
+        --grid: #f1f5f9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          "Inter",
+          -apple-system,
+          system-ui,
+          "Segoe UI",
+          sans-serif;
+        font-feature-settings: "cv11", "ss01";
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 48px 40px 64px;
+      }
+
+      /* ============ HEADER ============ */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 32px;
+      }
+
+      .header .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+
+      .header h1 {
+        font-size: 30px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+
+      .header .sub {
+        font-size: 14px;
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+
+      .header-meta {
+        text-align: right;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        line-height: 1.7;
+      }
+
+      .header-meta strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      /* ============ SCORE STRIP ============ */
+      .score-strip {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .score-hero {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 28px 28px 24px;
+      }
+
+      .score-hero .label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .score-hero .value {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .score-hero .num {
+        font-size: 64px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        color: var(--text);
+      }
+
+      .score-hero .denom {
+        font-size: 20px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .score-hero .grade-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .grade-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--green-soft);
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 600;
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .grade-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--green);
+      }
+
+      .score-hero .desc {
+        font-size: 13px;
+        color: var(--text-2);
+        line-height: 1.5;
+        margin-top: 10px;
+      }
+
+      .score-hero hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 18px 0 14px;
+      }
+
+      .mini-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .mini-stat .k {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-bottom: 2px;
+      }
+
+      .mini-stat .v {
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* ============ 10 RULES BAR CHART ============ */
+      .rules {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px 24px 24px;
+      }
+
+      .rules .rules-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .rules h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .legend-inline {
+        display: flex;
+        gap: 14px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-2);
+      }
+
+      .legend-inline span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .legend-inline i {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+      }
+
+      .rule-row {
+        display: grid;
+        grid-template-columns: 28px 1fr 220px 56px;
+        gap: 12px;
+        align-items: center;
+        padding: 7px 0;
+        font-size: 13px;
+      }
+
+      .rule-row + .rule-row {
+        border-top: 1px dashed var(--border);
+      }
+
+      .rule-row .idx {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        font-weight: 500;
+      }
+
+      .rule-row .title {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .rule-row .sub {
+        font-size: 11.5px;
+        color: var(--text-3);
+        margin-top: 1px;
+      }
+
+      .rule-row .bar {
+        height: 8px;
+        border-radius: 3px;
+        background: var(--grid);
+        overflow: hidden;
+      }
+
+      .rule-row .bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 3px;
+      }
+
+      .bar-good > span {
+        background: var(--green);
+      }
+      .bar-warn > span {
+        background: var(--amber);
+      }
+      .bar-bad > span {
+        background: var(--red);
+      }
+
+      .rule-row .num {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: right;
+        color: var(--text);
+      }
+
+      /* ============ MAP ============ */
+      .map-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 32px;
+        overflow: hidden;
+      }
+
+      .map-head {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .map-head h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .map-head .sub {
+        font-size: 12px;
+        color: var(--text-2);
+        margin-top: 2px;
+      }
+
+      .map-legend {
+        display: flex;
+        gap: 18px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-2);
+        align-items: center;
+      }
+
+      .map-legend > span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+      }
+
+      .legend-square {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+      }
+
+      .legend-line {
+        width: 24px;
+        height: 0;
+        border-top: 1.5px solid;
+      }
+
+      .map-body {
+        padding: 28px 24px 32px;
+      }
+
+      .map-body svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* ============ FINDINGS ============ */
+      .findings {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .panel-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .panel-head h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .panel-head .count {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        margin-left: auto;
+      }
+
+      .panel-strength .panel-head {
+        background: var(--green-soft);
+      }
+      .panel-strength .panel-head h3 {
+        color: var(--green);
+      }
+
+      .panel-risk .panel-head {
+        background: var(--red-soft);
+      }
+      .panel-risk .panel-head h3 {
+        color: var(--red);
+      }
+
+      .panel-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .panel-list li {
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .panel-list li:first-child {
+        border-top: 0;
+      }
+
+      .panel-list .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .panel-list .tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+
+      .tag-rule {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .panel-list .note {
+        margin-top: 4px;
+        color: var(--text-2);
+        font-size: 12.5px;
+      }
+
+      .panel-list code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11.5px;
+        background: var(--grid);
+        padding: 1px 5px;
+        border-radius: 3px;
+        color: var(--text);
+      }
+
+      footer {
+        margin-top: 48px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-3);
+        text-align: center;
+      }
+
+      /* ============ SVG ============ */
+      .grid-bg {
+        stroke: var(--grid);
+        stroke-width: 1;
+      }
+
+      .node-card {
+        fill: var(--surface);
+        stroke: var(--border-strong);
+        stroke-width: 1.2;
+      }
+
+      .node-card.accent {
+        stroke: var(--accent);
+      }
+
+      .node-title {
+        font-family: "Inter", sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        fill: var(--text);
+      }
+
+      .node-meta {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        fill: var(--text-3);
+      }
+
+      .node-kpi {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .edge {
+        fill: none;
+        stroke: var(--border-strong);
+        stroke-width: 1.3;
+      }
+
+      .edge-dash {
+        stroke-dasharray: 4 3;
+      }
+
+      .edge-warn {
+        stroke: var(--amber);
+      }
+
+      .edge-type {
+        stroke: var(--accent);
+        stroke-width: 1.5;
+      }
+
+      .claude-dot {
+        fill: var(--accent);
+      }
+      .claude-ring {
+        fill: var(--accent-soft);
+      }
+
+      .test-dot {
+        fill: var(--green);
+      }
+
+      .hot {
+        fill: var(--red-soft);
+        stroke: var(--red);
+        stroke-width: 1;
+      }
+
+      .warm {
+        fill: var(--amber-soft);
+        stroke: var(--amber);
+        stroke-width: 1;
+      }
+
+      @media (max-width: 960px) {
+        .score-strip,
+        .findings {
+          grid-template-columns: 1fr;
+        }
+        .rule-row {
+          grid-template-columns: 24px 1fr 140px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <div class="eyebrow">Repository Audit · AI Readiness · v2 Rubric</div>
+          <h1>finsight — AI Readiness Map</h1>
+          <div class="sub">7-category scoring · structure map · ROI-ranked actions</div>
+        </div>
+        <div class="header-meta">
+          <div>Scored <strong>2026-06-08</strong></div>
+          <div>Branch <strong>main</strong></div>
+          <div>Modules <strong>3</strong> · Context files <strong>2</strong></div>
+        </div>
+      </header>
+
+      <section class="score-strip">
+        <div class="score-hero">
+          <div class="label">AI Readiness Index</div>
+          <div class="value">
+            <span class="num">20</span><span class="denom">/ 100</span>
+          </div>
+          <div class="grade-row">
+            <span class="grade-badge" style="background: var(--red-soft); color: var(--red)">
+              <span class="grade-dot" style="background: var(--red)"></span> AI-Hostile · agent-hostile
+            </span>
+          </div>
+          <div class="desc">7 categories · weighted (A 15 · B 20 · C 20 · D 15 · E 15 · F 10 · G 5). Weakest areas are <strong>A AI Navigation & Coverage (0/15)</strong> and <strong>C Tribal Knowledge Externalization (0/20)</strong>. <strong>4 nonexistent paths in context files</strong> are the core cause breaking E1 verification.</div>
+          <hr />
+          <div class="mini-stats">
+            <div class="mini-stat"><div class="k">Modules w/ context</div><div class="v">0 / 3</div></div>
+            <div class="mini-stat"><div class="k">Broken paths</div><div class="v" style="color: var(--red)">4</div></div>
+            <div class="mini-stat"><div class="k">Files &gt; 300 ln</div><div class="v">8</div></div>
+          </div>
+        </div>
+        <div class="rules">
+          <div class="rules-head">
+            <div><h2>7 Categories — Score by Category</h2></div>
+            <div class="legend-inline">
+              <span><i style="background: var(--green)"></i> &ge; 75%</span>
+              <span><i style="background: var(--amber)"></i> 50–74%</span>
+              <span><i style="background: var(--red)"></i> &lt; 50%</span>
+            </div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">A</div>
+            <div>
+              <div class="title">AI Navigation &amp; Coverage</div>
+              <div class="sub">3 core module(s) without context: scripts, src, supabase</div>
+              
+            </div>
+            <div class="bar bar-bad"><span style="width: 0%"></span></div>
+            <div class="num">0/15</div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">B</div>
+            <div>
+              <div class="title">Context Document Quality</div>
+              <div class="sub">Few bash code blocks — add quick commands</div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Concise 4</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Quick cmds 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Key files 4</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Hidden rules 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Cross-refs 0</span></div>
+            </div>
+            <div class="bar bar-bad"><span style="width: 40%"></span></div>
+            <div class="num">8/20</div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">C</div>
+            <div>
+              <div class="title">Tribal Knowledge Externalization</div>
+              <div class="sub">No MEMORY.md / ADR / docs/decisions — no tribal-knowledge store</div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">C_Q1_Owns 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">C_Q2_Patterns 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">C_Q3_NonObvious 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">C_Q4_Dependencies 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">C_Q5_TribalStore 0</span></div>
+            </div>
+            <div class="bar bar-bad"><span style="width: 0%"></span></div>
+            <div class="num">0/20</div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">D</div>
+            <div>
+              <div class="title">Cross-Module Dependency Mapping</div>
+              <div class="sub">No mermaid diagrams — no visual dependency map</div>
+              
+            </div>
+            <div class="bar bar-bad"><span style="width: 40%"></span></div>
+            <div class="num">6/15</div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">E</div>
+            <div>
+              <div class="title">Verification &amp; Quality Gates</div>
+              <div class="sub"><strong style="color: var(--red)">⚠ 4/17 refs broken</strong> · no CODEOWNERS · no evals</div>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Ref accuracy 4</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Critic review 0</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Test infra 2</span> <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text-3)">Prompt tests 0</span></div>
+            </div>
+            <div class="bar bar-bad"><span style="width: 40%"></span></div>
+            <div class="num">6/15</div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">F</div>
+            <div>
+              <div class="title">Freshness &amp; Self-Maintenance</div>
+              <div class="sub">No context / docs validation step in CI</div>
+              
+            </div>
+            <div class="bar bar-bad"><span style="width: 0%"></span></div>
+            <div class="num">0/10</div>
+          </div>
+          <div class="rule-row">
+            <div class="idx">G</div>
+            <div>
+              <div class="title">Agent Performance Outcomes</div>
+              <div class="sub">No agent eval / benchmark dir or result files — no perf-measurement infra</div>
+              
+            </div>
+            <div class="bar bar-bad"><span style="width: 0%"></span></div>
+            <div class="num">0/5</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="map-section">
+        <div class="map-head">
+          <div>
+            <h2>Structure Map</h2>
+            <div class="sub">Columns = modules · blue card = has context · red/amber = files over 300 lines</div>
+          </div>
+          <div class="map-legend">
+            <span><span class="legend-dot" style="background: var(--accent)"></span> has context</span>
+            <span><span class="legend-square" style="background: var(--red-soft); border: 1px solid var(--red)"></span> &gt; 500 ln</span>
+            <span><span class="legend-square" style="background: var(--amber-soft); border: 1px solid var(--amber)"></span> 300–499 ln</span>
+            <span><span class="legend-dot" style="background: var(--red)"></span> no context</span>
+          </div>
+        </div>
+        <div class="map-body">
+<svg viewBox="0 0 960 316" xmlns="http://www.w3.org/2000/svg">
+<g class="grid-bg">
+<path d="M0,80 H960" />
+<path d="M0,160 H960" />
+<path d="M0,240 H960" />
+<path d="M100,0 V316" />
+<path d="M300,0 V316" />
+<path d="M500,0 V316" />
+<path d="M700,0 V316" />
+<path d="M900,0 V316" />
+</g>
+<text x="164" y="32" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">src · 123 files</text>
+<g transform="translate(24,64)">
+  <rect class="node-card" width="280" height="64" rx="8" stroke-dasharray="4 3" stroke="var(--red)" />
+  <circle cx="22" cy="22" r="12" fill="var(--red-soft)" />
+  <circle cx="22" cy="22" r="5" fill="var(--red)" />
+  <text x="42" y="26" class="node-title" style="fill:var(--red)">src/ — no context</text>
+  <text x="42" y="46" class="node-meta">no CLAUDE.md · missing agent entry point</text>
+  <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill:var(--red)">0 ctx</text>
+</g>
+<text x="24" y="136" class="node-meta" style="fill:var(--text-3)">files &gt; 300 ln</text>
+<g transform="translate(24,144)">
+  <rect class="hot" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--red);font-weight:600">lib/orchestration/index.test.ts</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--red);font-weight:600">1136</text>
+</g>
+<g transform="translate(24,166)">
+  <rect class="hot" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--red);font-weight:600">lib/orchestration/index.ts</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--red);font-weight:600">685</text>
+</g>
+<g transform="translate(24,188)">
+  <rect class="hot" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--red);font-weight:600">services/supabase/index.test.ts</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--red);font-weight:600">667</text>
+</g>
+<g transform="translate(24,210)">
+  <rect class="hot" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--red);font-weight:600">services/supabase/index.ts</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--red);font-weight:600">564</text>
+</g>
+<g transform="translate(24,232)">
+  <rect class="hot" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--red);font-weight:600">lib/csv/index.ts</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--red);font-weight:600">563</text>
+</g>
+<g transform="translate(24,254)">
+  <rect class="warm" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--amber);font-weight:600">services/polar/index.test.ts</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--amber);font-weight:600">334</text>
+</g>
+<text x="480" y="32" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">supabase · 5 files</text>
+<g transform="translate(340,64)">
+  <rect class="node-card" width="280" height="64" rx="8" stroke-dasharray="4 3" stroke="var(--red)" />
+  <circle cx="22" cy="22" r="12" fill="var(--red-soft)" />
+  <circle cx="22" cy="22" r="5" fill="var(--red)" />
+  <text x="42" y="26" class="node-title" style="fill:var(--red)">supabase/ — no context</text>
+  <text x="42" y="46" class="node-meta">no CLAUDE.md · missing agent entry point</text>
+  <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill:var(--red)">0 ctx</text>
+</g>
+<text x="796" y="32" text-anchor="middle" class="node-meta" style="font-size:11px;fill:var(--text-2);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">scripts · 2 files</text>
+<g transform="translate(656,64)">
+  <rect class="node-card" width="280" height="64" rx="8" stroke-dasharray="4 3" stroke="var(--red)" />
+  <circle cx="22" cy="22" r="12" fill="var(--red-soft)" />
+  <circle cx="22" cy="22" r="5" fill="var(--red)" />
+  <text x="42" y="26" class="node-title" style="fill:var(--red)">scripts/ — no context</text>
+  <text x="42" y="46" class="node-meta">no CLAUDE.md · missing agent entry point</text>
+  <text x="264" y="26" text-anchor="end" class="node-kpi" style="fill:var(--red)">0 ctx</text>
+</g>
+<text x="656" y="136" class="node-meta" style="fill:var(--text-3)">files &gt; 300 ln</text>
+<g transform="translate(656,144)">
+  <rect class="hot" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--red);font-weight:600">test_execute.py</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--red);font-weight:600">567</text>
+</g>
+<g transform="translate(656,166)">
+  <rect class="warm" width="280" height="18" rx="3" />
+  <text x="8" y="13" class="node-meta" style="fill:var(--amber);font-weight:600">execute.py</text>
+  <text x="272" y="13" text-anchor="end" class="node-meta" style="fill:var(--amber);font-weight:600">418</text>
+</g>
+</svg>
+        </div>
+      </section>
+
+      <div class="findings">
+        <section class="panel panel-strength">
+          <div class="panel-head"><h3>Strengths</h3><span class="count">keep these</span></div>
+          <ul class="panel-list">
+            <li>
+              <div class="head"><span class="tag tag-rule">Cat A</span> Root context file present</div>
+              <div class="note"><code>CLAUDE.md</code> serves as the agent's first entry point — drill down top to bottom.</div>
+            </li>
+          </ul>
+        </section>
+        <section class="panel panel-risk">
+          <div class="panel-head"><h3>Top ROI Actions</h3><span class="count">priority-ranked</span></div>
+          <ul class="panel-list">
+            <li>
+              <div class="head">
+                <span class="tag tag-rule" style="background: var(--red-soft); color: var(--red)">Cat E · S</span>
+                Fix 4 hallucinated paths in context (referential trust)
+              </div>
+              <div class="note">
+                <strong>Effort 0.5 hr · Impact 10/10.</strong>
+                Prevents agents from following wrong paths — stale is worse than missing
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat F · S</span>
+                Add context-path validation to CI or a pre-push hook
+              </div>
+              <div class="note">
+                <strong>Effort 1.0 hr · Impact 8/10.</strong>
+                Blocks stale references at merge time — prevents regressions
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat A · S</span>
+                Add CLAUDE.md to 3 core module(s) (scripts, src, supabase)
+              </div>
+              <div class="note">
+                <strong>Effort 1.5 hr · Impact 9/10.</strong>
+                ~3 min/task × ~5 tasks/day saved → ~1-2 hr/week recovered per module
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat C · M</span>
+                Externalize tribal knowledge via MEMORY.md or docs/adr/
+              </div>
+              <div class="note">
+                <strong>Effort 3.0 hr · Impact 8/10.</strong>
+                Externalize senior-dependent decisions → fewer errors on new agent runs
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat G · L</span>
+                Introduce an evals/ dir + representative task pass-rate
+              </div>
+              <div class="note">
+                <strong>Effort 6.0 hr · Impact 6/10.</strong>
+                Makes AI regressions measurable — quantifies improvement ROI itself
+              </div>
+            </li>
+            <li>
+              <div class="head">
+                <span class="tag tag-rule">Cat B · L</span>
+                Split 6 god files (&gt;500 lines): src/lib/orchestration/index.test.ts (1136), src/lib/orchestration/index.ts (685), src/services/supabase/index.test.ts (667)
+              </div>
+              <div class="note">
+                <strong>Effort 15.0 hr · Impact 6/10.</strong>
+                ~5K-10K tokens saved per file + better edit accuracy
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <footer>finsight · AI Readiness Audit · v2 Rubric (7 categories / 100 pts) · scored 2026-06-08</footer>
+    </div>
+  </body>
+</html>

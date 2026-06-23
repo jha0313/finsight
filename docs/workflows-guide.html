@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workflows — 멀티에이전트 오케스트레이션 가이드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f8fa;
+    --surface:#ffffff;
+    --ink:#0a0e14;
+    --ink-2:#3d4654;
+    --ink-3:#6b7585;
+    --line:#e6e9ef;
+    --line-2:#d4d9e2;
+    --primary:#0052ff;
+    --primary-soft:#eef3ff;
+    --green:#0f9d58;
+    --amber:#c77700;
+    --red:#d23f3f;
+    --violet:#7b5cff;
+    --ai-gradient:linear-gradient(120deg,#0052ff 0%,#7b5cff 55%,#b06bff 100%);
+    --code-bg:#0d1117;
+    --code-ink:#e6edf3;
+    --code-comment:#8b96a5;
+    --code-key:#79c0ff;
+    --code-str:#a5d6ff;
+    --code-fn:#d2a8ff;
+    --radius:14px;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"Inter","Pretendard",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    padding:0 20px 120px;
+  }
+  .wrap{max-width:880px;margin:0 auto;}
+
+  /* HERO */
+  .hero{
+    padding:84px 0 56px;
+    text-align:left;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--mono);font-size:12px;font-weight:500;
+    letter-spacing:.08em;text-transform:uppercase;
+    color:var(--primary);
+    background:var(--primary-soft);
+    padding:6px 12px;border-radius:999px;
+    margin-bottom:22px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--ai-gradient);}
+  h1{
+    font-size:clamp(34px,5vw,52px);
+    font-weight:800;letter-spacing:-0.03em;line-height:1.08;
+    margin-bottom:18px;
+  }
+  h1 .grad{
+    background:var(--ai-gradient);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lede{
+    font-size:19px;color:var(--ink-2);max-width:640px;
+  }
+  .lede code{font-family:var(--mono);font-size:.86em;background:#eceef3;padding:2px 6px;border-radius:5px;color:var(--ink);}
+
+  /* SECTION */
+  section{margin-top:64px;}
+  .kicker{
+    font-family:var(--mono);font-size:12px;font-weight:600;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+    margin-bottom:10px;
+  }
+  h2{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:14px;}
+  h2 .num{color:var(--primary);font-family:var(--mono);font-size:.66em;font-weight:600;margin-right:10px;}
+  .section-intro{color:var(--ink-2);font-size:16px;max-width:680px;margin-bottom:28px;}
+
+  p{color:var(--ink-2);}
+  p+p{margin-top:12px;}
+  strong{color:var(--ink);font-weight:600;}
+  a{color:var(--primary);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  code{font-family:var(--mono);font-size:.88em;background:#eceef3;padding:1px 6px;border-radius:5px;color:var(--ink);}
+
+  /* CARDS */
+  .grid{display:grid;gap:16px;}
+  .grid-2{grid-template-columns:1fr 1fr;}
+  .grid-3{grid-template-columns:1fr 1fr 1fr;}
+  @media(max-width:680px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:24px;
+  }
+  .card h3{font-size:16px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:9px;}
+  .card p{font-size:14.5px;}
+  .card .ico{
+    width:30px;height:30px;border-radius:8px;flex:none;
+    display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:14px;
+    background:var(--primary-soft);color:var(--primary);
+  }
+  .card .ico.v{background:#f0ecff;color:var(--violet);}
+
+  /* CALLOUT */
+  .callout{
+    border-radius:var(--radius);
+    padding:20px 22px;
+    border:1px solid;
+    display:flex;gap:14px;align-items:flex-start;
+    font-size:15px;
+  }
+  .callout .tag{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;flex:none;margin-top:1px;}
+  .callout.warn{background:#fff8ec;border-color:#f0dcb0;color:#5c4708;}
+  .callout.warn .tag{background:var(--amber);color:#fff;}
+  .callout.warn strong{color:#3d2f00;}
+  .callout.key{background:var(--primary-soft);border-color:#cfe0ff;color:#1a2a4d;}
+  .callout.key .tag{background:var(--primary);color:#fff;}
+  .callout.key strong{color:#0a1a3d;}
+
+  /* CODE */
+  pre{
+    background:var(--code-bg);
+    color:var(--code-ink);
+    font-family:var(--mono);
+    font-size:13px;line-height:1.7;
+    padding:22px 24px;
+    border-radius:var(--radius);
+    overflow-x:auto;
+    margin-top:4px;
+  }
+  pre .c{color:var(--code-comment);font-style:italic;}
+  pre .k{color:var(--code-key);}
+  pre .s{color:var(--code-str);}
+  pre .f{color:var(--code-fn);}
+  .code-label{
+    font-family:var(--mono);font-size:12px;color:var(--ink-3);
+    margin-bottom:8px;display:flex;align-items:center;gap:8px;
+  }
+  .code-label::before{content:"";width:9px;height:9px;border-radius:2px;background:var(--ai-gradient);}
+
+  /* PIPELINE vs PARALLEL DIAGRAM */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media(max-width:680px){.vs{grid-template-columns:1fr;}}
+  .vs-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;}
+  .vs-card.def{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
+  .vs-card h3{font-size:17px;font-weight:700;margin-bottom:4px;}
+  .vs-card .sub{font-size:13px;color:var(--ink-3);font-family:var(--mono);margin-bottom:18px;}
+  .badge-def{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.05em;background:var(--primary);color:#fff;padding:2px 7px;border-radius:5px;margin-left:8px;vertical-align:middle;}
+  .lane{display:flex;align-items:center;gap:6px;margin-bottom:9px;}
+  .lane-label{font-family:var(--mono);font-size:11px;color:var(--ink-3);width:18px;flex:none;}
+  .blk{height:26px;border-radius:6px;display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600;color:#fff;flex:none;}
+  .s1{background:#0052ff;}
+  .s2{background:#5a7fff;}
+  .s3{background:#7b5cff;}
+  .barrier-line{border-top:2px dashed var(--line-2);margin:14px 0 12px;position:relative;}
+  .barrier-line span{position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--surface);padding:0 8px;font-family:var(--mono);font-size:10px;color:var(--ink-3);}
+  .vs-note{font-size:13px;color:var(--ink-2);margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+
+  /* PATTERN LIST */
+  .pat{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 22px;display:flex;gap:16px;align-items:flex-start;
+  }
+  .pat+.pat{margin-top:12px;}
+  .pat .pn{font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;background:var(--ai-gradient);width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;}
+  .pat h3{font-size:15.5px;font-weight:700;margin-bottom:3px;}
+  .pat p{font-size:14px;}
+
+  /* TABLE */
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;font-size:14px;}
+  th,td{text-align:left;padding:13px 18px;border-bottom:1px solid var(--line);}
+  th{font-size:12px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);background:#fafbfc;font-weight:600;}
+  tr:last-child td{border-bottom:none;}
+  td code{font-size:.85em;}
+  td:first-child{white-space:nowrap;}
+
+  .footer{margin-top:80px;padding-top:28px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-3);font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <span class="eyebrow"><span class="dot"></span>Claude Code · 멀티에이전트 오케스트레이션</span>
+    <h1>여러 에이전트를<br><span class="grad">결정론적으로 지휘하는</span> 도구</h1>
+    <p class="lede">
+      <strong>Workflow</strong>는 JavaScript 스크립트 한 편으로 수십 개의 서브에이전트를
+      병렬·파이프라인으로 돌리는 도구입니다. 제어 흐름(루프·분기·팬아웃)은 코드가 결정론적으로 잡고,
+      각 단계의 판단만 에이전트에게 맡깁니다. 실행은 백그라운드에서 진행되고
+      <code>/workflows</code>로 실시간 진행 상황을 봅니다.
+    </p>
+  </header>
+
+  <!-- 1. WHY -->
+  <section>
+    <div class="kicker">왜 쓰는가</div>
+    <h2><span class="num">01</span>한 컨텍스트로는 벅찬 일을 나눠 맡길 때</h2>
+    <p class="section-intro">
+      혼자 처리하면 느리거나, 빠뜨리거나, 확신이 안 서는 작업이 있습니다.
+      Workflow는 그 일을 <strong>구조</strong>로 풉니다. 쓰는 이유는 보통 셋 중 하나입니다.
+    </p>
+    <div class="grid grid-3">
+      <div class="card">
+        <h3><span class="ico">철</span>철저함</h3>
+        <p>작업을 쪼개 병렬로 커버. 큰 코드베이스 감사, 광범위한 검색, 전수 점검처럼 빠뜨림이 치명적인 일에.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico">확</span>확신</h3>
+        <p>독립적인 관점과 adversarial 검증을 거쳐 결론을 굳힘. 그럴듯하지만 틀린 결과가 살아남지 못하게.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico">규</span>규모</h3>
+        <p>한 컨텍스트에 안 들어가는 규모. 마이그레이션, 대규모 리팩터, 코드베이스 전체 sweep.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. OPT-IN -->
+  <section>
+    <div class="kicker">전제 조건</div>
+    <h2><span class="num">02</span>반드시 사용자가 명시적으로 켜야 한다</h2>
+    <p class="section-intro">
+      Workflow는 에이전트를 수십 개 띄우고 토큰을 많이 씁니다. 그래서 <strong>옵트인</strong>이 강제됩니다 —
+      "이득이 될 것 같아서" 추론으로 켜는 일은 없습니다.
+    </p>
+    <div class="callout key">
+      <span class="tag">트리거</span>
+      <div>
+        다음 중 하나일 때만 실행됩니다 — 프롬프트에 <strong>"ultracode"</strong> 키워드가 있을 때,
+        세션에 ultracode가 켜져 있을 때, 사용자가 자기 말로 <em>"워크플로우 돌려줘 · 에이전트 팬아웃해줘 ·
+        멀티에이전트로 처리해줘"</em>라고 직접 요청할 때, 또는 그렇게 지시하는 스킬/슬래시 명령을 부를 때.
+        그 외에는 — 명백히 이득인 작업이라도 — 단일 <code>Agent</code>를 쓰거나 비용을 먼저 알리고 물어봅니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. ANATOMY -->
+  <section>
+    <div class="kicker">스크립트 구조</div>
+    <h2><span class="num">03</span>meta 선언 + 본문, 단 두 부분</h2>
+    <p class="section-intro">
+      모든 스크립트는 순수 리터럴 <code>meta</code> 객체로 시작합니다(변수·함수호출·스프레드 금지).
+      그 아래 본문은 <code>agent()</code> / <code>parallel()</code> / <code>pipeline()</code> / <code>phase()</code> / <code>log()</code>로 짭니다.
+    </p>
+    <div class="code-label">workflow.js — 기본 골격</div>
+<pre><span class="k">export const</span> meta = {
+  name: <span class="s">'find-flaky-tests'</span>,
+  description: <span class="s">'Find flaky tests and propose fixes'</span>,  <span class="c">// 권한 다이얼로그에 표시</span>
+  phases: [                                          <span class="c">// phase() 호출마다 한 줄</span>
+    { title: <span class="s">'Scan'</span>, detail: <span class="s">'grep test logs for retries'</span> },
+    { title: <span class="s">'Fix'</span>,  detail: <span class="s">'one agent per flaky test'</span> },
+  ],
+}
+<span class="c">// ── 여기서부터 본문 (async 컨텍스트 — await 직접 사용) ──</span>
+<span class="f">phase</span>(<span class="s">'Scan'</span>)
+<span class="k">const</span> flaky = <span class="k">await</span> <span class="f">agent</span>(<span class="s">'grep CI logs for retry markers'</span>, { schema: FLAKY_SCHEMA })
+
+<span class="f">phase</span>(<span class="s">'Fix'</span>)
+<span class="k">const</span> fixes = <span class="k">await</span> <span class="f">pipeline</span>(flaky.tests,
+  t => <span class="f">agent</span>(<span class="s">`Reproduce flake: ${t.name}`</span>, { schema: REPRO }),
+  r => <span class="f">agent</span>(<span class="s">`Propose a fix for: ${r.cause}`</span>, { schema: FIX }),
+)
+<span class="k">return</span> { fixes }</pre>
+    <div class="callout warn" style="margin-top:18px;">
+      <span class="tag">주의</span>
+      <div>
+        스크립트는 <strong>TypeScript가 아니라 순수 JS</strong>입니다 — 타입 주석·인터페이스·제네릭은 파싱 실패.
+        그리고 <code>Date.now()</code> · <code>Math.random()</code> · 인자 없는 <code>new Date()</code>는
+        <strong>throw</strong>합니다(resume를 깨뜨리므로). 타임스탬프는 <code>args</code>로 주입하거나 워크플로우가 끝난 뒤 찍으세요.
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. BUILDING BLOCKS -->
+  <section>
+    <div class="kicker">빌딩 블록</div>
+    <h2><span class="num">04</span>다섯 개의 훅</h2>
+    <table>
+      <thead><tr><th>훅</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>agent(prompt, opts?)</code></td>
+          <td>서브에이전트 하나를 띄움. <code>schema</code>를 주면 검증된 객체를, 안 주면 최종 텍스트를 반환. <code>label</code>·<code>phase</code>·<code>model</code>·<code>effort</code>·<code>isolation:'worktree'</code>·<code>agentType</code> 지정 가능.</td>
+        </tr>
+        <tr>
+          <td><code>pipeline(items, …stages)</code></td>
+          <td><strong>기본 선택지.</strong> 각 item을 모든 stage에 독립적으로 통과시킴 — 단계 사이 <em>배리어 없음</em>. item A가 stage 3일 때 item B는 아직 stage 1일 수 있음.</td>
+        </tr>
+        <tr>
+          <td><code>parallel(thunks)</code></td>
+          <td><strong>배리어.</strong> 모든 thunk를 동시에 돌리고 전부 끝날 때까지 기다림. 결과를 한꺼번에 모아야 할 때만.</td>
+        </tr>
+        <tr>
+          <td><code>phase(title)</code> · <code>log(msg)</code></td>
+          <td>진행 표시를 그룹핑 / 내레이터 줄로 진행 메시지 출력.</td>
+        </tr>
+        <tr>
+          <td><code>args</code> · <code>budget</code> · <code>workflow()</code></td>
+          <td>입력값 주입 / 토큰 예산(<code>budget.remaining()</code>로 동적 루프) / 다른 워크플로우를 한 단계로 인라인 실행(1단계 중첩까지).</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 5. PIPELINE vs PARALLEL -->
+  <section>
+    <div class="kicker">가장 중요한 선택</div>
+    <h2><span class="num">05</span>pipeline 먼저, parallel은 정말 필요할 때만</h2>
+    <p class="section-intro">
+      이게 Workflow 설계의 핵심입니다. 배리어(parallel)는 벽시계 시간을 낭비합니다 —
+      빠른 에이전트가 느린 에이전트를 기다리며 놀게 되니까요. <strong>stage N이 stage N-1의 전체 결과를
+      교차 참조해야 할 때만</strong> 배리어가 정당합니다.
+    </p>
+    <div class="vs">
+      <div class="vs-card def">
+        <h3>pipeline()<span class="badge-def">기본값</span></h3>
+        <div class="sub">단계 간 배리어 없음 · 각 item 독립 진행</div>
+        <div class="lane"><span class="lane-label">A</span><div class="blk s1" style="width:30%">stage1</div><div class="blk s2" style="width:30%">stage2</div><div class="blk s3" style="width:30%">stage3</div></div>
+        <div class="lane"><span class="lane-label">B</span><div class="blk s1" style="width:45%">stage1</div><div class="blk s2" style="width:30%">stage2</div></div>
+        <div class="lane"><span class="lane-label">C</span><div class="blk s1" style="width:30%">stage1</div><div class="blk s2" style="width:30%">stage2</div><div class="blk s3" style="width:25%">…</div></div>
+        <div class="vs-note">벽시계 = <strong>가장 느린 한 체인</strong>. A의 stage3가 B의 stage1과 동시에 흐름. 빠른 item이 안 기다림.</div>
+      </div>
+      <div class="vs-card">
+        <h3>parallel()</h3>
+        <div class="sub">배리어 · 전부 끝나야 다음으로</div>
+        <div class="lane"><span class="lane-label">A</span><div class="blk s1" style="width:30%">stage1</div></div>
+        <div class="lane"><span class="lane-label">B</span><div class="blk s1" style="width:62%">stage1</div></div>
+        <div class="lane"><span class="lane-label">C</span><div class="blk s1" style="width:40%">stage1</div></div>
+        <div class="barrier-line"><span>⟵ 전원 대기 (배리어) ⟶</span></div>
+        <div class="lane"><span class="lane-label">→</span><div class="blk s3" style="width:70%">dedup / merge / 0건이면 조기종료</div></div>
+        <div class="vs-note">정당한 경우: 전체 결과 <strong>dedup·병합</strong>, 합계 0이면 조기종료, "다른 발견들과 비교"가 프롬프트에 필요할 때.</div>
+      </div>
+    </div>
+    <div class="callout warn" style="margin-top:18px;">
+      <span class="tag">스멜 테스트</span>
+      <div>
+        <code>parallel</code> 결과를 그냥 flatten/map/filter한 뒤 다시 <code>parallel</code>에 넣고 있다면 —
+        그 중간 변환엔 배리어가 필요 없습니다. <code>pipeline</code> stage 안에서 변환하세요.
+        "코드가 더 깔끔해서"는 배리어의 이유가 아닙니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. QUALITY PATTERNS -->
+  <section>
+    <div class="kicker">품질 패턴</div>
+    <h2><span class="num">06</span>구조로 정확도를 끌어올린다</h2>
+    <p class="section-intro">
+      단순 팬아웃을 넘어, 결과의 신뢰도를 높이는 검증된 형태들. 작업에 맞게 골라 조합합니다.
+    </p>
+    <div class="pat"><div class="pn">검</div><div><h3>Adversarial verify</h3><p>발견마다 독립적인 회의론자 N명을 띄워 <em>반증</em>하게 함. 과반이 반증하면 폐기. 그럴듯하지만 틀린 결과를 걸러냄.</p></div></div>
+    <div class="pat"><div class="pn">렌</div><div><h3>Perspective-diverse verify</h3><p>실패 방식이 여러 가지면 검증자마다 다른 렌즈(정확성·보안·성능·재현성)를 부여. 중복보다 다양성이 더 많은 실패를 잡음.</p></div></div>
+    <div class="pat"><div class="pn">심</div><div><h3>Judge panel</h3><p>서로 다른 각도(MVP우선·리스크우선·사용자우선)로 N개 안을 생성 → 병렬 심사로 점수 → 승자 기반으로 종합하되 차점안의 좋은 아이디어를 이식.</p></div></div>
+    <div class="pat"><div class="pn">건</div><div><h3>Loop-until-dry</h3><p>크기를 모르는 발견(버그·엣지케이스)은 K라운드 연속으로 새 결과가 없을 때까지 finder를 계속 띄움. 단순 카운터는 꼬리를 놓침.</p></div></div>
+    <div class="pat"><div class="pn">탐</div><div><h3>Multi-modal sweep</h3><p>병렬 에이전트가 각자 다른 방식(컨테이너별·내용별·엔티티별·시간별)으로 검색. 한 검색 각도로는 다 못 찾을 때.</p></div></div>
+    <div class="pat"><div class="pn">완</div><div><h3>Completeness critic</h3><p>마지막에 "무엇이 빠졌나 — 안 돌린 모달리티, 미검증 주장, 안 읽은 출처는?"을 묻는 에이전트. 그 답이 다음 라운드 작업이 됨.</p></div></div>
+  </section>
+
+  <!-- 7. CONSTRAINTS -->
+  <section>
+    <div class="kicker">제약과 한계</div>
+    <h2><span class="num">07</span>알아둘 경계선</h2>
+    <div class="grid grid-2">
+      <div class="card"><h3><span class="ico v">∥</span>동시성 캡</h3><p>동시 실행은 <code>min(16, 코어수−2)</code>개. 초과분은 큐에 쌓여 슬롯이 비면 실행. 그래서 100개를 넘겨도 다 끝나긴 함.</p></div>
+      <div class="card"><h3><span class="ico v">∞</span>총량 캡</h3><p>워크플로우 수명 전체 에이전트 1000개 상한(런어웨이 루프 방지용 backstop). 한 <code>parallel/pipeline</code> 호출은 최대 4096 item.</p></div>
+      <div class="card"><h3><span class="ico v">$</span>토큰 budget</h3><p><code>budget.total</code>이 하드 천장. <code>spent()</code>가 도달하면 이후 <code>agent()</code>는 throw. 메인루프+모든 워크플로우가 풀을 공유.</p></div>
+      <div class="card"><h3><span class="ico v">↻</span>Resume</h3><p><code>scriptPath</code>+<code>resumeFromRunId</code>로 재개. 안 바뀐 <code>agent()</code> 호출은 캐시 결과 즉시 반환, 수정된 첫 호출부터 라이브 실행.</p></div>
+    </div>
+    <div class="callout key" style="margin-top:18px;">
+      <span class="tag">/workflows</span>
+      <div>
+        Workflow는 백그라운드에서 돌고, 호출 즉시 task ID를 반환합니다. 진행 트리를 실시간으로 보려면
+        <code>/workflows</code>를 쓰고, 완료되면 <code>&lt;task-notification&gt;</code>이 도착합니다.
+        반복하려면 매번 풀 스크립트를 다시 보내지 말고, 반환된 <code>scriptPath</code> 파일을 수정해 재호출하세요.
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. CANONICAL EXAMPLE -->
+  <section>
+    <div class="kicker">정석 예시</div>
+    <h2><span class="num">08</span>차원별 리뷰 → 발견마다 즉시 검증</h2>
+    <p class="section-intro">
+      pipeline의 진가 — 'bugs' 차원의 발견이 검증되는 동안 'perf' 차원은 아직 리뷰 중. 낭비되는 벽시계 시간이 없습니다.
+    </p>
+    <div class="code-label">review-changes.js</div>
+<pre><span class="k">const</span> DIMENSIONS = [{ key: <span class="s">'bugs'</span>, prompt: <span class="s">'…'</span> }, { key: <span class="s">'perf'</span>, prompt: <span class="s">'…'</span> }]
+
+<span class="k">const</span> results = <span class="k">await</span> <span class="f">pipeline</span>(
+  DIMENSIONS,
+  d => <span class="f">agent</span>(d.prompt, { label: <span class="s">`review:${d.key}`</span>, phase: <span class="s">'Review'</span>, schema: FINDINGS }),
+  review => <span class="f">parallel</span>(review.findings.<span class="f">map</span>(f => () =>
+    <span class="f">agent</span>(<span class="s">`Adversarially verify: ${f.title}`</span>, { label: <span class="s">`verify:${f.file}`</span>, phase: <span class="s">'Verify'</span>, schema: VERDICT })
+      .<span class="f">then</span>(v => ({ ...f, verdict: v }))
+  ))
+)
+
+<span class="k">const</span> confirmed = results.<span class="f">flat</span>().<span class="f">filter</span>(Boolean).<span class="f">filter</span>(f => f.verdict?.isReal)
+<span class="k">return</span> { confirmed }</pre>
+  </section>
+
+  <div class="footer">
+    finsight · Workflows 가이드 · Claude Code 멀티에이전트 오케스트레이션 도구 설명 · docs/workflows-guide.html
+  </div>
+
+</div>
+</body>
+</html>
