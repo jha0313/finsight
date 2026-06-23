@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Oncall — CI 실패 자동수정 플로우</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --border: #e4e7ec;
+    --ink: #0a0e14;
+    --muted: #5b6472;
+    --primary: #0052ff;
+    --green: #00875a; --green-bg: #e3f6ee; --green-br: #aee3cc;
+    --red: #de350b; --red-bg: #ffece8; --red-br: #ffc7ba;
+    --amber: #b76e00; --amber-bg: #fff7e6; --amber-br: #ffe2a8;
+    --violet: #5b3df5; --violet-bg: #efeaff; --violet-br: #cfc2ff;
+    --mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 28px 72px; }
+
+  header { margin-bottom: 28px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--primary); font-weight: 600;
+  }
+  h1 { font-size: 30px; font-weight: 600; margin: 8px 0 6px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: 15px; max-width: 760px; }
+  .sub code { font-family: var(--mono); font-size: 13px; background: #eef1f5; padding: 1px 6px; border-radius: 5px; }
+
+  .layout { display: grid; grid-template-columns: 1fr 320px; gap: 36px; align-items: start; }
+  @media (max-width: 920px){ .layout { grid-template-columns: 1fr; } .side { position: static !important; } }
+
+  /* ---- flow spine ---- */
+  .flow { display: flex; flex-direction: column; align-items: stretch; }
+  .node {
+    position: relative; background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px;
+    box-shadow: 0 1px 2px rgba(10,14,20,.04);
+  }
+  .node .step {
+    position: absolute; top: -11px; left: 16px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    background: var(--ink); color: #fff; padding: 2px 9px; border-radius: 20px;
+    letter-spacing: .04em;
+  }
+  .node h3 { margin: 4px 0 4px; font-size: 16px; font-weight: 600; }
+  .node h3 .tag {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    color: var(--muted); margin-left: 8px;
+  }
+  .node p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .node .file {
+    font-family: var(--mono); font-size: 12px; color: var(--primary);
+    background: #eef3ff; border: 1px solid #d6e2ff; border-radius: 6px;
+    padding: 1px 7px; display: inline-block; margin-bottom: 6px;
+  }
+  code.kw { font-family: var(--mono); font-size: 12px; background: #f0f2f5; padding: 1px 5px; border-radius: 4px; color: #1a2230; }
+
+  /* accent variants */
+  .n-ci    { border-color: #cdddff; }
+  .n-ci    .step { background: var(--primary); }
+  .n-event { border-style: dashed; background: #fcfdff; }
+  .n-agent { border-color: var(--violet-br); background: linear-gradient(180deg,#fbfaff, #fff); }
+  .n-agent .step { background: var(--violet); }
+  .n-out   { border-color: var(--green-br); background: linear-gradient(180deg,#f4fcf8,#fff); }
+  .n-out   .step { background: var(--green); }
+  .n-human .step { background: var(--green); }
+
+  /* connector */
+  .conn { display: flex; flex-direction: column; align-items: center; height: 30px; }
+  .conn .line { width: 2px; flex: 1; background: #cfd5de; }
+  .conn .head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #cfd5de; margin-top: -1px; }
+  .conn .label {
+    position: relative; top: -2px; font-family: var(--mono); font-size: 11px;
+    color: var(--muted); background: var(--bg); padding: 0 6px;
+  }
+
+  /* decision row: main fail-state pill */
+  .verdict { display: flex; gap: 10px; margin: 0 0 0 0; }
+  .pill {
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 8px; border: 1px solid;
+  }
+  .pill.pass { color: var(--green); background: var(--green-bg); border-color: var(--green-br); }
+  .pill.fail { color: var(--red); background: var(--red-bg); border-color: var(--red-br); }
+
+  /* off-ramp (skip / no-op) card */
+  .offramp {
+    margin: 8px 0 0 26px; border-left: 2px dashed #cbd2db; padding: 2px 0 2px 16px;
+  }
+  .offramp .mini {
+    background: var(--amber-bg); border: 1px solid var(--amber-br); border-radius: 10px;
+    padding: 10px 13px; font-size: 13px; color: #6b4b00;
+  }
+  .offramp .mini.green { background: var(--green-bg); border-color: var(--green-br); color: #1c5b43; }
+  .offramp .mini b { font-weight: 600; }
+  .offramp .arr { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 4px; display: block; }
+
+  /* guard checklist */
+  .guard { border-color: var(--amber-br); background: linear-gradient(180deg,#fffdf6,#fff); }
+  .guard .step { background: var(--amber); }
+  .checks { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+  .checks li { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; }
+  .checks .ck { color: var(--green); font-weight: 700; flex: none; }
+  .checks code { font-family: var(--mono); font-size: 12px; background: #f3f0e7; padding: 1px 5px; border-radius: 4px; color: #4a3c12; }
+  .checks .why { color: var(--muted); }
+
+  /* agent internal steps */
+  .agent-steps { list-style: none; counter-reset: a; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+  .agent-steps li { display: flex; gap: 11px; align-items: flex-start; font-size: 13.5px; }
+  .agent-steps li::before {
+    counter-increment: a; content: counter(a);
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    background: var(--violet-bg); color: var(--violet); border: 1px solid var(--violet-br);
+    width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  }
+  .agent-steps b { font-weight: 600; }
+  .agent-steps code { font-family: var(--mono); font-size: 12px; background: #f1eefe; padding: 1px 5px; border-radius: 4px; color: #3a2aa8; }
+
+  .nomerge {
+    margin-top: 12px; display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+    color: var(--red); background: var(--red-bg); border: 1px solid var(--red-br);
+    border-radius: 8px; padding: 6px 11px;
+  }
+
+  /* ---- sidebar ---- */
+  .side { position: sticky; top: 24px; display: grid; gap: 18px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 17px; box-shadow: 0 1px 2px rgba(10,14,20,.04); }
+  .panel h4 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .gate { display: flex; gap: 11px; padding: 9px 0; border-top: 1px solid #f0f2f5; }
+  .gate:first-of-type { border-top: 0; padding-top: 0; }
+  .gate .ic { font-size: 16px; flex: none; line-height: 1.3; }
+  .gate .t { font-size: 13.5px; font-weight: 600; }
+  .gate .d { font-size: 12.5px; color: var(--muted); }
+  .files { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .files li { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.4; }
+  .files li span { color: var(--muted); font-family: var(--sans); display: block; font-size: 12px; }
+  .legend { display: grid; gap: 7px; }
+  .legend div { display: flex; gap: 9px; align-items: center; font-size: 12.5px; color: var(--muted); }
+  .legend .sw { width: 13px; height: 13px; border-radius: 4px; border: 1px solid rgba(0,0,0,.1); flex: none; }
+
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+  footer code { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">FinSight · Oncall 운영 에이전트</div>
+    <h1>CI 실패 → 자동 분석 → 수정 PR</h1>
+    <p class="sub">
+      사람이 시킨 게 아니라 <b>시스템이 깨진 사실 자체가 트리거</b>다(사고 대응). 기본 CI(<code>lint·build·test</code>)가
+      실패로 끝나면, 헤드리스 Claude 에이전트가 <b>실패 잡 로그만</b> 읽어 근본 원인을 짚고 수정 브랜치 → PR을 연다.
+      출력은 <b>무조건 PR(자동 머지 금지)</b> — 최종 머지는 사람이 한다.
+    </p>
+  </header>
+
+  <div class="layout">
+    <!-- ============ FLOW ============ -->
+    <div class="flow">
+
+      <!-- 0 trigger source -->
+      <div class="node">
+        <span class="step">0 · 트리거 소스</span>
+        <h3>개발자 변경 <span class="tag">push → main · 또는 PR open/sync</span></h3>
+        <p>커밋이 올라오면 기본 CI가 자동으로 돈다. 여기엔 secret이 필요 없다 — 외부 클라이언트는 호출 시점 지연 생성이라 키 없이 build/test가 통과해야 정상.</p>
+      </div>
+
+      <div class="conn"><div class="line"></div><div class="head"></div></div>
+
+      <!-- 1 ci.yml -->
+      <div class="node n-ci">
+        <span class="step">1 · 기본 CI</span>
+        <span class="file">.github/workflows/ci.yml</span>
+        <h3>lint · build · test <span class="tag">node 22 · npm ci</span></h3>
+        <p>ESLint(<code class="kw">--max-warnings=0</code>) → <code class="kw">next build</code>(타입체크 포함) → <code class="kw">vitest run</code>. 깨질 대상이자, 자동수정 루프의 진입 신호.</p>
+      </div>
+
+      <div class="conn"><div class="line"></div><div class="head"></div></div>
+
+      <!-- decision: pass/fail -->
+      <div class="node">
+        <span class="step">결과 판정</span>
+        <div class="verdict">
+          <span class="pill pass">✅ conclusion = success</span>
+          <span class="pill fail">❌ conclusion = failure</span>
+        </div>
+        <div class="offramp">
+          <span class="arr">↳ 통과하면</span>
+          <div class="mini green"><b>종료 — 아무 일도 하지 않음.</b> oncall은 깨어나지 않는다.</div>
+        </div>
+      </div>
+
+      <div class="conn"><span class="label">실패일 때만 ↓</span><div class="line"></div><div class="head"></div></div>
+
+      <!-- 2 event -->
+      <div class="node n-event">
+        <span class="step">2 · 이벤트</span>
+        <h3><code class="kw">workflow_run</code> · workflows:["ci"] · completed</h3>
+        <p>CI가 <b>실패로 완료</b>되면 후속 워크플로가 깨어난다. <code class="kw">workflow_run</code>은 기본 브랜치(main)에 있는 워크플로 정의만 추적한다 — 그래서 <code class="kw">ci.yml</code>·<code class="kw">oncall-ci-fix.yml</code>이 main에 있어야 동작한다.</p>
+      </div>
+
+      <div class="conn"><div class="line"></div><div class="head"></div></div>
+
+      <!-- 3 guard -->
+      <div class="node guard">
+        <span class="step">3 · GUARD (if:)</span>
+        <span class="file">.github/workflows/oncall-ci-fix.yml</span>
+        <h3>실행 전 4중 가드 — 무한루프·포크·봇 차단</h3>
+        <ul class="checks">
+          <li><span class="ck">✓</span><div><code>conclusion == 'failure'</code> <span class="why">— 실패한 run만</span></div></li>
+          <li><span class="ck">✓</span><div><code>!startsWith(head_branch, 'oncall/')</code> <span class="why">— 에이전트가 만든 브랜치의 실패는 무시(자기 자신을 다시 깨우지 않음 = 무한루프 1순위 가드)</span></div></li>
+          <li><span class="ck">✓</span><div><code>head_repository == repository</code> <span class="why">— 포크 PR 차단(신뢰 못 할 코드에 secret 노출 금지)</span></div></li>
+          <li><span class="ck">✓</span><div><code>actor != 'github-actions[bot]'</code> <span class="why">— 봇이 트리거한 실패 차단</span></div></li>
+        </ul>
+        <div class="offramp">
+          <span class="arr">↳ 하나라도 불충족이면</span>
+          <div class="mini"><b>SKIP — 잡이 아예 실행되지 않음.</b> 봇/oncall 브랜치/포크가 만든 실패는 여기서 조용히 끊겨 무한루프를 막는다.</div>
+        </div>
+      </div>
+
+      <div class="conn"><span class="label">모두 충족 ↓</span><div class="line"></div><div class="head"></div></div>
+
+      <!-- 4 job setup -->
+      <div class="node">
+        <span class="step">4 · 잡 셋업</span>
+        <h3>실패 브랜치 체크아웃 · node 22 · <code class="kw">npm ci</code></h3>
+        <p>실패한 브랜치를 <code class="kw">fetch-depth: 0</code>으로 받아 main 대비 diff를 본다. 에이전트가 수정을 <b>직접 lint/build/test로 검증</b>할 수 있도록 의존성을 설치한다.</p>
+      </div>
+
+      <div class="conn"><div class="line"></div><div class="head"></div></div>
+
+      <!-- 5 agent -->
+      <div class="node n-agent">
+        <span class="step">5 · 헤드리스 에이전트</span>
+        <h3>anthropics/claude-code-action@v1 <span class="tag">하네스: SKILL.md · ci-fix.md · service-map.md</span></h3>
+        <p>인터랙티브 터미널과 동일한 oncall 하네스를 읽고 따른다. 허용 도구는 <code class="kw">Read/Edit/Write · git · gh run view · gh pr create/list · npm run *</code>로 좁혀져 있다.</p>
+        <ol class="agent-steps">
+          <li><b>실패 로그 수집</b> — <code>gh run view &lt;id&gt; --log-failed</code> · <b>실패 잡 로그만</b> 읽는다(성공 잡은 노이즈).</li>
+          <li><b>근본 원인 분석</b> — 타입 에러·누락 import·테스트 미스매치 등. <code>CLAUDE.md</code> CRITICAL 규칙 위반 수정 금지.</li>
+          <li><b>수정 브랜치</b> — <code>oncall/fix-&lt;run_id&gt;</code> 를 새로 딴다. 원본/main에 직접 push·머지 금지.</li>
+          <li><b>패치 + 검증</b> — 수정 후 <code>npm run lint/build/test</code> 로 green 확인.</li>
+          <li><b>PR 생성</b> — <code>git push</code> → <code>gh pr create --base &lt;실패 브랜치&gt;</code>.</li>
+        </ol>
+      </div>
+
+      <div class="conn"><div class="line"></div><div class="head"></div></div>
+
+      <!-- 6 output PR -->
+      <div class="node n-out">
+        <span class="step">6 · 출력 = PR</span>
+        <h3>수정 PR <span class="tag">base = 실패 브랜치 · head = oncall/fix-&lt;run_id&gt;</span></h3>
+        <p>본문엔 <b>무엇이 왜 깨졌고(분석) 어떻게 고쳤는지(패치 요약) + 검증 결과</b>를 담는다. 로그 원문이 아니라 분석 요약만 — 키/토큰 같은 <b>secret 패턴은 본문에서 제거</b>. 같은 run엔 PR 하나(중복 생성 금지, 기존 브랜치 갱신).</p>
+        <span class="nomerge">🚫 자동 머지·approve 절대 금지 — 사람 게이트</span>
+      </div>
+
+      <div class="conn"><div class="line"></div><div class="head"></div></div>
+
+      <!-- 7 human -->
+      <div class="node n-human">
+        <span class="step">7 · 루프 닫힘</span>
+        <h3>code-review.yml 자동 리뷰 → 👤 사람이 머지</h3>
+        <p>이 PR은 기존 리뷰 워크플로가 자동으로 본다. 에이전트는 "고쳤다"까지, <b>"반영했다"는 사람</b>이 결정한다. 이 PR의 CI가 또 돌아도 head_branch가 <code class="kw">oncall/*</code>라 가드(3)에서 skip — 루프가 다시 안 돈다.</p>
+      </div>
+
+    </div>
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="side">
+      <div class="panel">
+        <h4>항상 지키는 게이트</h4>
+        <div class="gate"><div class="ic">🛑</div><div><div class="t">자동 머지 금지</div><div class="d">출력은 PR. 고침과 반영 사이에 사람을 한 명 세운다.</div></div></div>
+        <div class="gate"><div class="ic">🔁</div><div><div class="t">무한루프 가드</div><div class="d">oncall/* 브랜치·봇 actor·포크가 트리거한 실패는 skip.</div></div></div>
+        <div class="gate"><div class="ic">🙈</div><div><div class="t">secret 비노출</div><div class="d">로그 원문 대신 분석 요약. 키·Bearer 토큰 패턴 제거.</div></div></div>
+        <div class="gate"><div class="ic">🔒</div><div><div class="t">prod read-only</div><div class="d">prod를 직접 고치지 않는다. 모든 변경은 PR을 통해서만.</div></div></div>
+      </div>
+
+      <div class="panel">
+        <h4>실패 잡 로그만 본다</h4>
+        <div class="legend">
+          <div><span class="sw" style="background:var(--red-bg);border-color:var(--red-br)"></span>실패 스텝 로그 + 변경 diff → 컨텍스트로 사용</div>
+          <div><span class="sw" style="background:var(--green-bg);border-color:var(--green-br)"></span>성공 잡 로그 → 보지 않음(노이즈)</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4>구현 파일</h4>
+        <ul class="files">
+          <li>.github/workflows/ci.yml<span>기본 CI — 깨질 대상</span></li>
+          <li>.github/workflows/oncall-ci-fix.yml<span>실패 → 분석 → 수정 PR</span></li>
+          <li>.claude/skills/oncall/SKILL.md<span>운영 하네스(공용)</span></li>
+          <li>.claude/skills/oncall/references/ci-fix.md<span>CI-fix 절차·함정 정본</span></li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    범위: <b>트리거 ① CI-fix 전용</b> 플로우. (prod alert triage·유저 질의 autopilot은 별도 트리거로 이 그림에 포함하지 않음.)
+    · 활성화 전제: <code>ci.yml</code>·<code>oncall-ci-fix.yml</code>이 main에 있어야 하고, repo Secret <code>ANTHROPIC_API_KEY</code> + "Allow GitHub Actions to create and approve pull requests" 설정이 필요하다.
+  </footer>
+</div>
+</body>
+</html>

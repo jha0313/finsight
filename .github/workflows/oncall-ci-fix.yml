@@ -1,0 +1,87 @@
+name: oncall-ci-fix (CI 실패 자동 분석 → PR)
+
+# ci.yml(lint/build/test)이 실패로 끝나면 깨어나, 실패 로그를 분석하고 수정 브랜치
+# (oncall/fix-<run_id>)에 패치를 담아 PR을 연다. 출력은 무조건 PR(자동 머지 절대 금지).
+# 그 PR은 code-review.yml이 자동 리뷰하고 최종 머지는 사람이 한다 — 루프가 닫힌다.
+#
+# 트리거: ci 워크플로우가 conclusion=failure로 완료(workflow_run). workflow_run은
+# 기본 브랜치(main)에 있는 워크플로우만 추적하므로 ci.yml·이 파일이 main에 있어야 한다.
+#
+# 무한루프 가드(자율 시스템 1순위 사고): oncall/* 브랜치·봇이 만든 실패는 skip.
+# 포크 PR도 skip(신뢰 못 하는 코드에 secret 노출 금지).
+#
+# 사전 준비:
+#   1) repo Secret ANTHROPIC_API_KEY.
+#   2) Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests" 체크.
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions:
+  contents: write # 수정 브랜치 push
+  pull-requests: write # PR 생성
+  actions: read # 실패 run 로그 읽기
+  id-token: write
+
+concurrency:
+  group: oncall-ci-fix-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      !startsWith(github.event.workflow_run.head_branch, 'oncall/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.actor.login != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0 # main 대비 diff + 브랜치 push
+
+      - name: git identity
+        run: |
+          git config user.name "oncall-agent[bot]"
+          git config user.email "oncall-agent@users.noreply.github.com"
+
+      # 에이전트가 수정을 lint/build/test로 직접 검증하려면 의존성이 있어야 한다.
+      # ci.yml과 동일한 node 22 + npm ci. npm ci는 lockfile만 설치 → 코드 버그와 무관하게 성공.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          prompt: |
+            FinSight CI(ci.yml)가 실패했다. 너는 oncall 에이전트다. 먼저 하네스를 읽어라:
+            `.claude/skills/oncall/SKILL.md` 와 `.claude/skills/oncall/references/ci-fix.md`.
+            수정 시 위반 금지 규칙은 `.claude/skills/oncall/references/service-map.md` + `CLAUDE.md`.
+
+            맥락:
+            - 실패한 run id: ${{ github.event.workflow_run.id }} (브랜치: ${{ github.event.workflow_run.head_branch }})
+            - 실패 로그: `gh run view ${{ github.event.workflow_run.id }} --log-failed` (실패 잡만 — 성공 잡 로그는 보지 마라).
+            - 실패 브랜치가 이미 체크아웃돼 있다. 변경분은 `git diff origin/main...HEAD`.
+
+            절차(ci-fix.md):
+            1) 실패 로그 + 깨진 코드를 읽고 근본 원인을 짚어라(타입 에러/누락 import/테스트 미스매치 등).
+            2) 수정 브랜치 `oncall/fix-${{ github.event.workflow_run.id }}` 를 새로 따서 패치하라. main/원본 브랜치에 직접 push·머지 금지.
+            3) 가능하면 `npm run lint`·`npm run build`·`npm run test` 로 수정을 로컬 검증하라.
+            4) `git push -u origin oncall/fix-${{ github.event.workflow_run.id }}` 후
+               `gh pr create --base ${{ github.event.workflow_run.head_branch }} --head oncall/fix-${{ github.event.workflow_run.id }}` 로 PR을 열어라.
+
+            PR 본문: 무엇이/왜 깨졌는지(분석) + 어떻게 고쳤는지(패치 요약) + 검증 결과.
+            금지: 자동 머지·approve 하지 마라(사람 게이트). 로그 원문을 그대로 붙이지 말고 분석 요약만 써라.
+            secret(키=값·Bearer 토큰)이 보이면 본문에서 제거하라.
+            이미 `oncall/fix-${{ github.event.workflow_run.id }}` PR이 있으면(`gh pr list --head`로 확인) 새로 만들지 말고 그 브랜치를 갱신하라.
+          claude_args: |
+            --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh run view:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(npm run lint),Bash(npm run build),Bash(npm run test)"
