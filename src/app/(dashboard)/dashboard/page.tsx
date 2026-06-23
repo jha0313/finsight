@@ -4,7 +4,7 @@ import { UploadPanel } from "@/components/UploadPanel";
 import { getCurrentUser, getSubscriptionSummary } from "@/services/supabase";
 
 export const metadata: Metadata = {
-  title: "대시보드 | finsight",
+  title: "대시보드",
 };
 
 export default async function DashboardPage() {

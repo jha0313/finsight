@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -6,6 +7,12 @@ import {
   isSupabaseConfigured,
   sanitizeRedirectPath,
 } from "@/services/supabase";
+
+export const metadata: Metadata = {
+  title: "로그인",
+  // 로그인 페이지는 색인 가치가 없으므로 크롤은 허용하되 색인은 막는다.
+  robots: { index: false, follow: true },
+};
 
 type LoginPageProps = {
   searchParams?: Promise<{

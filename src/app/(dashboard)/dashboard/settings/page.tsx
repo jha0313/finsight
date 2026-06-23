@@ -11,7 +11,7 @@ import {
 import { signOutAction } from "../../actions";
 
 export const metadata: Metadata = {
-  title: "설정 | finsight",
+  title: "설정",
 };
 
 export default async function SettingsPage() {

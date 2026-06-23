@@ -18,6 +18,7 @@ import { Hero } from "@/components/Hero";
 import { PricingTable } from "@/components/PricingTable";
 import { SecuritySection } from "@/components/SecuritySection";
 import { previewCsvRows, selectInsightTabs } from "@/lib/landing-insights";
+import { siteConfig, siteUrl } from "@/lib/site";
 
 const iconProps = {
   "aria-hidden": "true",
@@ -112,6 +113,42 @@ const plans = [
   },
 ];
 
+// 브랜드 검색·리치 결과용 구조화 데이터. Organization/WebSite/SoftwareApplication을
+// @graph로 묶어 검색엔진이 finsight를 단일 엔티티로 인식하게 한다.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${siteUrl}/#organization`,
+      name: siteConfig.name,
+      url: siteUrl,
+      logo: `${siteUrl}/icon.svg`,
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${siteUrl}/#website`,
+      url: siteUrl,
+      name: siteConfig.name,
+      description: siteConfig.description,
+      inLanguage: "ko-KR",
+      publisher: { "@id": `${siteUrl}/#organization` },
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: siteConfig.name,
+      applicationCategory: "FinanceApplication",
+      operatingSystem: "Web",
+      description: siteConfig.description,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "KRW",
+      },
+    },
+  ],
+};
+
 export default async function Home() {
   const sampleDemoAnalysis = await getSampleDemoAnalysis();
   const insightTabs = selectInsightTabs(sampleDemoAnalysis);
@@ -124,6 +161,10 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-canvas">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Hero
         aiInsight={{
           amount: heroTab.headlineNumber,

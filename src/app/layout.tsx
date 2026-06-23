@@ -1,16 +1,42 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import { siteConfig, siteUrl } from "@/lib/site";
+
 export const metadata: Metadata = {
-  title: "finsight",
-  description:
-    "카드·은행 명세서 CSV를 업로드하면 Claude가 지출 구조·이상 거래·절약 인사이트를 분석해 보여주는 핀테크 대시보드.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: siteConfig.title,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  applicationName: siteConfig.name,
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
-    title: "finsight",
-    description:
-      "카드·은행 명세서 CSV를 업로드하면 Claude가 지출 구조·이상 거래·절약 인사이트를 분석해 보여주는 핀테크 대시보드.",
     type: "website",
-    locale: "ko_KR",
+    locale: siteConfig.locale,
+    url: siteUrl,
+    siteName: siteConfig.name,
+    title: siteConfig.title,
+    description: siteConfig.description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.title,
+    description: siteConfig.description,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
 };
 
