@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { parseCsvStatement } from "@/lib/csv";
 import type { ProInsights } from "@/types/analysis";
@@ -1191,28 +1191,62 @@ describe("runCheckoutRequest", () => {
 
 describe("runPolarWebhookRequest", () => {
   it("returns 401 before idempotency when signature verification fails", async () => {
-    const { deps, repository, verifyCalls } = createWebhookRequestDeps({
+    const { deps, repository, verifyCalls, analytics } = createWebhookRequestDeps({
       verifyThrows: true,
     });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const result = await runPolarWebhookRequest({
-      rawBody: "{\"type\":\"subscription.active\"}",
-      headers: { "webhook-id": "evt_1" },
-      deps,
-    });
-
-    expect(result).toEqual({
-      status: 401,
-      body: { error: "invalid_signature" },
-    });
-    expect(verifyCalls).toEqual([
-      {
+    try {
+      const result = await runPolarWebhookRequest({
         rawBody: "{\"type\":\"subscription.active\"}",
-        headers: { "webhook-id": "evt_1" },
-      },
-    ]);
-    expect(repository.markCalls).toEqual([]);
-    expect(repository.upsertCalls).toEqual([]);
+        headers: {
+          "webhook-id": "evt_1",
+          "x-forwarded-for": "203.0.113.10, 10.0.0.1",
+        },
+        deps,
+      });
+
+      expect(result).toEqual({
+        status: 401,
+        body: { error: "invalid_signature" },
+      });
+      expect(verifyCalls).toEqual([
+        {
+          rawBody: "{\"type\":\"subscription.active\"}",
+          headers: {
+            "webhook-id": "evt_1",
+            "x-forwarded-for": "203.0.113.10, 10.0.0.1",
+          },
+        },
+      ]);
+      expect(repository.markCalls).toEqual([]);
+      expect(repository.upsertCalls).toEqual([]);
+      expect(analytics.eventsNamed("polar_webhook_invalid_signature")).toEqual([
+        {
+          distinctId: "polar_webhook",
+          event: "polar_webhook_invalid_signature",
+          properties: {
+            error_name: "Error",
+            reason: "signature_verification_failed",
+            remote_ip: "203.0.113.10",
+            webhook_id_present: true,
+            webhook_timestamp_present: false,
+          },
+        },
+      ]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        "polar_webhook_invalid_signature",
+        {
+          error_name: "Error",
+          reason: "signature_verification_failed",
+          remote_ip: "203.0.113.10",
+          webhook_id_present: true,
+          webhook_timestamp_present: false,
+        },
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it("re-applies the idempotent upsert and reports duplicate for replayed events", async () => {

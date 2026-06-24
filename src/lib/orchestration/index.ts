@@ -470,7 +470,9 @@ export async function runPolarWebhookRequest(input: {
 
   try {
     event = input.deps.verifyWebhook(input.rawBody, input.headers);
-  } catch {
+  } catch (error) {
+    recordInvalidPolarWebhookSignature(input.headers, input.deps.analytics, error);
+
     return {
       status: 401,
       body: { error: "invalid_signature" },
@@ -510,6 +512,49 @@ export async function runPolarWebhookRequest(input: {
     status: 200,
     body: { received: true },
   };
+}
+
+function recordInvalidPolarWebhookSignature(
+  headers: Record<string, string>,
+  analytics: AnalyticsPort,
+  error: unknown,
+): void {
+  const properties = {
+    error_name: error instanceof Error ? error.name : "UnknownError",
+    reason: "signature_verification_failed",
+    remote_ip: extractRemoteIp(headers),
+    webhook_id_present: headerIsPresent(headers, "webhook-id"),
+    webhook_timestamp_present: headerIsPresent(headers, "webhook-timestamp"),
+  };
+
+  console.warn("polar_webhook_invalid_signature", properties);
+  analytics.capture({
+    distinctId: "polar_webhook",
+    event: "polar_webhook_invalid_signature",
+    properties,
+  });
+}
+
+function extractRemoteIp(headers: Record<string, string>): string {
+  const forwardedFor = headers["x-forwarded-for"];
+
+  if (forwardedFor !== undefined && forwardedFor.trim() !== "") {
+    return forwardedFor.split(",")[0].trim();
+  }
+
+  const realIp = headers["x-real-ip"];
+
+  if (realIp !== undefined && realIp.trim() !== "") {
+    return realIp.trim();
+  }
+
+  return "unknown";
+}
+
+function headerIsPresent(headers: Record<string, string>, key: string): boolean {
+  const value = headers[key];
+
+  return value !== undefined && value.trim() !== "";
 }
 
 // PostHog error webhook → oncall 운영 트리거(②). Vercel serverless에서는 에이전트를

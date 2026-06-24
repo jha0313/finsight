@@ -51,6 +51,9 @@
     "typescript": "^5.0.0",
     "vitest": "^4.1.8"
   },
+  "overrides": {
+    "undici": "7.28.0"
+  },
   "lint-staged": {
     "*.{ts,tsx}": "eslint --fix --max-warnings=0"
   }
