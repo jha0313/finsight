@@ -69,6 +69,20 @@ describe("verifyPostHogWebhook", () => {
 
     expect(alert.eventId).toBe("posthog:iss_1:2026-06-23T00:00:00Z");
   });
+
+  it("dedups a re-delivered spike but re-wakes on a fresh spike of the same issue", () => {
+    const headers = { authorization: "Bearer s3cret" };
+    const spike = (triggeredAt: string) =>
+      verifyPostHogWebhook(
+        JSON.stringify({ issue: { id: "iss_spike" }, triggered_at: triggeredAt }),
+        headers,
+      ).eventId;
+
+    // 같은 급증의 재전송(동일 triggered_at)은 동일 키 → 멱등으로 dispatch 1회.
+    expect(spike("2026-06-23T11:00:00Z")).toBe(spike("2026-06-23T11:00:00Z"));
+    // 다른 시각에 다시 급증하면 새 키 → triage를 다시 깨운다(놓치지 않음).
+    expect(spike("2026-06-23T11:00:00Z")).not.toBe(spike("2026-06-23T12:30:00Z"));
+  });
 });
 
 describe("createGitHubDispatch", () => {
