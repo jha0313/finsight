@@ -402,9 +402,18 @@ export function createStatementRepository(): StatementRepository {
 }
 
 export function createSubscriptionGateway(): SubscriptionGateway {
+  const requestCache = new Map<string, Promise<SubscriptionSummary>>();
+
   return {
     async resolveTier(userId) {
-      const { tier } = await getSubscriptionSummary(userId);
+      let summary = requestCache.get(userId);
+
+      if (summary === undefined) {
+        summary = getSubscriptionSummary(userId);
+        requestCache.set(userId, summary);
+      }
+
+      const { tier } = await summary;
       return tier;
     },
   };
