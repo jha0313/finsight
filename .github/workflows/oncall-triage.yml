@@ -22,6 +22,7 @@ on:
 permissions:
   contents: read # 코드 + git log grounding
   issues: write # escalation issue 생성
+  id-token: write # claude-code-action@v1 OIDC 토큰(없으면 setup 단계에서 실패)
 
 concurrency:
   group: oncall-triage-${{ github.event.client_payload.fingerprint || github.run_id }}
