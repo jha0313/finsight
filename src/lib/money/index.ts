@@ -119,9 +119,9 @@ function parseDecimalToken(compact: string): {
     // 콤마만: 1개이고 뒤 1~2자리면 소수점, 그 외(여러 개·3자리)는 천단위.
     decimalSep = isSingleDecimalComma(token) ? "," : "";
   } else if (lastDot >= 0) {
-    // 점만: 1개면 소수점(자릿수 무관), 여러 개면 천단위 그룹으로 본다.
-    // (이미 정규화된 "1234.567" 같은 값이 천단위로 오해되지 않게 한다.)
-    decimalSep = token.split(".").length - 1 === 1 ? "." : "";
+    // 점만: 1~2자리 소수는 소수점, 1.234처럼 3자리 그룹은 천단위로 본다.
+    // 이미 정규화된 1234.567 같은 값은 기존처럼 소수점으로 유지해 반올림한다.
+    decimalSep = isSingleDecimalDot(token) ? "." : "";
   }
 
   if (decimalSep === "") {
@@ -145,11 +145,31 @@ function parseDecimalToken(compact: string): {
 // 콤마가 1개이고 뒤가 1~2자리이면 소수점(유럽식 1234,56), 그 외(여러 개·
 // 3자리 그룹)는 천단위로 본다. 금액 소수부는 사실상 항상 2자리이다.
 function isSingleDecimalComma(token: string): boolean {
-  if (token.split(",").length - 1 !== 1) {
+  return isSingleDecimalSeparator(token, ",");
+}
+
+function isSingleDecimalDot(token: string): boolean {
+  if (token.split(".").length - 1 !== 1) {
     return false;
   }
 
-  const fractionLength = token.length - token.lastIndexOf(",") - 1;
+  const splitIndex = token.lastIndexOf(".");
+  const wholeLength = splitIndex;
+  const fractionLength = token.length - splitIndex - 1;
+
+  if (fractionLength === 1 || fractionLength === 2) {
+    return true;
+  }
+
+  return fractionLength === 3 && wholeLength > 3;
+}
+
+function isSingleDecimalSeparator(token: string, separator: "," | "."): boolean {
+  if (token.split(separator).length - 1 !== 1) {
+    return false;
+  }
+
+  const fractionLength = token.length - token.lastIndexOf(separator) - 1;
 
   return fractionLength === 1 || fractionLength === 2;
 }

@@ -33,6 +33,7 @@ describe("parseAmount", () => {
     expect(parseAmount("1.234,56")).toBe("1234.56");
     expect(parseAmount("1234,56")).toBe("1234.56");
     expect(parseAmount("€1.234,56")).toBe("1234.56");
+    expect(parseAmount("1.234")).toBe("1234.00");
     expect(parseAmount("1.234.567,89")).toBe("1234567.89");
     expect(parseAmount("1.234.567")).toBe("1234567.00");
     expect(parseAmount("2.000,00")).toBe("2000.00");
