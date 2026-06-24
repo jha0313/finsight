@@ -66,6 +66,7 @@ describe("Polar webhook route", () => {
     webhookRouteMocks.verifyPolarWebhook.mockImplementationOnce(() => {
       throw new Error("invalid signature");
     });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const request = new NextRequest(
       "https://finsight.test/api/webhook/polar",
       {
@@ -95,6 +96,15 @@ describe("Polar webhook route", () => {
     );
     expect(webhookRouteMocks.markEventProcessed).not.toHaveBeenCalled();
     expect(webhookRouteMocks.upsertSubscription).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "polar_webhook_invalid_signature",
+      expect.objectContaining({
+        reason: "signature_verification_failed",
+        webhook_id_present: true,
+        webhook_timestamp_present: true,
+      }),
+    );
+    warnSpy.mockRestore();
   });
 
   it("returns 200 duplicate after re-applying the idempotent upsert for a replayed event_id", async () => {
