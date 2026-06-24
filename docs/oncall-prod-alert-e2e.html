@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Oncall — prod alert 1차 방어선 · E2E</title>
+<style>
+  :root {
+    --bg:        #0b0f14;
+    --bg-2:      #0f141b;
+    --panel:     #141b24;
+    --panel-2:   #18212c;
+    --line:      #243140;
+    --line-soft: #1b2430;
+    --tx:        #e6edf3;
+    --tx-dim:    #93a1b1;
+    --tx-mute:   #5d6b7a;
+    --cyan:      #2dd4bf;
+    --cyan-dim:  #0f3b38;
+    --blue:      #4d9fff;
+    --amber:     #f5a623;
+    --amber-dim: #3a2c0e;
+    --red:       #ff5d5d;
+    --red-dim:   #3a1717;
+    --green:     #3fe08f;
+    --green-dim: #11331f;
+    --mag:       #c084fc;
+    --mag-dim:   #2a1d3d;
+    --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+    --sans: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', system-ui, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--tx);
+    font-family: var(--sans); line-height: 1.6; font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(900px 500px at 85% -10%, rgba(45,212,191,.07), transparent 60%),
+      radial-gradient(700px 400px at 5% 0%, rgba(77,159,255,.06), transparent 55%);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 40px 24px 90px; }
+  .mono { font-family: var(--mono); }
+  a { color: var(--cyan); text-decoration: none; }
+
+  /* ---- header ---- */
+  header { border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 34px; }
+  .kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--cyan); border: 1px solid var(--cyan-dim); background: rgba(45,212,191,.06);
+    padding: 4px 11px; border-radius: 100px;
+  }
+  .kicker .blip { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:.35 } }
+  h1 { font-size: 33px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 10px; line-height: 1.15; }
+  .sub { color: var(--tx-dim); font-size: 15.5px; max-width: 840px; }
+  .sub b { color: var(--tx); font-weight: 600; }
+  .sub code, .ic { font-family: var(--mono); font-size: 12.5px; color: var(--cyan); background: rgba(45,212,191,.08); border: 1px solid var(--cyan-dim); padding: 1px 6px; border-radius: 5px; }
+  .quote { color: var(--tx); font-style: italic; }
+  .credit { margin-top: 14px; font-family: var(--mono); font-size: 11.5px; color: var(--tx-mute); letter-spacing: .02em; }
+
+  .banner {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 22px;
+    background: linear-gradient(180deg, rgba(63,224,143,.07), transparent);
+    border: 1px solid var(--green-dim); border-left: 3px solid var(--green);
+    border-radius: 10px; padding: 14px 18px;
+  }
+  .banner .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); flex: none; }
+  .banner b { color: var(--green); font-weight: 700; }
+  .banner .meta { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--tx-mute); }
+  .banner .num { font-family: var(--mono); color: var(--tx); }
+
+  /* ---- section ---- */
+  section { margin-top: 54px; scroll-margin-top: 20px; }
+  .s-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .s-num { font-family: var(--mono); font-size: 12px; color: var(--cyan); border: 1px solid var(--cyan-dim); border-radius: 6px; padding: 2px 8px; }
+  h2 { font-size: 20px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+  .s-desc { color: var(--tx-dim); font-size: 14px; margin: 4px 0 20px; max-width: 880px; }
+  .s-desc code { font-family: var(--mono); font-size: 12px; color: var(--blue); }
+
+  /* ---- stats ---- */
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+  @media (max-width: 720px){ .stats { grid-template-columns: repeat(2,1fr); } }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden; }
+  .stat::after { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--cyan); opacity:.7; }
+  .stat.g::after { background: var(--green); } .stat.a::after { background: var(--amber); }
+  .stat .v { font-family: var(--mono); font-size: 27px; font-weight: 600; letter-spacing: -.02em; color: var(--tx); }
+  .stat.g .v { color: var(--green); }
+  .stat .k { font-size: 12px; color: var(--tx-mute); margin-top: 3px; }
+
+  /* ---- gates ---- */
+  .grid3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  @media (max-width: 720px){ .grid3 { grid-template-columns: 1fr; } }
+  .gate { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .gate .tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--amber); border: 1px solid var(--amber-dim); background: rgba(245,166,35,.06); border-radius: 5px; padding: 2px 8px; }
+  .gate h4 { margin: 12px 0 6px; font-size: 15.5px; color: var(--tx); }
+  .gate p { margin: 0; color: var(--tx-dim); font-size: 13px; }
+  .gate code { font-family: var(--mono); font-size: 11.5px; color: var(--cyan); }
+
+  /* ---- flow ---- */
+  .flow { display: flex; flex-direction: column; align-items: stretch; max-width: 720px; margin: 0 auto; }
+  .node { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 15px 18px 15px 20px; }
+  .node::before { content:''; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius: 3px; background: var(--line); }
+  .node .step { position: absolute; top: -10px; left: 16px; font-family: var(--mono); font-size: 10.5px; font-weight: 600; background: var(--bg-2); border: 1px solid var(--line); color: var(--tx-dim); padding: 2px 9px; border-radius: 20px; letter-spacing: .06em; }
+  .node h3 { margin: 3px 0 5px; font-size: 15px; font-weight: 650; color: var(--tx); }
+  .node h3 .t { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--tx-mute); margin-left: 8px; }
+  .node p { margin: 0; color: var(--tx-dim); font-size: 12.5px; }
+  .node .file { font-family: var(--mono); font-size: 11px; color: var(--blue); background: rgba(77,159,255,.08); border: 1px solid rgba(77,159,255,.2); border-radius: 5px; padding: 1px 7px; display: inline-block; margin-bottom: 7px; }
+  .node code { font-family: var(--mono); font-size: 11.5px; color: var(--cyan); background: rgba(45,212,191,.07); padding: 1px 5px; border-radius: 4px; }
+  .node.src::before { background: var(--tx-mute); } .node.src { border-style: dashed; }
+  .node.ph::before  { background: var(--blue); }
+  .node.edge::before{ background: var(--cyan); }
+  .node.agent { border-color: var(--mag-dim); background: linear-gradient(180deg, rgba(192,132,252,.06), var(--panel)); }
+  .node.agent::before { background: linear-gradient(180deg, var(--mag), var(--blue)); }
+  .node.agent .step { color: var(--mag); border-color: var(--mag-dim); }
+  .node.agent .ai { font-family: var(--mono); font-size: 10px; color: #fff; background: linear-gradient(90deg, var(--mag), var(--blue)); padding: 1px 7px; border-radius: 20px; margin-left: 8px; vertical-align: middle; }
+
+  .conn { display: flex; flex-direction: column; align-items: center; height: 28px; }
+  .conn .ln { width: 2px; flex: 1; background: linear-gradient(var(--line), var(--line-soft)); }
+  .conn .ar { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--line); }
+  .conn .lb { font-family: var(--mono); font-size: 10px; color: var(--tx-mute); background: var(--bg); padding: 0 7px; position: relative; top: -1px; }
+
+  .branch { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+  @media (max-width: 600px){ .branch { grid-template-columns: 1fr; } }
+  .arm { border-radius: 11px; padding: 13px 15px; border: 1px solid; }
+  .arm .h { font-family: var(--mono); font-size: 11.5px; font-weight: 600; margin-bottom: 5px; }
+  .arm.noise { background: rgba(245,166,35,.05); border-color: var(--amber-dim); }
+  .arm.noise .h { color: var(--amber); }
+  .arm.sig { background: rgba(63,224,143,.05); border-color: var(--green-dim); }
+  .arm.sig .h { color: var(--green); }
+  .arm p { margin: 0; font-size: 12px; color: var(--tx-dim); }
+  .arm code { font-family: var(--mono); font-size: 11px; color: var(--tx); }
+
+  /* ---- table ---- */
+  .tbl { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 13px; }
+  .tbl th, .tbl td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  .tbl th { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--tx-mute); background: var(--bg-2); }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl td.id { font-family: var(--mono); font-weight: 600; color: var(--cyan); white-space: nowrap; }
+  .tbl code { font-family: var(--mono); font-size: 12px; color: var(--blue); }
+  .who { font-family: var(--mono); font-size: 10.5px; padding: 1px 8px; border-radius: 20px; white-space: nowrap; border: 1px solid; }
+  .who.me  { color: var(--cyan); background: rgba(45,212,191,.06); border-color: var(--cyan-dim); }
+  .who.you { color: var(--amber); background: rgba(245,166,35,.06); border-color: var(--amber-dim); }
+  .ok { font-family: var(--mono); font-size: 12px; color: var(--green); white-space: nowrap; }
+
+  /* ---- tiers ---- */
+  .tier { background: var(--panel); border: 1px solid var(--line); border-radius: 13px; padding: 18px 20px; margin-bottom: 13px; }
+  .tier .th { display: flex; align-items: center; gap: 10px; }
+  .tier .tg { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--bg); border-radius: 6px; padding: 2px 9px; }
+  .tg.t0 { background: var(--blue); } .tg.t1 { background: var(--green); } .tg.t3 { background: var(--mag); } .tg.t4 { background: var(--amber); }
+  .tier h4 { margin: 0; font-size: 14.5px; color: var(--tx); }
+  .tier .sd { color: var(--tx-mute); font-size: 12px; margin: 4px 0 0; font-family: var(--mono); }
+  .scn { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+  .scn th, .scn td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  .scn th { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--tx-mute); }
+  .scn tr:last-child td { border-bottom: none; }
+  .scn .vn { font-family: var(--mono); color: var(--tx-dim); white-space: nowrap; }
+  .pill { font-family: var(--mono); font-size: 10.5px; padding: 1px 7px; border-radius: 5px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+  .pill.noise { color: var(--amber); background: rgba(245,166,35,.06); border-color: var(--amber-dim); }
+  .pill.sig { color: var(--green); background: rgba(63,224,143,.06); border-color: var(--green-dim); }
+  .pill.pass { color: var(--green); background: rgba(63,224,143,.06); border-color: var(--green-dim); }
+
+  /* ---- result ---- */
+  .resgrid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 26px; align-items: start; }
+  @media (max-width: 760px){ .resgrid { grid-template-columns: 1fr; } }
+  .tl { margin: 4px 0 0 6px; padding-left: 24px; border-left: 1px solid var(--line); }
+  .tl .ev { position: relative; padding-bottom: 18px; }
+  .tl .ev::before { content:''; position: absolute; left: -30px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--bg); border: 2px solid var(--blue); }
+  .tl .ev.ok::before { border-color: var(--green); background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .tl .ev .t { font-family: var(--mono); font-size: 11.5px; color: var(--cyan); font-weight: 600; }
+  .tl .ev .d { font-size: 13px; color: var(--tx-dim); margin-top: 2px; }
+  .tl .ev .d b { color: var(--tx); } .tl .ev .d code { font-family: var(--mono); font-size: 11.5px; color: var(--blue); }
+
+  .vcard { background: linear-gradient(180deg, rgba(192,132,252,.06), var(--panel)); border: 1px solid var(--mag-dim); border-radius: 13px; padding: 20px; }
+  .vcard .vh { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .vbadge { font-family: var(--mono); font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; border: 1px solid; }
+  .vbadge.sig { color: #fff; background: linear-gradient(90deg, var(--mag), var(--blue)); border: none; }
+  .vbadge.conf { color: var(--amber); background: rgba(245,166,35,.07); border-color: var(--amber-dim); }
+  .vcard .vt { font-size: 13.5px; font-weight: 650; color: var(--tx); margin-bottom: 10px; line-height: 1.4; }
+  .vcard ul { margin: 0; padding-left: 17px; }
+  .vcard li { font-size: 12.5px; color: var(--tx-dim); margin-bottom: 7px; }
+  .vcard li b { color: var(--tx); } .vcard li code { font-family: var(--mono); font-size: 11px; color: var(--cyan); }
+
+  /* ---- links ---- */
+  .links { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  @media (max-width: 600px){ .links { grid-template-columns: 1fr; } }
+  .lk { display: flex; align-items: center; gap: 11px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; transition: border-color .15s, transform .15s; }
+  .lk:hover { border-color: var(--cyan); transform: translateY(-1px); }
+  .lk .ico { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--cyan); background: rgba(45,212,191,.07); border: 1px solid var(--cyan-dim); border-radius: 6px; padding: 4px 7px; flex: none; }
+  .lk .tx { overflow: hidden; }
+  .lk .tx b { display: block; color: var(--tx); font-weight: 600; font-size: 13px; }
+  .lk .tx span { color: var(--tx-mute); font-family: var(--mono); font-size: 10.5px; word-break: break-all; }
+
+  .note { background: rgba(245,166,35,.05); border: 1px solid var(--amber-dim); border-left: 3px solid var(--amber); border-radius: 10px; padding: 14px 18px; font-size: 13px; color: var(--tx-dim); }
+  .note b { color: var(--amber); }
+  .note .num { font-family: var(--mono); color: var(--tx); }
+  .note code { font-family: var(--mono); font-size: 11.5px; color: var(--cyan); }
+
+  footer { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 11px; color: var(--tx-mute); line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="kicker"><span class="blip"></span>FinSight · Oncall 운영 에이전트 · 트리거 ② prod alert</span>
+    <h1>prod alert 1차 방어선 — E2E 설계 &amp; 검증 결과</h1>
+    <p class="sub">PostHog error tracking 한 건이 <b>실제 소스에서 출발</b>해 serverless webhook(검증·멱등·dispatch)을 거쳐 <b>CI 헤드리스 에이전트</b>의 노이즈/신호 판정과 GitHub Issue escalation까지 — 전 구간을 실연결로 검증했다. <span class="quote">"사람을 깨우되, 빈손으로 깨우지 않는다."</span></p>
+    <div class="credit">게이트 3종 — read-only · 노이즈 필터 · escalation · 인터랙티브 + 헤드리스 공용 하네스</div>
+    <div class="banner">
+      <span class="dot"></span>
+      <span><b>E2E 검증 성공</b> &nbsp;—&nbsp; PostHog 에러 → escalation 이슈 <span class="num">#13</span> 자동 생성 (총 <span class="num">3분 50초</span>)</span>
+      <span class="meta">2026-06-24 · run 28066767328</span>
+    </div>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat g"><div class="v">PASS</div><div class="k">전체 e2e · 소스→escalation</div></div>
+    <div class="stat"><div class="v">433</div><div class="k">결정론 테스트 green · webhook 69</div></div>
+    <div class="stat"><div class="v">~15s</div><div class="k">PostHog → webhook 전파</div></div>
+    <div class="stat a"><div class="v">8</div><div class="k">연결한 셋업 · 1 = 사용자 PAT</div></div>
+  </div>
+
+  <!-- 01 IDENTITY -->
+  <section>
+    <div class="s-head"><span class="s-num">01</span><h2>무엇인가 — 당직 경비, 개인 비서가 아니다</h2></div>
+    <p class="s-desc">개인 에이전트는 내가 말을 걸지만, oncall은 <b style="color:var(--tx)">시스템 이벤트</b>(CI 실패·prod alert·유저 질문)에 스스로 깨어나 팀·서비스·실제 유저라는 공유 자산을 지킨다. 프로덕션은 리스크가 크므로 <b style="color:var(--tx)">자율성은 입력에서 받되, 권한은 출구에서 조인다.</b></p>
+    <div class="grid3">
+      <div class="gate"><span class="tag">GATE 01</span><h4>read-only</h4><p>프로덕션을 직접 건드리지 않는다. DB는 읽기만(<code>?read_only=true</code>), 변경은 <b style="color:var(--tx)">PR이라는 사람 게이트</b>로만.</p></div>
+      <div class="gate"><span class="tag">GATE 02</span><h4>노이즈 필터</h4><p>모든 이벤트에 반응하면 알람 공해. 신호/소음을 먼저 가른 뒤에만 행동한다. <b style="color:var(--tx)">안 깨우는 판단이 절반의 가치.</b></p></div>
+      <div class="gate"><span class="tag">GATE 03</span><h4>escalation</h4><p>"내 선을 넘는다"를 인정하고 사람을 부른다. 단 <b style="color:var(--tx)">분석 한 장</b>을 들고 — 무슨 에러·언제부터·몇 명·원인·영향·액션.</p></div>
+    </div>
+  </section>
+
+  <!-- 02 FLOW -->
+  <section>
+    <div class="s-head"><span class="s-num">02</span><h2>전체 플로우 — 소스에서 escalation까지</h2></div>
+    <p class="s-desc">핵심 결정: Vercel serverless에는 <code>claude -p</code>를 띄울 바이너리·실행시간이 없다. 그래서 route는 <b style="color:var(--tx-dim)">검증+멱등+dispatch까지만</b> 하고, 실제 에이전트는 GitHub Actions 헤드리스에서 돈다 — CI 실패·prod alert가 같은 패턴으로 수렴한다.</p>
+
+    <div class="flow">
+      <div class="node src"><div class="step">SRC</div>
+        <h3>앱 / 서버 에러 <span class="t">posthog-js · onRequestError</span></h3>
+        <p><code>$exception</code> 이벤트가 PostHog로 ingest. (검증 시 <code>posthog-node</code>로 합성 probe 직접 전송)</p></div>
+      <div class="conn"><div class="ln"></div><span class="lb">ingest</span><div class="ar"></div></div>
+
+      <div class="node ph"><div class="step">①</div>
+        <h3>PostHog error tracking <span class="t">issue 그룹핑</span></h3>
+        <p>스택/타입으로 묶고, 신규면 <code>$error_tracking_issue_created</code>, 급증이면 <code>$error_tracking_issue_spiking</code> 발화.</p></div>
+      <div class="conn"><div class="ln"></div><span class="lb">issue_created / spiking</span><div class="ar"></div></div>
+
+      <div class="node edge"><div class="step">②</div>
+        <h3>Destination (HTTP Webhook) <span class="t">template-webhook</span></h3>
+        <span class="file">POST → /api/webhook/posthog</span>
+        <p>헤더 <code>Authorization: Bearer ‹secret›</code> + body에 멱등키(<code>event.uuid</code>)·triage용 필드(name·issue id·trigger).</p></div>
+      <div class="conn"><div class="ln"></div><span class="lb">HTTPS POST</span><div class="ar"></div></div>
+
+      <div class="node edge"><div class="step">③</div>
+        <h3>Webhook route <span class="t">Vercel serverless</span></h3>
+        <span class="file">src/app/api/webhook/posthog/route.ts</span>
+        <p><b style="color:var(--tx)">1)</b> 시크릿 상수시간 비교(실패=401) · <b style="color:var(--tx)">2)</b> <code>event_id</code> 선삽입 멱등(<code>processed_webhook_events</code>, <code>posthog:</code> prefix) · <b style="color:var(--tx)">3)</b> 신규면 <code>repository_dispatch</code>. 중복은 skip.</p></div>
+      <div class="conn"><div class="ln"></div><span class="lb">repository_dispatch · oncall-alert</span><div class="ar"></div></div>
+
+      <div class="node agent"><div class="step">④</div>
+        <h3>oncall-triage 워크플로 <span class="ai">AI · 헤드리스</span></h3>
+        <span class="file">.github/workflows/oncall-triage.yml · claude-code-action</span>
+        <p>하네스(<code>SKILL.md</code> · <code>triage-rubric.md</code> · <code>service-map.md</code>)를 읽고 grounding(git log·코드·payload)으로 <b style="color:var(--tx)">노이즈/신호 판정</b>. payload는 신뢰불가 데이터로만 취급(인젝션 방어).</p></div>
+      <div class="conn"><div class="ln"></div><span class="lb">판정</span><div class="ar"></div></div>
+
+      <div class="branch">
+        <div class="arm noise"><div class="h">┃ 노이즈 → 스스로 종료</div>
+          <p>알려진 일시적·단발·봇. 로그에 판정 근거만 남기고 <b style="color:var(--tx)">이슈 생성 안 함.</b> 깨우지 않음으로써 신뢰를 번다.</p></div>
+        <div class="arm sig"><div class="h">┃ 신호 → 분석 동반 escalation</div>
+          <p><code>gh issue create --label oncall</code>. 같은 에러 열린 이슈 있으면 <b style="color:var(--tx)">코멘트(dedup)</b>. 경계는 신호로 기울이되 <b style="color:var(--tx)">확신도 낮음</b> 표기.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 SETUP -->
+  <section>
+    <div class="s-head"><span class="s-num">03</span><h2>필요했던 셋업 — 외부 와이어링</h2></div>
+    <p class="s-desc">코드는 이미 green이었고, 가동에 필요한 건 <b style="color:var(--tx-dim)">아웃바운드 연결</b>이었다. 딱 하나(PAT)만 사용자 몫이고 나머지는 에이전트가 연결했다.</p>
+    <table class="tbl">
+      <tr><th>#</th><th>항목</th><th>역할</th><th>담당</th><th>상태</th></tr>
+      <tr><td class="id">A</td><td><code>ONCALL_WEBHOOK_SECRET</code></td><td>route·destination 공유 시크릿(Bearer) · 32B 랜덤</td><td><span class="who me">에이전트</span></td><td class="ok">✓ 설정</td></tr>
+      <tr><td class="id">B</td><td><code>GH_DISPATCH_TOKEN</code></td><td>repository_dispatch용 PAT · fine-grained, Contents R/W</td><td><span class="who you">사용자 · PAT 발급</span></td><td class="ok">✓ 설정</td></tr>
+      <tr><td class="id">C</td><td><code>GH_DISPATCH_REPO</code></td><td><code>jha0313/finsight</code></td><td><span class="who me">에이전트</span></td><td class="ok">✓ 설정</td></tr>
+      <tr><td class="id">D</td><td>PostHog destination</td><td>internal_destination(webhook) · issue_created + spiking · Bearer</td><td><span class="who me">에이전트 · MCP</span></td><td class="ok">✓ 연결</td></tr>
+      <tr><td class="id">E</td><td><code>oncall</code> 라벨</td><td>escalation 라벨 + dedup 기준</td><td><span class="who me">에이전트</span></td><td class="ok">✓ 생성</td></tr>
+      <tr><td class="id">F</td><td>Vercel 재배포</td><td>새 env 3종을 live 배포에 반영</td><td><span class="who me">에이전트</span></td><td class="ok">✓ 배포</td></tr>
+      <tr><td class="id">★</td><td><code>id-token: write</code></td><td><b style="color:var(--amber)">발견·수정한 버그</b> — claude-code-action OIDC. 누락 시 setup 실패</td><td><span class="who me">에이전트 · 커밋</span></td><td class="ok">✓ 90ddf9f</td></tr>
+      <tr><td class="id">—</td><td><code>ANTHROPIC_API_KEY</code></td><td>헤드리스 에이전트 실행 (GH secret)</td><td><span class="who me">기존</span></td><td class="ok">✓ 보유</td></tr>
+    </table>
+    <div class="note" style="margin-top:14px"><b>발견한 버그 →</b> <code>oncall-triage.yml</code>만 <code>id-token: write</code>가 빠져 있어, 첫 실제 dispatch에서 PostHog→webhook→dispatch는 정상 발화했으나 triage run이 <span class="num">25초</span> 만에 <i>"Could not fetch an OIDC token"</i>으로 setup 실패. sibling 워크플로 2개와 동일 패턴으로 한 줄 보강 후 재검증에서 <span class="num">3.5분</span> 정상 실행.</div>
+  </section>
+
+  <!-- 04 TESTS -->
+  <section>
+    <div class="s-head"><span class="s-num">04</span><h2>테스트 — 4개 티어</h2></div>
+    <p class="s-desc">서버리스 레이어(결정론) → 실제 소스 발화 → 에이전트 두뇌(하네스 판정) → 헤드리스 전 과정까지 계층별로 검증.</p>
+
+    <div class="tier">
+      <div class="th"><span class="tg t1">T1</span><h4>결정론 — 서버리스 레이어(검증·멱등·dispatch)</h4></div>
+      <div class="sd">Vitest · 부작용 0 · webhook/orchestration 69 (전체 433) green</div>
+      <table class="scn">
+        <tr><th>시나리오</th><th>입력</th><th>기대</th><th>결과</th></tr>
+        <tr><td>시크릿 불일치 / 미설정</td><td class="vn">Bearer wrong</td><td>throw → 401</td><td><span class="pill pass">PASS</span></td></tr>
+        <tr><td>멱등키 — 신규 vs 재전송</td><td class="vn">id / hash 폴백</td><td>동일 본문 = 동일 키</td><td><span class="pill pass">PASS</span></td></tr>
+        <tr><td>단건+급증 dedup (추가)</td><td class="vn">issue.id + triggered_at</td><td>다른 시각=새 키, 같으면 dedup</td><td><span class="pill pass">PASS</span></td></tr>
+        <tr><td>route 흐름</td><td class="vn">401 / dup / new</td><td>mark→dispatch 순서, 중복 skip</td><td><span class="pill pass">PASS</span></td></tr>
+      </table>
+    </div>
+
+    <div class="tier">
+      <div class="th"><span class="tg t0">T0</span><h4>실제 소스 — PostHog로 진짜 에러 전송</h4></div>
+      <div class="sd">posthog-node ingest · error tracking이 새 issue로 그룹핑하는지</div>
+      <table class="scn">
+        <tr><th>probe</th><th>기대</th><th>결과</th></tr>
+        <tr><td class="vn">OncallE2eProbe</td><td>새 error tracking issue</td><td><span class="pill pass">PASS · 019ef6f7…</span></td></tr>
+        <tr><td class="vn">OncallE2eSignal_*</td><td>신규 issue → issue_created 발화</td><td><span class="pill pass">PASS · 019ef70c…</span></td></tr>
+      </table>
+    </div>
+
+    <div class="tier">
+      <div class="th"><span class="tg t3">T3</span><h4>하네스 판정 — 에이전트 두뇌 (dry-run 시나리오)</h4></div>
+      <div class="sd">픽스처 5종으로 노이즈/신호 분류 + escalation 본문 생성 검증하도록 설계</div>
+      <table class="scn">
+        <tr><th>픽스처</th><th>성격</th><th>기대 판정</th></tr>
+        <tr><td class="vn">01 claude-timeout</td><td>알려진 일시적·단발(1유저)</td><td><span class="pill noise">노이즈</span></td></tr>
+        <tr><td class="vn">02 save-rpc TypeError</td><td>신규·핵심경로·14유저</td><td><span class="pill sig">신호 · 높음</span></td></tr>
+        <tr><td class="vn">03 supabase spike</td><td>급증 0→137/min · 88유저</td><td><span class="pill sig">신호</span></td></tr>
+        <tr><td class="vn">04 csv RangeError</td><td>애매 · 3회 · 반핵심</td><td><span class="pill sig">신호 · 낮음</span></td></tr>
+        <tr><td class="vn">05 bot + injection</td><td>봇 404 + 프롬프트 인젝션</td><td><span class="pill noise">노이즈 + 인젝션 무시</span></td></tr>
+      </table>
+    </div>
+
+    <div class="tier">
+      <div class="th"><span class="tg t4">T4</span><h4>실제 헤드리스 e2e — GitHub Actions에서 진짜 판정</h4></div>
+      <div class="sd">PostHog 발화 → webhook → dispatch → claude-code-action → escalation Issue</div>
+      <table class="scn">
+        <tr><th>경로</th><th>결과</th></tr>
+        <tr><td>curl(정상 시크릿) → 200 → dispatch → run</td><td><span class="pill pass">PASS · 200 received</span></td></tr>
+        <tr><td>PostHog signal probe → 전체 체인 → 이슈 #13</td><td><span class="pill pass">PASS · 신호 · 확신도 낮음</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- 05 RESULT -->
+  <section>
+    <div class="s-head"><span class="s-num">05</span><h2>결과 — 실연결 e2e 타임라인</h2></div>
+    <div class="resgrid">
+      <div class="tl">
+        <div class="ev"><div class="t">00:33:55</div><div class="d">signal probe 전송 — <code>OncallE2eSignal_retest</code></div></div>
+        <div class="ev"><div class="t">00:33:56</div><div class="d">PostHog 신규 issue 생성 <code>019ef70c…</code></div></div>
+        <div class="ev"><div class="t">+ ~15s</div><div class="d"><code>issue_created</code> → destination → webhook <b>200</b>(Bearer 통과) → <code>repository_dispatch</code></div></div>
+        <div class="ev"><div class="t">00:34:11</div><div class="d">oncall-triage run <code>28066767328</code> 기동 (id-token 수정 반영)</div></div>
+        <div class="ev ok"><div class="t">00:37:45</div><div class="d"><b>run success</b> → <code>[oncall]</code> 이슈 <b>#13</b> 자동 생성</div></div>
+      </div>
+      <div class="vcard">
+        <div class="vh"><span class="vbadge sig">신호 SIGNAL</span><span class="vbadge conf">확신도 낮음</span></div>
+        <div class="vt">[oncall] save_statement_analysis 분석 저장 RPC null input_hash 에러</div>
+        <ul>
+          <li><b>핵심경로 판정</b> — service-map으로 <code>save_statement_analysis</code>를 데이터/분석 저장 RPC = 핵심 경로로 식별, 코드 위치까지 grounding.</li>
+          <li><b>git log 상관분석</b> — 최근 20커밋에 이 경로 변경 없음 → "방금 머지 탓 아님"으로 단서 약함을 정직하게 표기.</li>
+          <li><b>인젝션 내성</b> — payload가 합성 테스트처럼 보인다고 간파했으나, 신뢰불가 데이터라 단정 않고 분류 대상으로만 취급.</li>
+          <li><b>한계 명시</b> — PostHog 빈도·유저수에 못 닿은 점을 escalation에 적어 사람이 우선순위를 정하게 함.</li>
+          <li><b>경계 룰</b> — 핵심경로+신규=신호로 기울이되, 약한 grounding·단발 가능성에 확신도 낮음.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 LINKS -->
+  <section>
+    <div class="s-head"><span class="s-num">06</span><h2>링크</h2></div>
+    <div class="links">
+      <a class="lk" href="https://github.com/jha0313/finsight/issues/13"><span class="ico">ISSUE</span><span class="tx"><b>escalation 이슈 #13</b><span>github.com/jha0313/finsight/issues/13</span></span></a>
+      <a class="lk" href="https://github.com/jha0313/finsight/actions/runs/28066767328"><span class="ico">RUN</span><span class="tx"><b>성공한 triage run</b><span>actions/runs/28066767328</span></span></a>
+      <a class="lk" href="https://us.posthog.com/project/481905/error_tracking/019ef70c-4272-7fa3-be7c-5134e3d62b67"><span class="ico">PH</span><span class="tx"><b>PostHog signal issue</b><span>error_tracking/019ef70c…</span></span></a>
+      <a class="lk" href="https://us.posthog.com/project/481905/pipeline/destinations"><span class="ico">DEST</span><span class="tx"><b>PostHog destination</b><span>posthog · pipeline/destinations</span></span></a>
+      <a class="lk" href="https://github.com/jha0313/finsight/actions/workflows/oncall-triage.yml"><span class="ico">WF</span><span class="tx"><b>oncall-triage 워크플로</b><span>actions/workflows/oncall-triage.yml</span></span></a>
+      <a class="lk" href="https://vercel.com/jha0313s-projects/finsight/settings/environment-variables"><span class="ico">ENV</span><span class="tx"><b>Vercel 환경변수</b><span>vercel · environment-variables</span></span></a>
+    </div>
+    <div class="note" style="margin-top:18px"><b>운영 상태 →</b> destination이 <span style="color:var(--green);font-weight:600">LIVE</span>. 이제 prod의 모든 신규 에러·급증이 triage를 깨우고, 신호면 <code>[oncall]</code> 이슈가 자동 생성된다(의도한 1차 방어선 가동). 합성 테스트 잔여물(이슈 #13 · PostHog <code>OncallE2e*</code>)은 정리 대상.</div>
+  </section>
+
+  <footer>
+    FinSight · Oncall 운영 에이전트 · prod alert triage (②) · 게이트 3종 — read-only · 노이즈 필터 · escalation<br/>
+    하네스 .claude/skills/oncall/ · 셋업 docs/ONCALL_SETUP.md · 생성 2026-06-24
+  </footer>
+
+</div>
+</body>
+</html>
