@@ -226,4 +226,141 @@ describe("analyze route", () => {
 
     expect(analyzeRouteMocks.extractPdfStatement).toHaveBeenCalledTimes(1);
   });
+
+  it("returns 400 and flushes analytics for an empty upload", async () => {
+    const request = new NextRequest("https://finsight.test/api/analyze", {
+      method: "POST",
+      body: "   ",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid_upload",
+      message: "CSV 또는 PDF 명세서를 업로드해 주세요.",
+    });
+    expect(analyzeRouteMocks.runAnalyzeRequest).not.toHaveBeenCalled();
+    expect(analyzeRouteMocks.createPostHogAnalytics).toHaveBeenCalledTimes(1);
+    const analytics = analyzeRouteMocks.createPostHogAnalytics.mock.results[0]
+      .value;
+    expect(analytics.capture).toHaveBeenCalledWith({
+      distinctId: "anonymous",
+      event: "analysis_failed",
+      properties: { phase: "upload", reason: "empty_upload", status: 400 },
+    });
+    expect(analytics.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 400 and skips analysis when CSV parsing fails", async () => {
+    const request = new NextRequest("https://finsight.test/api/analyze", {
+      method: "POST",
+      body: 'date,merchant,amount\n2026-06-01,"unterminated,1000',
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid_upload",
+      message: "명세서 형식을 읽을 수 없습니다. CSV/PDF 파일을 확인해 주세요.",
+    });
+    expect(analyzeRouteMocks.runAnalyzeRequest).not.toHaveBeenCalled();
+    const analytics = analyzeRouteMocks.createPostHogAnalytics.mock.results[0]
+      .value;
+    expect(analytics.capture).toHaveBeenCalledWith({
+      distinctId: "anonymous",
+      event: "analysis_failed",
+      properties: { phase: "parse", reason: "invalid_statement", status: 400 },
+    });
+    expect(analytics.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 400 when multipart upload parsing fails", async () => {
+    const request = new NextRequest("https://finsight.test/api/analyze", {
+      method: "POST",
+      headers: {
+        "content-type": "multipart/form-data; boundary=broken-boundary",
+      },
+      body: "not a valid multipart body",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid_upload",
+      message: "업로드된 파일을 읽을 수 없습니다. CSV/PDF 파일을 다시 선택해 주세요.",
+    });
+    expect(analyzeRouteMocks.runAnalyzeRequest).not.toHaveBeenCalled();
+    const analytics = analyzeRouteMocks.createPostHogAnalytics.mock.results[0]
+      .value;
+    expect(analytics.capture).toHaveBeenCalledWith({
+      distinctId: "anonymous",
+      event: "analysis_failed",
+      properties: { phase: "upload", reason: "invalid_statement", status: 400 },
+    });
+    expect(analytics.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 503 and flushes analytics when PDF extraction fails", async () => {
+    analyzeRouteMocks.extractPdfStatement.mockRejectedValue(
+      new Error("Claude PDF extraction timed out"),
+    );
+    const formData = new FormData();
+    formData.set(
+      "file",
+      new Blob([Buffer.from("%PDF-1.7 binary")], {
+        type: "application/pdf",
+      }),
+      "statement.pdf",
+    );
+    const request = new NextRequest("https://finsight.test/api/analyze", {
+      method: "POST",
+      body: formData,
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "analysis_unavailable",
+      message: "PDF 명세서 추출이 일시적으로 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    });
+    expect(analyzeRouteMocks.runAnalyzeRequest).not.toHaveBeenCalled();
+    const analytics = analyzeRouteMocks.createPostHogAnalytics.mock.results[0]
+      .value;
+    expect(analytics.capture).toHaveBeenCalledWith({
+      distinctId: "anonymous",
+      event: "analysis_failed",
+      properties: { phase: "pdf_extraction", reason: "dependency_failure", status: 503 },
+    });
+    expect(analytics.flush).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 503 and flushes analytics when analysis dependencies fail", async () => {
+    analyzeRouteMocks.runAnalyzeRequest.mockRejectedValue(
+      new Error("Supabase RPC failed"),
+    );
+    const request = new NextRequest("https://finsight.test/api/analyze", {
+      method: "POST",
+      body: "date,merchant,amount\n2026-06-01,서점,12000",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "analysis_unavailable",
+      message: "분석 처리 중 일시적 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    });
+    const analytics = analyzeRouteMocks.createPostHogAnalytics.mock.results[0]
+      .value;
+    expect(analytics.capture).toHaveBeenCalledWith({
+      distinctId: "anonymous",
+      event: "analysis_failed",
+      properties: { phase: "analysis", reason: "dependency_failure", status: 503 },
+    });
+    expect(analytics.flush).toHaveBeenCalledTimes(1);
+  });
 });
