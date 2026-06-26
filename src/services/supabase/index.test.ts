@@ -391,6 +391,27 @@ describe("supabase adapter", () => {
     expect(supabaseMocks.maybeSingle).toHaveBeenCalledTimes(1);
   });
 
+  it("shares one in-flight tier lookup for concurrent same-user resolutions", async () => {
+    selectChain({
+      data: {
+        status: "active",
+        current_period_end: "2999-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const gateway = createSubscriptionGateway();
+    const tiers = await Promise.all([
+      gateway.resolveTier("user-1"),
+      gateway.resolveTier("user-1"),
+      gateway.resolveTier("user-1"),
+    ]);
+
+    expect(tiers).toEqual(["pro", "pro", "pro"]);
+    expect(supabaseMocks.from).toHaveBeenCalledTimes(1);
+    expect(supabaseMocks.maybeSingle).toHaveBeenCalledTimes(1);
+  });
+
   it("resolves free for missing, expired, or inactive subscriptions", async () => {
     const gateway = createSubscriptionGateway();
 
