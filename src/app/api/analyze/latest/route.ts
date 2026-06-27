@@ -8,6 +8,7 @@ import {
   createStatementRepository,
   createSubscriptionGateway,
   getCurrentUser,
+  runWithSubscriptionRequestCache,
 } from "@/services/supabase";
 
 // 저장된 마지막 명세서를 Pro(Opus)로 재분석한다(인사이트 호출 1회 + 저장 RPC).
@@ -18,16 +19,18 @@ export const maxDuration = 120;
 // 클라이언트 본문이 아니라 서버 세션 사용자의 저장된 명세서에서 가져온다.
 export async function POST(): Promise<NextResponse> {
   const analytics = createPostHogAnalytics();
-  const result = await runLatestAnalysisRequest({
-    deps: {
-      getCurrentUser,
-      subscriptionGateway: createSubscriptionGateway(),
-      aiUsage: createAiUsage(),
-      statementRepository: createStatementRepository(),
-      insightProviderFactory: createClaudeInsightProvider,
-      analytics,
-    },
-  });
+  const result = await runWithSubscriptionRequestCache(() =>
+    runLatestAnalysisRequest({
+      deps: {
+        getCurrentUser,
+        subscriptionGateway: createSubscriptionGateway(),
+        aiUsage: createAiUsage(),
+        statementRepository: createStatementRepository(),
+        insightProviderFactory: createClaudeInsightProvider,
+        analytics,
+      },
+    }),
+  );
 
   // serverless(Vercel 람다) freeze 전에 emit된 서버 이벤트 전송을 보장한다.
   await analytics.flush();

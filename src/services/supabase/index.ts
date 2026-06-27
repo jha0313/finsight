@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { createServerClient } from "@supabase/ssr";
 import type { CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -290,6 +292,16 @@ export const FREE_SUMMARY: SubscriptionSummary = {
   polarSubscriptionId: null,
 };
 
+const subscriptionRequestCache = new AsyncLocalStorage<
+  Map<string, Promise<SubscriptionSummary>>
+>();
+
+export async function runWithSubscriptionRequestCache<T>(
+  callback: () => Promise<T>,
+): Promise<T> {
+  return subscriptionRequestCache.run(new Map(), callback);
+}
+
 export async function getSubscriptionSummary(
   userId: string,
 ): Promise<SubscriptionSummary> {
@@ -402,15 +414,16 @@ export function createStatementRepository(): StatementRepository {
 }
 
 export function createSubscriptionGateway(): SubscriptionGateway {
-  const requestCache = new Map<string, Promise<SubscriptionSummary>>();
+  const gatewayCache = new Map<string, Promise<SubscriptionSummary>>();
 
   return {
     async resolveTier(userId) {
-      let summary = requestCache.get(userId);
+      const cache = subscriptionRequestCache.getStore() ?? gatewayCache;
+      let summary = cache.get(userId);
 
       if (summary === undefined) {
         summary = getSubscriptionSummary(userId);
-        requestCache.set(userId, summary);
+        cache.set(userId, summary);
       }
 
       const { tier } = await summary;

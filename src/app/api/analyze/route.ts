@@ -13,6 +13,7 @@ import {
   createStatementRepository,
   createSubscriptionGateway,
   getCurrentUser,
+  runWithSubscriptionRequestCache,
 } from "@/services/supabase";
 import type { ParsedStatement } from "@/types/csv";
 import type { AnalyticsPort } from "@/types/ports";
@@ -72,17 +73,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const upload = await readUpload(request);
     const statement = await toStatement(upload);
-    const result = await runAnalyzeRequest({
-      statement,
-      deps: {
-        getCurrentUser,
-        subscriptionGateway: createSubscriptionGateway(),
-        aiUsage: createAiUsage(),
-        statementRepository: createStatementRepository(),
-        insightProviderFactory: createClaudeInsightProvider,
-        analytics,
-      },
-    });
+    const result = await runWithSubscriptionRequestCache(() =>
+      runAnalyzeRequest({
+        statement,
+        deps: {
+          getCurrentUser,
+          subscriptionGateway: createSubscriptionGateway(),
+          aiUsage: createAiUsage(),
+          statementRepository: createStatementRepository(),
+          insightProviderFactory: createClaudeInsightProvider,
+          analytics,
+        },
+      }),
+    );
 
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
