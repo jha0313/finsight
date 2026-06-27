@@ -11,6 +11,7 @@ import {
   createSubscriptionGateway,
   exchangeAuthCodeForSession,
   getCurrentUser,
+  runWithSubscriptionRequestCache,
   getSubscriptionSummary,
   isSupabaseConfigured,
   resolveAuthCallbackRedirect,
@@ -408,6 +409,27 @@ describe("supabase adapter", () => {
     ]);
 
     expect(tiers).toEqual(["pro", "pro", "pro"]);
+    expect(supabaseMocks.from).toHaveBeenCalledTimes(1);
+    expect(supabaseMocks.maybeSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one tier lookup across gateway instances in the same request", async () => {
+    selectChain({
+      data: {
+        status: "active",
+        current_period_end: "2999-01-01T00:00:00.000Z",
+      },
+      error: null,
+    });
+
+    const tiers = await runWithSubscriptionRequestCache(() =>
+      Promise.all([
+        createSubscriptionGateway().resolveTier("user-1"),
+        createSubscriptionGateway().resolveTier("user-1"),
+      ]),
+    );
+
+    expect(tiers).toEqual(["pro", "pro"]);
     expect(supabaseMocks.from).toHaveBeenCalledTimes(1);
     expect(supabaseMocks.maybeSingle).toHaveBeenCalledTimes(1);
   });

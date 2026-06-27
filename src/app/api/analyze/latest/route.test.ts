@@ -15,6 +15,7 @@ const latestRouteMocks = vi.hoisted(() => {
     createAiUsage: vi.fn(),
     createStatementRepository: vi.fn(),
     createClaudeInsightProvider: vi.fn(),
+    runWithSubscriptionRequestCache: vi.fn((callback) => callback()),
     createPostHogAnalytics: vi.fn(() => analytics),
     analytics,
   };
@@ -37,6 +38,8 @@ vi.mock("@/services/supabase", () => ({
   createSubscriptionGateway: latestRouteMocks.createSubscriptionGateway,
   createAiUsage: latestRouteMocks.createAiUsage,
   createStatementRepository: latestRouteMocks.createStatementRepository,
+  runWithSubscriptionRequestCache:
+    latestRouteMocks.runWithSubscriptionRequestCache,
 }));
 
 describe("analyze latest route", () => {

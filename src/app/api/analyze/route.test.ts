@@ -11,6 +11,7 @@ const analyzeRouteMocks = vi.hoisted(() => {
   const createSubscriptionGateway = vi.fn();
   const getCurrentUser = vi.fn();
   const runAnalyzeRequest = vi.fn();
+  const runWithSubscriptionRequestCache = vi.fn((callback) => callback());
   const extractPdfStatement = vi.fn();
   const extractPdfText = vi.fn();
   const analytics = {
@@ -27,6 +28,7 @@ const analyzeRouteMocks = vi.hoisted(() => {
     createSubscriptionGateway,
     getCurrentUser,
     runAnalyzeRequest,
+    runWithSubscriptionRequestCache,
     extractPdfStatement,
     extractPdfText,
     createPostHogAnalytics,
@@ -52,6 +54,8 @@ vi.mock("@/services/supabase", () => ({
   createStatementRepository: analyzeRouteMocks.createStatementRepository,
   createSubscriptionGateway: analyzeRouteMocks.createSubscriptionGateway,
   getCurrentUser: analyzeRouteMocks.getCurrentUser,
+  runWithSubscriptionRequestCache:
+    analyzeRouteMocks.runWithSubscriptionRequestCache,
 }));
 
 vi.mock("@/services/posthog/analytics", () => ({
